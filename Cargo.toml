@@ -14,8 +14,8 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter", "default"] 
 async-trait = "0.1.88"
 figment = { version = "0.10.19", features = ["env", 'toml', 'serde_json'] }
 dotenvy = "0.15.7"
-uuid = { version = "1.17.0", features = ["v7", "v4", "zerocopy"] }
-tower = "0.4"
+uuid = { version = "1.17.0", features = ["v7", "zerocopy"] }
+tower = "0.5.2"
 rand = { version = "0.9" }
 tower-http = { version = "0.6.6", features = ["trace"] }
 utoipa = { version = "5", features = ["axum_extras", "debug", 'indexmap'] }
@@ -34,3 +34,7 @@ hmac = "0.12"
 hex = "0.4"
 time = { version = "0.3", features = ["macros"] }
 percent-encoding = "2.3"
+nject = "0.4"
+quick-xml = { version = "0.37.5", features = ["serialize"] }
+bincode = "2.0.1"
+chrono = "0.4.41"

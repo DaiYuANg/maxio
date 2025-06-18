@@ -7,6 +7,7 @@ mod s3;
 mod state;
 mod max;
 mod bucket;
+mod metadata;
 
 #[tokio::main]
 async fn main() {
