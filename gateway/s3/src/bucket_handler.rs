@@ -1,4 +1,3 @@
-use crate::metadata::insert_bucket;
 use axum::{
     body::Body,
     extract::Path,
@@ -6,7 +5,6 @@ use axum::{
     response::Response,
     Json,
 };
-use redb::Database;
 use std::collections::HashMap;
 use tracing::debug;
 
@@ -48,8 +46,6 @@ pub async fn list_buckets() -> Response {
 )]
 pub async fn create_bucket(Path(bucket): Path<String>) -> StatusCode {
   debug!("Create bucket: {}", bucket);
-  let db = Database::create("my_db.redb").unwrap();
-  insert_bucket(&db).unwrap();
   StatusCode::NO_CONTENT // 204
 }
 

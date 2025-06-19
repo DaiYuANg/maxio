@@ -5,7 +5,6 @@ use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 use tracing::debug;
 use utoipa::ToSchema;
-use crate::s3::openapi::S3_TAG;
 use crate::state::AppState;
 
 pub const OBJECT_TAG: &str = "object";

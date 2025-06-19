@@ -1,0 +1,28 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { workspace = true, features = ["net", "default", 'rt', 'rt-multi-thread', 'macros', "time"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tracing = { workspace = true, features = ["default"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "default"] }
+async-trait = "0.1.88"
+figment = { workspace = true, features = ["env", 'toml', 'serde_json'] }
+dotenvy = { workspace = true }
+uuid = { version = "1.17.0", features = ["v7", "zerocopy"] }
+rand = { version = "0.9" }
+base64 = "0.22.1"
+sha2 = "0.10.9"
+redb = "2.6.0"
+bytes = "1.6"
+anyhow = { workspace = true }
+rmp-serde = "1.1"
+xdg = "3.0.0"
+percent-encoding = "2.3"
+nject = { workspace = true }
+quick-xml = { version = "0.37.5", features = ["serialize"] }
+bincode = "2.0.1"
+chrono = "0.4.41"

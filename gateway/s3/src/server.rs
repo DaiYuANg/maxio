@@ -1,10 +1,3 @@
-use crate::s3::bucket_handler::{
-    create_bucket, delete_bucket, get_bucket_acl, get_bucket_cors, get_bucket_location,
-    get_bucket_policy, list_buckets, put_bucket_acl, put_bucket_cors, put_bucket_policy,
-};
-use crate::s3::object_handler::{delete_object, get_object, head_object, list_objects, put_object};
-use crate::s3::openapi::ApiDoc;
-use crate::state::AppState;
 use axum::routing::{delete, get, head, put};
 use axum::Router;
 use axum_prometheus::PrometheusMetricLayer;
@@ -12,6 +5,10 @@ use tower_http::trace::TraceLayer;
 use tracing::debug;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use crate::bucket_handler::{create_bucket, delete_bucket, list_buckets};
+use crate::object_handler::{delete_object, get_object, head_object, list_objects, put_object};
+use crate::openapi::ApiDoc;
+use crate::state::AppState;
 
 pub struct S3Server {
   router: Router,

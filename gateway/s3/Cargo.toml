@@ -1,0 +1,30 @@
+[package]
+name = "s3"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.8" }
+axum-extra = { version = "0.10.0" }
+figment = { workspace = true, features = ["env", 'toml', 'serde_json'] }
+dotenvy = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tower-http = { version = "0.6.6", features = ["trace"] }
+utoipa = { version = "5", features = ["axum_extras", "debug", 'indexmap'] }
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
+utoipa-axum = { version = "0.2", features = ["debug"] }
+metrics-exporter-prometheus = "0.17"
+axum-prometheus = "0.8"
+tower = "0.5.2"
+tracing = { workspace = true, features = ["default"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "default"] }
+hmac = "0.12"
+hex = "0.4"
+time = { version = "0.3", features = ["macros"] }
+bytes = "1.6"
+percent-encoding = "2.3"
+serde_json = "1.0"
+sha2 = "0.10.9"
+serde = { version = "1.0.219", features = ["derive"] }
+nject = { workspace = true }
+anyhow = { workspace = true }
