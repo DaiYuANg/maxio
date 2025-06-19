@@ -8,6 +8,8 @@ mod state;
 mod max;
 mod bucket;
 mod metadata;
+mod config;
+mod writer;
 
 #[tokio::main]
 async fn main() {
