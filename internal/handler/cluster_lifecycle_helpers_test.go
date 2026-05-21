@@ -22,6 +22,9 @@ import (
 type lifecycleRaft struct {
 	membership  raftx.Membership
 	leaderErr   error
+	addErr      error
+	removeErr   error
+	syncErr     error
 	addCalls    int
 	removeCalls int
 	syncCalls   int
@@ -39,6 +42,9 @@ func newLifecycleRaft(nodes map[uint64]string) *lifecycleRaft {
 
 func (raft *lifecycleRaft) AddReplica(_ context.Context, replicaID uint64, target string) error {
 	raft.addCalls++
+	if raft.addErr != nil {
+		return raft.addErr
+	}
 	if raft.membership.Nodes == nil {
 		raft.membership.Nodes = map[uint64]string{}
 	}
@@ -65,6 +71,9 @@ func (raft *lifecycleRaft) LocalReplicaID() uint64 {
 
 func (raft *lifecycleRaft) RemoveReplica(_ context.Context, replicaID uint64) error {
 	raft.removeCalls++
+	if raft.removeErr != nil {
+		return raft.removeErr
+	}
 	delete(raft.membership.Nodes, replicaID)
 	raft.membership.Removed = append(raft.membership.Removed, replicaID)
 	raft.membership.ConfigChangeID++
@@ -77,6 +86,9 @@ func (raft *lifecycleRaft) SyncReplicas(
 ) (raftx.SyncMembershipResult, error) {
 	raft.syncCalls++
 	before := cloneLifecycleMembership(raft.membership)
+	if raft.syncErr != nil {
+		return raftx.SyncMembershipResult{Before: before}, raft.syncErr
+	}
 	raft.membership.Nodes = maps.Clone(desired)
 	raft.membership.ConfigChangeID++
 	return raftx.SyncMembershipResult{

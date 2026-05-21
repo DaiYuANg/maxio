@@ -36,6 +36,10 @@ treated as a production-grade object storage service.
   Node registry now exposes explicit storage lifecycle state and flags drained
   storage nodes that still own object shards. Decommission conflict responses now
   include remaining object, shard, and logical byte counts.
+- Cluster lifecycle now returns structured blocked responses for Raft address
+  changes and removed replica reappearance, reports the same conditions in
+  reconcile plans and node registry issues, and treats empty member rebalance as
+  an idempotent no-op.
 - Object read errors for decoded object corruption and unrecoverable shard
   recovery failures are surfaced as explicit `503 Service Unavailable` responses.
   Read-path tests now cover unrecoverable shard corruption.

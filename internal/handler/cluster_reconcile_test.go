@@ -78,7 +78,61 @@ func TestBuildClusterReconcilePlanReportsTargetConflicts(t *testing.T) {
 	if len(plan.Conflicts) != 1 {
 		t.Fatalf("conflicts = %+v", plan.Conflicts)
 	}
+	if plan.Conflicts[0].Reason != "address_change_blocked" {
+		t.Fatalf("reason = %q, want address_change_blocked", plan.Conflicts[0].Reason)
+	}
 	if plan.Desired[2] != "127.0.0.1:63001" {
 		t.Fatalf("conflict changed desired target to %q", plan.Desired[2])
+	}
+}
+
+func TestBuildClusterReconcilePlanBlocksAddressChangeInExactMode(t *testing.T) {
+	t.Parallel()
+
+	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+		LocalReplicaID: 1,
+		Nodes: map[uint64]string{
+			1: "127.0.0.1:63000",
+			2: "127.0.0.1:63001",
+		},
+	}, []discovery.Node{
+		{ReplicaID: 2, RaftAddress: "127.0.0.1:63999", State: "alive"},
+	}, true)
+
+	if len(plan.Conflicts) != 1 {
+		t.Fatalf("conflicts = %+v", plan.Conflicts)
+	}
+	if plan.Conflicts[0].Reason != "address_change_blocked" {
+		t.Fatalf("reason = %q, want address_change_blocked", plan.Conflicts[0].Reason)
+	}
+	if plan.Desired[2] != "127.0.0.1:63001" {
+		t.Fatalf("desired replica 2 = %q, want current target", plan.Desired[2])
+	}
+}
+
+func TestBuildClusterReconcilePlanReportsRemovedReplicaReappearance(t *testing.T) {
+	t.Parallel()
+
+	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+		LocalReplicaID: 1,
+		Nodes: map[uint64]string{
+			1: "127.0.0.1:63000",
+		},
+		Removed: []uint64{2},
+	}, []discovery.Node{
+		{ReplicaID: 2, RaftAddress: "127.0.0.1:63001", State: "alive"},
+	}, false)
+
+	if len(plan.Conflicts) != 1 {
+		t.Fatalf("conflicts = %+v", plan.Conflicts)
+	}
+	if plan.Conflicts[0].Reason != "removed_replica_reappeared" {
+		t.Fatalf("reason = %q, want removed_replica_reappeared", plan.Conflicts[0].Reason)
+	}
+	if _, ok := plan.Desired[2]; ok {
+		t.Fatal("removed replica should not be added to desired membership")
+	}
+	if len(plan.Added) != 0 {
+		t.Fatalf("added = %+v, want none", plan.Added)
 	}
 }

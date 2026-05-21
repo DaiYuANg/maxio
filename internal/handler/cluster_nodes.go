@@ -32,6 +32,7 @@ type ClusterNodeInfo struct {
 	Status            string   `json:"status"`
 	Local             bool     `json:"local,omitempty"`
 	Member            bool     `json:"member"`
+	Removed           bool     `json:"removed,omitempty"`
 	Discovered        bool     `json:"discovered"`
 	StorageRegistered bool     `json:"storage_registered"`
 	StorageState      string   `json:"storage_state"`
@@ -69,8 +70,9 @@ func BuildClusterNodeRegistry(
 	discovered []discovery.Node,
 	storageNodes []engine.StorageNodeInfo,
 ) []ClusterNodeInfo {
-	nodes := make(map[string]ClusterNodeInfo, len(membership.Nodes)+len(discovered)+len(storageNodes))
+	nodes := make(map[string]ClusterNodeInfo, len(membership.Nodes)+len(membership.Removed)+len(discovered)+len(storageNodes))
 	mergeMembershipNodes(nodes, membership)
+	mergeRemovedMembershipNodes(nodes, membership)
 	mergeDiscoveryNodes(nodes, discovered)
 	mergeStorageNodes(nodes, storageNodes)
 	result := make([]ClusterNodeInfo, 0, len(nodes))
@@ -94,6 +96,23 @@ func mergeMembershipNodes(nodes map[string]ClusterNodeInfo, membership raftx.Mem
 		node.Member = true
 		node.Local = replicaID == membership.LocalReplicaID
 		node.RaftTarget = strings.TrimSpace(target)
+		nodes[key] = node
+	}
+}
+
+func mergeRemovedMembershipNodes(nodes map[string]ClusterNodeInfo, membership raftx.Membership) {
+	for _, replicaID := range membership.Removed {
+		if replicaID == 0 {
+			continue
+		}
+		if _, active := membership.Nodes[replicaID]; active {
+			continue
+		}
+		key := clusterNodeKey(replicaID, clusterStorageNodeID(replicaID))
+		node := nodes[key]
+		node.ReplicaID = replicaID
+		node.StorageNodeID = clusterStorageNodeID(replicaID)
+		node.Removed = true
 		nodes[key] = node
 	}
 }
@@ -179,6 +198,8 @@ func clusterUnknownDiscoveryStatus(node ClusterNodeInfo) string {
 		return ClusterNodeOnline
 	case node.Member:
 		return ClusterNodeOffline
+	case node.Removed:
+		return ClusterNodeOffline
 	case node.StorageRegistered:
 		return ClusterNodeStorageOnly
 	default:
@@ -192,6 +213,8 @@ func clusterNodeIssues(node ClusterNodeInfo) []string {
 	issues = appendIssueIf(issues, node.Member && !node.StorageRegistered, "storage_not_registered")
 	issues = appendIssueIf(issues, node.Discovered && !node.Member, "not_in_raft_membership")
 	issues = appendIssueIf(issues, node.StorageRegistered && !node.Member, "storage_without_raft_member")
+	issues = appendIssueIf(issues, node.Removed && node.Discovered, "removed_node_reappeared")
+	issues = appendIssueIf(issues, node.Removed && node.StorageRegistered, "removed_storage_registered")
 	issues = appendIssueIf(issues, drainedStorageHasOwnership(node), "drained_storage_has_ownership")
 	issues = appendIssueIf(issues, addressMismatch(node.RaftTarget, node.RaftAddress), "raft_address_mismatch")
 	issues = appendIssueIf(issues, addressMismatch(node.StorageAddress, node.HTTPAddress), "storage_address_mismatch")

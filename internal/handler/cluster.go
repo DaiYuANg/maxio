@@ -1,15 +1,6 @@
 package handler
 
-import (
-	"context"
-	"errors"
-	"fmt"
-	"maps"
-	"net/http"
-	"strings"
-
-	"github.com/lyonbrown4d/maxio/internal/discovery"
-)
+import "net/http"
 
 type addReplicaRequest struct {
 	ReplicaID uint64 `json:"replica_id"`
@@ -56,6 +47,10 @@ func (s *Service) handleClusterBootstrap(w http.ResponseWriter, r *http.Request)
 		})
 		return
 	}
+	if blockers := clusterMembershipChangeBlockers(membership, nodes); len(blockers) > 0 {
+		s.writeClusterMembershipBlocked(w, blockers)
+		return
+	}
 	result, err := s.raft.SyncReplicas(r.Context(), nodes)
 	if err != nil {
 		s.writeError(w, err)
@@ -68,48 +63,6 @@ func (s *Service) handleClusterBootstrap(w http.ResponseWriter, r *http.Request)
 	}
 	s.auditHTTP(r, "cluster.bootstrap", "members", len(nodes))
 	s.writeJSON(w, http.StatusOK, result)
-}
-
-func membershipStatesMatch(current, desired map[uint64]string) bool {
-	if len(current) != len(desired) {
-		return false
-	}
-	for replicaID, target := range current {
-		if desired[replicaID] != target {
-			return false
-		}
-	}
-	return true
-}
-
-func (s *Service) maybeHandleExistingReplica(
-	w http.ResponseWriter,
-	r *http.Request,
-	replicaID uint64,
-	target string,
-	nodes map[uint64]string,
-	status string,
-) bool {
-	currentTarget, exists := nodes[replicaID]
-	if !exists {
-		return false
-	}
-	if currentTarget == target {
-		if err := s.syncStorageNodes(r.Context()); err != nil {
-			s.writeError(w, err)
-			return true
-		}
-		s.writeJSON(w, http.StatusOK, map[string]any{
-			"replica_id": replicaID,
-			"target":     target,
-			"status":     status,
-		})
-		return true
-	}
-	s.writeJSON(w, http.StatusConflict, map[string]string{
-		"error": fmt.Sprintf("raft replica %d already exists with different target", replicaID),
-	})
-	return true
 }
 
 func (s *Service) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +82,9 @@ func (s *Service) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.maybeHandleExistingReplica(w, r, req.ReplicaID, req.Target, membership.Nodes, "already_joined") {
+		return
+	}
+	if s.maybeHandleRemovedReplica(w, req.ReplicaID, req.Target, membership) {
 		return
 	}
 	err = s.raft.AddReplica(r.Context(), req.ReplicaID, req.Target)
@@ -172,6 +128,9 @@ func (s *Service) handleAddClusterMember(w http.ResponseWriter, r *http.Request)
 	if s.maybeHandleExistingReplica(w, r, req.ReplicaID, req.Target, membership.Nodes, "already_added") {
 		return
 	}
+	if s.maybeHandleRemovedReplica(w, req.ReplicaID, req.Target, membership) {
+		return
+	}
 	err = s.raft.AddReplica(r.Context(), req.ReplicaID, req.Target)
 	if err != nil {
 		s.writeError(w, err)
@@ -194,6 +153,15 @@ func (s *Service) handleSyncClusterMembers(w http.ResponseWriter, r *http.Reques
 	nodes, err := decodeClusterNodeMap(r)
 	if err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	membership, err := s.raft.GetMembership(r.Context())
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+	if blockers := clusterMembershipChangeBlockers(membership, nodes); len(blockers) > 0 {
+		s.writeClusterMembershipBlocked(w, blockers)
 		return
 	}
 	result, err := s.raft.SyncReplicas(r.Context(), nodes)
@@ -252,46 +220,4 @@ func (s *Service) handleClusterMember(w http.ResponseWriter, r *http.Request, re
 	}
 	s.auditHTTP(r, "cluster.member.delete", "replica_id", id)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Service) syncStorageNodes(ctx context.Context) error {
-	if s == nil || s.engine == nil || s.raft == nil {
-		return nil
-	}
-
-	membership, err := s.raft.GetMembership(ctx)
-	if err != nil {
-		return fmt.Errorf("get raft membership: %w", err)
-	}
-	localReplicaID := s.raft.LocalReplicaID()
-	if localReplicaID == 0 {
-		return errors.New("local raft replica id is missing")
-	}
-	s.engine.SetControlToken(s.storageNodeToken())
-	storageNodes := s.storageNodesFromMembership(membership.Nodes)
-	if err := s.engine.SyncStorageNodesFromRaft(localReplicaID, storageNodes); err != nil {
-		return fmt.Errorf("sync engine storage nodes: %w", err)
-	}
-	return nil
-}
-
-func (s *Service) storageNodesFromMembership(raftNodes map[uint64]string) map[uint64]string {
-	storageNodes := make(map[uint64]string, len(raftNodes))
-	maps.Copy(storageNodes, raftNodes)
-	for _, node := range s.discoveryNodes() {
-		if node.ReplicaID == 0 || strings.TrimSpace(node.HTTPAddress) == "" {
-			continue
-		}
-		if _, ok := storageNodes[node.ReplicaID]; ok {
-			storageNodes[node.ReplicaID] = strings.TrimSpace(node.HTTPAddress)
-		}
-	}
-	return storageNodes
-}
-
-func (s *Service) discoveryNodes() []discovery.Node {
-	if s == nil || s.discovery == nil {
-		return nil
-	}
-	return s.discovery.Nodes()
 }

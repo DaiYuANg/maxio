@@ -95,9 +95,15 @@ func TestClusterJoinRejectsExistingReplicaTargetChange(t *testing.T) {
 	if raft.addCalls != 0 {
 		t.Fatalf("add calls = %d, want 0", raft.addCalls)
 	}
-	response := decodeLifecycleJSON[map[string]string](t, recorder)
-	if !strings.Contains(response["error"], "already exists with different target") {
-		t.Fatalf("error = %q, want target conflict", response["error"])
+	response := decodeLifecycleJSON[clusterMembershipBlockedResponse](t, recorder)
+	if response.Status != clusterMembershipStatusBlocked {
+		t.Fatalf("status = %q, want blocked", response.Status)
+	}
+	if response.Reason != clusterMembershipReasonAddressChangeBlocked {
+		t.Fatalf("reason = %q, want address change blocked", response.Reason)
+	}
+	if !strings.Contains(response.Error, "already exists with different target") {
+		t.Fatalf("error = %q, want target conflict", response.Error)
 	}
 }
 

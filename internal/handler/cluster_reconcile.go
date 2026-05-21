@@ -48,6 +48,7 @@ type clusterReconcilePlan struct {
 
 type clusterDiscoveryConflict struct {
 	ReplicaID  uint64 `json:"replica_id"`
+	Reason     string `json:"reason"`
 	Current    string `json:"current"`
 	Discovered string `json:"discovered"`
 }
@@ -174,7 +175,7 @@ func BuildClusterReconcilePlan(
 	removeMissing bool,
 ) clusterReconcilePlan {
 	desired := desiredMembersBase(membership, removeMissing)
-	conflicts := mergeDiscoveredMembers(desired, discovered)
+	conflicts := mergeDiscoveredMembers(desired, membership.Nodes, removedReplicaSet(membership.Removed), discovered)
 	if removeMissing {
 		keepLocalMember(membership, desired)
 	}
@@ -193,30 +194,6 @@ func desiredMembersBase(membership raftx.Membership, removeMissing bool) map[uin
 		return make(map[uint64]string)
 	}
 	return maps.Clone(membership.Nodes)
-}
-
-func mergeDiscoveredMembers(desired map[uint64]string, nodes []discovery.Node) []clusterDiscoveryConflict {
-	conflicts := make([]clusterDiscoveryConflict, 0)
-	for index := range nodes {
-		node := nodes[index]
-		if !usableDiscoveredNode(node) {
-			continue
-		}
-		target := strings.TrimSpace(node.RaftAddress)
-		if existing, ok := desired[node.ReplicaID]; ok && existing != target {
-			conflicts = append(conflicts, clusterDiscoveryConflict{
-				ReplicaID:  node.ReplicaID,
-				Current:    existing,
-				Discovered: target,
-			})
-			continue
-		}
-		desired[node.ReplicaID] = target
-	}
-	slices.SortFunc(conflicts, func(left, right clusterDiscoveryConflict) int {
-		return cmp.Compare(left.ReplicaID, right.ReplicaID)
-	})
-	return conflicts
 }
 
 func usableDiscoveredNode(node discovery.Node) bool {

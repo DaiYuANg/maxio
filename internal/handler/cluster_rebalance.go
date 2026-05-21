@@ -25,6 +25,7 @@ type rebalanceResponse struct {
 	Objects   int    `json:"objects"`
 	Shards    int    `json:"shards"`
 	UsedBytes int64  `json:"used_bytes"`
+	Status    string `json:"status"`
 }
 
 var errClusterRebalanceMemberNotFound = errors.New("cluster rebalance member not found")
@@ -50,6 +51,7 @@ func (s *Service) handleClusterRebalance(w http.ResponseWriter, r *http.Request)
 		"objects", result.Objects,
 		"shards", result.Shards,
 		"used_bytes", result.UsedBytes,
+		"status", result.Status,
 	)
 	s.writeJSON(w, http.StatusAccepted, result)
 }
@@ -92,17 +94,26 @@ func (s *Service) rebalanceClusterMember(ctx context.Context, replicaID uint64) 
 	if err != nil {
 		return rebalanceResponse{}, err
 	}
+	response := rebalanceResponse{
+		ReplicaID: replicaID,
+		NodeID:    nodeID,
+		Objects:   stats.objects,
+		Shards:    stats.shards,
+		UsedBytes: stats.usedBytes,
+	}
+	if !stats.hasPlacements() {
+		response.Status = "already_balanced"
+		return response, nil
+	}
 	result, err := s.objects.RebalanceNode(ctx, nodeID)
 	if err != nil {
 		return rebalanceResponse{}, fmt.Errorf("rebalance cluster member: %w", err)
 	}
-	return rebalanceResponse{
-		ReplicaID: replicaID,
-		NodeID:    result.NodeID,
-		Objects:   result.Objects,
-		Shards:    result.Shards,
-		UsedBytes: stats.usedBytes,
-	}, nil
+	response.NodeID = result.NodeID
+	response.Objects = result.Objects
+	response.Shards = result.Shards
+	response.Status = "rebalanced"
+	return response, nil
 }
 
 func parseRequiredReplicaID(r *http.Request) (uint64, error) {

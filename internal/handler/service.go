@@ -82,16 +82,13 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	route := strings.Trim(path.Clean(r.URL.Path), "/")
 	parts := strings.Split(route, "/")
-	if s.requiresClusterAuth(parts) && !s.authorizeCluster(r) {
-		s.writeClusterUnauthorized(w)
+	if !s.authorizeControlHTTPRequest(w, r, route, parts) {
 		return
 	}
-	if s.requiresAdminAuth(route, parts) && !s.authorizeAdmin(r) {
-		s.writeUnauthorized(w)
+	if s.handleS3Route(w, r) {
 		return
 	}
-	if s.requiresAPIAuth(route, parts) && !s.authorizeAPI(r) {
-		s.writeUnauthorized(w)
+	if !s.authorizeNativeObjectHTTPRequest(w, r, route, parts) {
 		return
 	}
 

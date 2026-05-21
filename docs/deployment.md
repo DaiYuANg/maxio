@@ -164,6 +164,8 @@ Set `api_token` or `MAXIO_API_TOKEN` to protect bucket and object APIs.
 Set `s3_access_key`, `s3_secret_key`, and `s3_region` to require SigV4 header or presigned URL authentication for S3-compatible APIs.
 Set `http_body_limit` to control the maximum request body accepted by the Fiber HTTP adapter. The default is `1073741824` bytes so standard S3 multipart upload parts work out of the box.
 
+Native HTTP authorization is split by route class. Control-plane routes require the admin token when `admin_token` is set. Internal shard routes require the cluster token when `cluster_token` is set. Native bucket and object routes require object authorization when `api_token` is set; the API token grants object read/write access, and the admin token is accepted as an object superuser. The API token does not authorize control-plane routes.
+
 Admin requests can use either header:
 
 ```sh
@@ -194,9 +196,11 @@ Authorization: Bearer <api-token>
 X-Maxio-API: <api-token>
 ```
 
-The admin token is also accepted for bucket and object routes.
+The admin token is also accepted for native bucket and object routes.
 
 If both S3 key fields are empty, S3-compatible APIs run without authentication for local development. If either S3 key field is configured, both must be configured and S3 clients must send `Authorization: AWS4-HMAC-SHA256 ...` plus `X-Amz-Date`, or use standard presigned URL query parameters.
+
+S3-compatible routes use SigV4 authentication instead of `api_token`. If both native API token auth and S3 auth are enabled, native bucket/object paths use `api_token` or `admin_token`, while `/s3` paths use `s3_access_key` and `s3_secret_key`.
 
 S3 multipart upload is supported through the compatibility path. In-progress upload state is staged under `data_dir/s3-multipart` and completed objects are committed through the normal MaxIO object write path.
 
@@ -214,14 +218,26 @@ Example topology:
 client -> TLS proxy or ingress -> MaxIO HTTP address
 ```
 
-Forward these headers unchanged when admin or API tokens are used:
+Production deployments should treat the MaxIO HTTP listener as a private upstream, not as the public TLS endpoint. The supported production pattern is:
+
+```text
+client HTTPS -> reverse proxy / ingress / load balancer -> private MaxIO HTTP
+```
+
+The TLS terminator is responsible for certificate provisioning, renewal, cipher policy, HTTP to HTTPS redirects, HSTS, and any public mTLS policy. MaxIO currently does not terminate TLS itself and does not reload TLS certificates.
+
+Forward these headers unchanged when admin, API, cluster, or S3 credentials are used:
 
 ```text
 Authorization
 X-Maxio-Control
 X-Maxio-Cluster
 X-Maxio-API
+X-Amz-Date
+X-Amz-Content-Sha256
 ```
+
+For SigV4 requests, preserve the request path, query string, and `Host` semantics used by the client when it signs the request. If the proxy rewrites `Host`, configure clients to sign the externally visible host and make the proxy forward that host consistently.
 
 The internal shard API `/_internal/storage/shards/*` must only be reachable by trusted MaxIO nodes or by a private service network. If `cluster_token` is configured, MaxIO remote shard transport automatically sends `X-Maxio-Cluster`. If `cluster_token` is empty, the transport falls back to `admin_token` for development and compatibility.
 

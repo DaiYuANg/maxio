@@ -94,6 +94,33 @@ func TestBuildClusterNodeRegistryReportsDrainingStorageNode(t *testing.T) {
 	}
 }
 
+func TestBuildClusterNodeRegistryReportsRemovedNodeReappearance(t *testing.T) {
+	t.Parallel()
+
+	nodes := handler.BuildClusterNodeRegistry(raftx.Membership{
+		LocalReplicaID: 1,
+		Nodes: map[uint64]string{
+			1: "127.0.0.1:63000",
+		},
+		Removed: []uint64{2},
+	}, []discovery.Node{
+		{ReplicaID: 2, State: "alive", RaftAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
+	}, []engine.StorageNodeInfo{
+		{ID: "raft-2", Address: "127.0.0.1:8081"},
+	})
+
+	assertClusterNode(t, nodes[1], 2, handler.ClusterNodeDiscovered)
+	if !nodes[1].Removed {
+		t.Fatalf("removed = false, want true: %+v", nodes[1])
+	}
+	if !slices.Contains(nodes[1].Issues, "removed_node_reappeared") {
+		t.Fatalf("node issues = %+v, want removed_node_reappeared", nodes[1].Issues)
+	}
+	if !slices.Contains(nodes[1].Issues, "removed_storage_registered") {
+		t.Fatalf("node issues = %+v, want removed_storage_registered", nodes[1].Issues)
+	}
+}
+
 func assertClusterNode(t *testing.T, node handler.ClusterNodeInfo, replicaID uint64, status string) {
 	t.Helper()
 	if node.ReplicaID != replicaID {

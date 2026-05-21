@@ -11,6 +11,9 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/handler"
+	"github.com/lyonbrown4d/maxio/internal/metadata"
+	"github.com/lyonbrown4d/maxio/internal/store"
+	"github.com/lyonbrown4d/maxio/object"
 	"github.com/spf13/afero"
 )
 
@@ -52,6 +55,13 @@ func TestAdminAuthDoesNotProtectHealth(t *testing.T) {
 	}
 }
 
+func TestAdminAuthProtectsRecoveryRoutes(t *testing.T) {
+	recorder := serveHandlerGet(t, config.Config{AdminToken: "secret"}, "/_recovery/status", nil)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+}
+
 func TestRequestIDGenerated(t *testing.T) {
 	recorder := serveHandlerGet(t, config.Config{}, "/healthz", nil)
 	if recorder.Header().Get("X-Request-ID") == "" {
@@ -78,6 +88,39 @@ func TestAPIAuthDoesNotProtectReadiness(t *testing.T) {
 	recorder := serveHandlerGet(t, config.Config{APIToken: "api-secret"}, "/readyz", nil)
 	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestAPITokenDoesNotAuthorizeAdminRoutes(t *testing.T) {
+	headers := map[string]string{"X-Maxio-API": "api-secret"}
+	cfg := config.Config{AdminToken: "admin-secret", APIToken: "api-secret"}
+	recorder := serveHandlerGet(t, cfg, "/metrics", headers)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestObjectAuthAcceptsAPIHeaderForBucketMutation(t *testing.T) {
+	headers := map[string]string{"X-Maxio-API": "api-secret"}
+	recorder := serveObjectRequest(
+		t,
+		config.Config{APIToken: "api-secret"},
+		http.MethodPut,
+		"/photos",
+		headers,
+		nil,
+	)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), http.StatusCreated)
+	}
+}
+
+func TestObjectAuthAcceptsAdminTokenForBucketMutation(t *testing.T) {
+	headers := map[string]string{"X-Maxio-Control": "admin-secret"}
+	cfg := config.Config{AdminToken: "admin-secret", APIToken: "api-secret"}
+	recorder := serveObjectRequest(t, cfg, http.MethodPut, "/admin-photos", headers, nil)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), http.StatusCreated)
 	}
 }
 
@@ -134,6 +177,50 @@ func serveHandlerGet(
 	service.RegisterHTTP(router)
 
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, http.NoBody)
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func serveObjectRequest(
+	t *testing.T,
+	cfg config.Config,
+	method string,
+	target string,
+	headers map[string]string,
+	body []byte,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	return serveRouterRequest(newObjectRouter(t, cfg, slog.New(slog.DiscardHandler)), method, target, headers, body)
+}
+
+func newObjectRouter(t *testing.T, cfg config.Config, logger *slog.Logger) http.Handler {
+	t.Helper()
+
+	storage, err := store.NewStore(t.TempDir(), metadata.NewInMemoryMetadata(), nil)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	objects := object.NewService(storage, nil, nil, slog.New(slog.DiscardHandler), config.Config{})
+	deps := handler.NewDependencies(objects, nil, nil, nil, nil, nil)
+	service := handler.NewService(deps, logger, cfg)
+	router := http.NewServeMux()
+	service.RegisterHTTP(router)
+	return router
+}
+
+func serveRouterRequest(
+	router http.Handler,
+	method string,
+	target string,
+	headers map[string]string,
+	body []byte,
+) *httptest.ResponseRecorder {
+	request := httptest.NewRequestWithContext(context.Background(), method, target, bytes.NewReader(body))
 	for key, value := range headers {
 		request.Header.Set(key, value)
 	}
