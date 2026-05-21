@@ -1,0 +1,13 @@
+FROM gcr.io/distroless/static-debian12:nonroot
+
+ARG TARGETPLATFORM
+
+WORKDIR /app
+
+COPY $TARGETPLATFORM/maxio /app/maxio
+COPY config.example.json /app/config.json
+
+VOLUME ["/app/data"]
+EXPOSE 8080 63000 7946
+
+ENTRYPOINT ["/app/maxio"]

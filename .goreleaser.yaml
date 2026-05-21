@@ -1,0 +1,139 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: maxio
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: maxio
+    main: ./cmd/maxio
+    binary: maxio
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+  - id: maxio-s3bench
+    main: ./cmd/maxio-s3bench
+    binary: maxio-s3bench
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+upx:
+  - enabled: true
+    ids:
+      - maxio
+      - maxio-s3bench
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    compress: best
+    lzma: true
+
+archives:
+  - id: maxio-archives
+    ids:
+      - maxio
+      - maxio-s3bench
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - config.example.json
+      - deploy/systemd/maxio.env.example
+      - deploy/systemd/maxio.service
+      - docs/deployment.md
+      - docs/smoke-tests.md
+
+nfpms:
+  - id: maxio-linux-packages
+    package_name: maxio
+    ids:
+      - maxio
+      - maxio-s3bench
+    vendor: lyonbrown4d
+    homepage: https://github.com/lyonbrown4d/maxio
+    maintainer: lyonbrown4d
+    description: MaxIO object storage service
+    license: UNLICENSED
+    bindir: /usr/local/bin
+    formats:
+      - deb
+      - rpm
+      - apk
+    contents:
+      - src: config.example.json
+        dst: /etc/maxio/config.json
+        type: config|noreplace
+      - src: deploy/systemd/maxio.env.example
+        dst: /etc/maxio/maxio.env
+        type: config|noreplace
+      - src: deploy/systemd/maxio.service
+        dst: /lib/systemd/system/maxio.service
+        type: config
+
+dockers_v2:
+  - id: maxio
+    dockerfile: Dockerfile.goreleaser
+    ids:
+      - maxio
+    images:
+      - ghcr.io/lyonbrown4d/maxio
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - "{{ .Major }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    extra_files:
+      - config.example.json
+    labels:
+      org.opencontainers.image.title: MaxIO
+      org.opencontainers.image.description: MaxIO object storage service
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/maxio
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+
+release:
+  prerelease: auto

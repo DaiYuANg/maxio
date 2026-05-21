@@ -103,6 +103,12 @@ treated as a production-grade object storage service.
   range XML errors, stable ETags, list ETags, and a documented supported subset.
 - Operational delivery now documents data layout, backup, restore, and upgrade
   procedures alongside the deployment guide.
+- CI now runs GitHub Actions checks for Go tests, golangci-lint, package
+  builds, release binary builds, and Docker image build validation on pushes and
+  pull requests targeting `main`.
+- Release automation now uses GoReleaser on SemVer tags to publish multi-OS
+  archives, Linux `deb`/`rpm`/`apk` packages, checksums, and GHCR Docker images
+  built from UPX-compressed Linux binaries.
 - HTTP responses now include a generated or client-supplied request ID, and
   audit logs include the same request_id for request-to-log correlation.
 - Basic S3-compatible HTTP endpoints exist, but S3 compatibility is not yet a

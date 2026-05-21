@@ -41,6 +41,11 @@ Build the local image:
 docker build -t maxio:dev .
 ```
 
+The Dockerfile builds a static Linux binary and compresses it with UPX before
+copying it into the runtime image. Release images are built by GoReleaser from
+the same UPX-compressed Linux artifacts and published to GHCR when a SemVer tag
+such as `v0.1.0` is pushed.
+
 Run a single-node development container with a persistent data volume:
 
 ```sh
