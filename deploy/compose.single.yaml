@@ -16,6 +16,7 @@ services:
       MAXIO_RAFT_JOIN: "false"
       MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
+      MAXIO_CLUSTER_TOKEN: "${MAXIO_CLUSTER_TOKEN:-dev-cluster-token}"
     ports:
       - "8080:8080"
       - "63000:63000"

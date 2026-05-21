@@ -92,6 +92,13 @@ treated as a production-grade object storage service.
 - P0 test coverage now verifies object updated/deleted events are published
   only after successful committed object mutations, failed put/delete operations
   do not publish events, and overwrite events match the final committed object.
+- P0 security now separates node-to-node shard transport from admin access with
+  `cluster_token` / `MAXIO_CLUSTER_TOKEN`, and remote shard calls send
+  `X-Maxio-Cluster` by default.
+- S3 compatibility coverage now includes presigned reads, range reads, invalid
+  range XML errors, stable ETags, list ETags, and a documented supported subset.
+- Operational delivery now documents data layout, backup, restore, and upgrade
+  procedures alongside the deployment guide.
 - HTTP responses now include a generated or client-supplied request ID, and
   audit logs include the same request_id for request-to-log correlation.
 - Basic S3-compatible HTTP endpoints exist, but S3 compatibility is not yet a

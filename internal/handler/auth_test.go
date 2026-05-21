@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"net/http"
@@ -8,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/lyonbrown4d/maxio/internal/config"
+	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/handler"
+	"github.com/spf13/afero"
 )
 
 func TestAdminAuthDisabledByDefault(t *testing.T) {
@@ -78,6 +81,46 @@ func TestAPIAuthDoesNotProtectReadiness(t *testing.T) {
 	}
 }
 
+func TestClusterAuthRejectsStorageShardRouteWithoutToken(t *testing.T) {
+	recorder := serveStorageShardPut(t, config.Config{ClusterToken: "cluster-secret"}, nil)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestClusterAuthAcceptsStorageShardHeader(t *testing.T) {
+	headers := map[string]string{"X-Maxio-Cluster": "cluster-secret"}
+	recorder := serveStorageShardPut(t, config.Config{ClusterToken: "cluster-secret"}, headers)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+func TestClusterAuthAcceptsStorageShardBearerToken(t *testing.T) {
+	headers := map[string]string{"Authorization": "Bearer cluster-secret"}
+	recorder := serveStorageShardPut(t, config.Config{ClusterToken: "cluster-secret"}, headers)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+func TestClusterAuthRejectsStorageShardRouteWithWrongToken(t *testing.T) {
+	headers := map[string]string{"X-Maxio-Cluster": "wrong-secret"}
+	recorder := serveStorageShardPut(t, config.Config{ClusterToken: "cluster-secret"}, headers)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestClusterAuthDoesNotAcceptAdminTokenForStorageShardRoute(t *testing.T) {
+	headers := map[string]string{"X-Maxio-Control": "admin-secret"}
+	cfg := config.Config{AdminToken: "admin-secret", ClusterToken: "cluster-secret"}
+	recorder := serveStorageShardPut(t, cfg, headers)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+}
+
 func serveHandlerGet(
 	t *testing.T,
 	cfg config.Config,
@@ -91,6 +134,36 @@ func serveHandlerGet(
 	service.RegisterHTTP(router)
 
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, http.NoBody)
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func serveStorageShardPut(
+	t *testing.T,
+	cfg config.Config,
+	headers map[string]string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	eng, err := engine.NewEngine(t.TempDir(), engine.DefaultDataChunks, engine.DefaultParityChunks, afero.NewMemMapFs())
+	if err != nil {
+		t.Fatalf("create engine: %v", err)
+	}
+	deps := handler.NewDependencies(nil, eng, nil, nil, nil, nil)
+	service := handler.NewService(deps, slog.New(slog.DiscardHandler), cfg)
+	router := http.NewServeMux()
+	service.RegisterHTTP(router)
+
+	request := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPut,
+		"/_internal/storage/shards/ab/hash-1/0",
+		bytes.NewReader([]byte("payload")),
+	)
 	for key, value := range headers {
 		request.Header.Set(key, value)
 	}

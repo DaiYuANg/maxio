@@ -7,9 +7,17 @@ import (
 )
 
 const maxioControlHeader = "X-Maxio-Control"
+const maxioClusterHeader = "X-Maxio-Cluster"
+
+func (s *Service) requiresClusterAuth(parts []string) bool {
+	return isStorageShardRoute(parts) && strings.TrimSpace(s.cfg.ClusterToken) != ""
+}
 
 func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 	if strings.TrimSpace(s.cfg.AdminToken) == "" {
+		return false
+	}
+	if s.requiresClusterAuth(parts) {
 		return false
 	}
 	if route == strings.Trim(defaultSearchPath, "/") || route == "metrics" {
@@ -48,6 +56,18 @@ func (s *Service) authorizeAdmin(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(token)) == 1
 }
 
+func (s *Service) authorizeCluster(r *http.Request) bool {
+	token := strings.TrimSpace(s.cfg.ClusterToken)
+	if token == "" {
+		return true
+	}
+	provided := clusterTokenFromRequest(r)
+	if provided == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(provided), []byte(token)) == 1
+}
+
 func (s *Service) authorizeAPI(r *http.Request) bool {
 	token := strings.TrimSpace(s.cfg.APIToken)
 	if token == "" {
@@ -71,6 +91,23 @@ func adminTokenFromRequest(r *http.Request) string {
 	if value := strings.TrimSpace(r.Header.Get(maxioControlHeader)); value != "" {
 		return value
 	}
+	return bearerTokenFromRequest(r)
+}
+
+func clusterTokenFromRequest(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if value := strings.TrimSpace(r.Header.Get(maxioClusterHeader)); value != "" {
+		return value
+	}
+	return bearerTokenFromRequest(r)
+}
+
+func bearerTokenFromRequest(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
 		return strings.TrimSpace(auth[len("bearer "):])
@@ -91,4 +128,16 @@ func apiCredentialFromRequest(r *http.Request) string {
 func (s *Service) writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-admin"`)
 	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "admin authorization required"})
+}
+
+func (s *Service) writeClusterUnauthorized(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-cluster"`)
+	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "cluster authorization required"})
+}
+
+func (s *Service) storageNodeToken() string {
+	if token := strings.TrimSpace(s.cfg.ClusterToken); token != "" {
+		return token
+	}
+	return strings.TrimSpace(s.cfg.AdminToken)
 }

@@ -3,6 +3,7 @@
   "http_body_limit": 1073741824,
   "storage_address": "127.0.0.1:8080",
   "admin_token": "",
+  "cluster_token": "",
   "api_token": "",
   "s3_access_key": "",
   "s3_secret_key": "",

@@ -1,5 +1,19 @@
 # MaxIO deployment notes
 
+## Operational runbooks
+
+Before running MaxIO with persistent data, read:
+
+```text
+docs/data-layout.md
+docs/backup-restore-upgrade.md
+docs/smoke-tests.md
+```
+
+`docs/data-layout.md` explains what lives under `data_dir`, which data is
+authoritative, and which derived state can be rebuilt. `docs/backup-restore-upgrade.md`
+covers MVP-safe backup, restore, upgrade, and rollback procedures.
+
 ## Single node
 
 Use `config.example.json` as the baseline config. For local single-node runs, keep:
@@ -144,16 +158,23 @@ curl http://127.0.0.1:8080/readyz
 
 ## Admin protection
 
-Set `admin_token` or `MAXIO_ADMIN_TOKEN` to protect management and internal shard APIs.
+Set `admin_token` or `MAXIO_ADMIN_TOKEN` to protect management APIs.
+Set `cluster_token` or `MAXIO_CLUSTER_TOKEN` to protect internal shard APIs used between MaxIO nodes.
 Set `api_token` or `MAXIO_API_TOKEN` to protect bucket and object APIs.
 Set `s3_access_key`, `s3_secret_key`, and `s3_region` to require SigV4 header or presigned URL authentication for S3-compatible APIs.
 Set `http_body_limit` to control the maximum request body accepted by the Fiber HTTP adapter. The default is `1073741824` bytes so standard S3 multipart upload parts work out of the box.
 
-Authenticated requests can use either header:
+Admin requests can use either header:
 
 ```sh
 Authorization: Bearer <token>
 X-Maxio-Control: <token>
+```
+
+Internal shard requests use the cluster header:
+
+```sh
+X-Maxio-Cluster: <cluster-token>
 ```
 
 Protected paths include:
@@ -198,10 +219,11 @@ Forward these headers unchanged when admin or API tokens are used:
 ```text
 Authorization
 X-Maxio-Control
+X-Maxio-Cluster
 X-Maxio-API
 ```
 
-The internal shard API `/_internal/storage/shards/*` must only be reachable by trusted MaxIO nodes or by a private service network. If `admin_token` is configured, MaxIO remote shard transport automatically sends `X-Maxio-Control`.
+The internal shard API `/_internal/storage/shards/*` must only be reachable by trusted MaxIO nodes or by a private service network. If `cluster_token` is configured, MaxIO remote shard transport automatically sends `X-Maxio-Cluster`. If `cluster_token` is empty, the transport falls back to `admin_token` for development and compatibility.
 
 ## Multi-node bootstrap
 

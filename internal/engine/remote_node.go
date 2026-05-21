@@ -15,6 +15,7 @@ import (
 
 const (
 	internalStorageShardsPath = "/_internal/storage/shards"
+	maxioClusterHeader        = "X-Maxio-Cluster"
 )
 
 type remoteStorageNode struct {
@@ -173,7 +174,7 @@ func (node *remoteStorageNode) authorizeRequest(req *http.Request) {
 	if node == nil || req == nil || strings.TrimSpace(node.controlToken) == "" {
 		return
 	}
-	req.Header.Set("X-Maxio-Control", strings.TrimSpace(node.controlToken))
+	req.Header.Set(maxioClusterHeader, strings.TrimSpace(node.controlToken))
 }
 
 func (node *remoteStorageNode) shardURL(shardDir, hash string, index int) string {

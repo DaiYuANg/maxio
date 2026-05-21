@@ -20,7 +20,7 @@ import (
 )
 
 type testShardHTTPStorage struct {
-	controlValue string
+	clusterValue string
 	mu           sync.RWMutex
 	shards       map[string][]byte
 }
@@ -32,7 +32,7 @@ func newTestShardHTTPStorage() *testShardHTTPStorage {
 }
 
 func (s *testShardHTTPStorage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if s.controlValue != "" && r.Header.Get("X-Maxio-Control") != s.controlValue {
+	if s.clusterValue != "" && r.Header.Get("X-Maxio-Cluster") != s.clusterValue {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -190,21 +190,21 @@ func TestRemoteStorageNodeReadMissingReturnsErrNotExist(t *testing.T) {
 	}
 }
 
-func TestRemoteStorageNodeSendsControlHeaderViaHTTP(t *testing.T) {
+func TestRemoteStorageNodeSendsClusterHeaderViaHTTP(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestShardHTTPStorage()
-	storage.controlValue = "control-secret"
+	storage.clusterValue = "cluster-secret"
 	server := httptest.NewServer(storage)
 	defer server.Close()
 
-	e := newTestEngineForRemoteWithToken(t, server.URL, storage.controlValue)
+	e := newTestEngineForRemoteWithToken(t, server.URL, storage.clusterValue)
 	node, err := e.StorageNode("raft-2")
 	if err != nil {
 		t.Fatalf("StorageNode: %v", err)
 	}
 
 	if err := node.WriteShard(ctx, "ab", "hash-auth", 1, []byte("payload")); err != nil {
-		t.Fatalf("write remote shard with control header: %v", err)
+		t.Fatalf("write remote shard with cluster header: %v", err)
 	}
 }
 

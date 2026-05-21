@@ -20,6 +20,7 @@ type Config struct {
 	HTTPBodyLimit                int     `json:"http_body_limit"          koanf:"http_body_limit"`
 	StorageAddress               string  `json:"storage_address"          koanf:"storage_address"`
 	AdminToken                   string  `json:"admin_token"              koanf:"admin_token"`
+	ClusterToken                 string  `json:"cluster_token"            koanf:"cluster_token"`
 	APIToken                     string  `json:"api_token"                koanf:"api_token"`
 	S3AccessKey                  string  `json:"s3_access_key"            koanf:"s3_access_key"`
 	S3SecretKey                  string  `json:"s3_secret_key"            koanf:"s3_secret_key"`
@@ -172,6 +173,7 @@ func trim(cfg Config) Config {
 	cfg.HTTPAddress = strings.TrimSpace(cfg.HTTPAddress)
 	cfg.StorageAddress = strings.TrimSpace(cfg.StorageAddress)
 	cfg.AdminToken = strings.TrimSpace(cfg.AdminToken)
+	cfg.ClusterToken = strings.TrimSpace(cfg.ClusterToken)
 	cfg.APIToken = strings.TrimSpace(cfg.APIToken)
 	cfg.S3AccessKey = strings.TrimSpace(cfg.S3AccessKey)
 	cfg.S3SecretKey = strings.TrimSpace(cfg.S3SecretKey)

@@ -3,16 +3,21 @@ package s3_test
 import (
 	"context"
 	"encoding/xml"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/lyonbrown4d/maxio/internal/config"
 	maxios3 "github.com/lyonbrown4d/maxio/internal/s3"
 )
 
 type s3ErrorTestResult struct {
-	Code string `xml:"Code"`
+	Code      string `xml:"Code"`
+	Message   string `xml:"Message"`
+	RequestID string `xml:"RequestId"`
 }
 
 type listPartsTestResult struct {
@@ -60,6 +65,97 @@ func TestS3ObjectMetadataHeadersRoundTrip(t *testing.T) {
 	assertHeader(t, head, "Content-Encoding", "identity")
 	assertHeader(t, head, "Content-Language", "en")
 	assertHeader(t, head, "x-amz-meta-owner", "maxio")
+}
+
+func TestS3PresignedURLReadsObject(t *testing.T) {
+	t.Parallel()
+
+	accessID := "maxio-test-client"
+	material := strings.Repeat("m", 32)
+	region := "us-east-1"
+	_, objects := newMultipartTestService(t)
+	putListObject(t, objects, "presigned.txt")
+	service := maxios3.NewService(objects, slog.New(slog.DiscardHandler), config.Config{
+		DataDir:     t.TempDir(),
+		S3AccessKey: accessID,
+		S3SecretKey: material,
+		S3Region:    region,
+	})
+	request := newSignedRequest(t, "http://maxio.local/s3/bucket/presigned.txt?response-content-type=text%2Fplain")
+	signPresignedRequest(t, request, accessID, material, region, time.Now().UTC(), 60)
+
+	recorder := httptest.NewRecorder()
+	service.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("presigned get status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Body.String() != "content" {
+		t.Fatalf("presigned get body = %q, want content", recorder.Body.String())
+	}
+}
+
+func TestS3RangeGetReturnsPartialContent(t *testing.T) {
+	t.Parallel()
+
+	service, _ := newMultipartTestService(t)
+	putObjectWithHeaders(t, service, "/s3/bucket/range.txt", "0123456789", nil)
+
+	recorder := getObjectWithRange(t, service, "/s3/bucket/range.txt", "bytes=2-6")
+	if recorder.Code != http.StatusPartialContent {
+		t.Fatalf("range status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Body.String() != "23456" {
+		t.Fatalf("range body = %q, want 23456", recorder.Body.String())
+	}
+	assertHeader(t, recorder, "Accept-Ranges", "bytes")
+	assertHeader(t, recorder, "Content-Length", "5")
+	assertHeader(t, recorder, "Content-Range", "bytes 2-6/10")
+}
+
+func TestS3InvalidRangeReturnsXMLInvalidRange(t *testing.T) {
+	t.Parallel()
+
+	service, _ := newMultipartTestService(t)
+	putObjectWithHeaders(t, service, "/s3/bucket/range-error.txt", "0123456789", nil)
+
+	recorder := getObjectWithRange(t, service, "/s3/bucket/range-error.txt", "bytes=20-30")
+	if recorder.Code != http.StatusRequestedRangeNotSatisfiable {
+		t.Fatalf("range status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	assertHeader(t, recorder, "Content-Type", "application/xml")
+	assertHeader(t, recorder, "Content-Range", "bytes */10")
+	result := decodeS3Error(t, recorder)
+	if result.Code != "InvalidRange" {
+		t.Fatalf("error code = %q, want InvalidRange", result.Code)
+	}
+	if strings.TrimSpace(result.Message) == "" || strings.TrimSpace(result.RequestID) == "" {
+		t.Fatalf("error result missing message or request id: %+v", result)
+	}
+}
+
+func TestS3ETagIsQuotedAndStableAcrossObjectResponses(t *testing.T) {
+	t.Parallel()
+
+	service, _ := newMultipartTestService(t)
+	put := putObjectWithHeaders(t, service, "/s3/bucket/etag.txt", "etag-compatible-body", nil)
+	etag := put.Header().Get("ETag")
+	if !isQuotedETag(etag) {
+		t.Fatalf("put etag = %q, want quoted etag", etag)
+	}
+
+	head := serveS3Request(t, service, http.MethodHead, "/s3/bucket/etag.txt", nil)
+	assertHeader(t, head, "ETag", etag)
+
+	get := serveS3Request(t, service, http.MethodGet, "/s3/bucket/etag.txt", nil)
+	assertHeader(t, get, "ETag", etag)
+
+	list := listObjectsV2(t, service, "/s3/bucket?list-type=2&prefix=etag.txt")
+	if len(list.Contents) != 1 {
+		t.Fatalf("list contents = %+v, want one object", list.Contents)
+	}
+	if list.Contents[0].ETag != etag {
+		t.Fatalf("list etag = %q, want %q", list.Contents[0].ETag, etag)
+	}
 }
 
 func TestMultipartCompleteRejectsSmallNonLastPart(t *testing.T) {
@@ -173,6 +269,25 @@ func listMultipartUploads(
 		t.Fatalf("decode list uploads result: %v", err)
 	}
 	return result
+}
+
+func getObjectWithRange(
+	t *testing.T,
+	service *maxios3.Service,
+	target string,
+	rangeHeader string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, http.NoBody)
+	request.Header.Set("Range", rangeHeader)
+	recorder := httptest.NewRecorder()
+	service.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func isQuotedETag(value string) bool {
+	return len(value) >= 2 && strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`)
 }
 
 func assertHeader(t *testing.T, recorder *httptest.ResponseRecorder, name, want string) {

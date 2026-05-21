@@ -82,6 +82,10 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	route := strings.Trim(path.Clean(r.URL.Path), "/")
 	parts := strings.Split(route, "/")
+	if s.requiresClusterAuth(parts) && !s.authorizeCluster(r) {
+		s.writeClusterUnauthorized(w)
+		return
+	}
 	if s.requiresAdminAuth(route, parts) && !s.authorizeAdmin(r) {
 		s.writeUnauthorized(w)
 		return

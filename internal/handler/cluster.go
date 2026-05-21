@@ -267,7 +267,7 @@ func (s *Service) syncStorageNodes(ctx context.Context) error {
 	if localReplicaID == 0 {
 		return errors.New("local raft replica id is missing")
 	}
-	s.engine.SetControlToken(s.cfg.AdminToken)
+	s.engine.SetControlToken(s.storageNodeToken())
 	storageNodes := s.storageNodesFromMembership(membership.Nodes)
 	if err := s.engine.SyncStorageNodesFromRaft(localReplicaID, storageNodes); err != nil {
 		return fmt.Errorf("sync engine storage nodes: %w", err)

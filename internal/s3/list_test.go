@@ -21,7 +21,8 @@ type listObjectsV2TestResult struct {
 }
 
 type listObjectTestResult struct {
-	Key string `xml:"Key"`
+	Key  string `xml:"Key"`
+	ETag string `xml:"ETag"`
 }
 
 type commonPrefixTestResult struct {
