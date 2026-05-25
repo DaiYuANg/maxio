@@ -26,6 +26,7 @@ func validateDurations(cfg Config) error {
 		{name: "dedupe_interval", value: cfg.DedupeInterval},
 		{name: "index_timeout", value: cfg.IndexTimeout},
 		{name: "index_retry_backoff", value: cfg.IndexRetryBackoff},
+		{name: "cache_ttl", value: cfg.CacheTTL},
 	}
 	for _, cfgValue := range durationConfigs {
 		if err := validateDuration(cfgValue.name, cfgValue.value); err != nil {
@@ -40,6 +41,8 @@ func validateDurations(cfg Config) error {
 		{name: "index_max_retries", value: cfg.IndexMaxRetries, minimum: 0},
 		{name: "index_queue_size", value: cfg.IndexQueueSize, minimum: 0},
 		{name: "index_rate_limit", value: cfg.IndexRateLimit, minimum: 0},
+		{name: "cache_max_cost", value: cfg.CacheMaxCost, minimum: 0},
+		{name: "cache_redis_db", value: cfg.CacheRedisDB, minimum: 0},
 	}
 	for _, cfgValue := range integerConfigs {
 		if err := validateNonNegativeInt(cfgValue.name, cfgValue.value, cfgValue.minimum); err != nil {

@@ -25,6 +25,14 @@ type Config struct {
 	S3AccessKey                  string  `json:"s3_access_key"            koanf:"s3_access_key"`
 	S3SecretKey                  string  `json:"s3_secret_key"            koanf:"s3_secret_key"`
 	S3Region                     string  `json:"s3_region"                koanf:"s3_region"`
+	CacheBackend                 string  `json:"cache_backend"            koanf:"cache_backend"            validate:"required,oneof=none memory redis"`
+	CacheTTL                     string  `json:"cache_ttl"                koanf:"cache_ttl"                validate:"required,min=1"`
+	CacheMaxCost                 int     `json:"cache_max_cost"           koanf:"cache_max_cost"`
+	CacheRedisAddress            string  `json:"cache_redis_address"      koanf:"cache_redis_address"`
+	CacheRedisUsername           string  `json:"cache_redis_username"     koanf:"cache_redis_username"`
+	CacheRedisPassword           string  `json:"cache_redis_password"     koanf:"cache_redis_password"`
+	CacheRedisDB                 int     `json:"cache_redis_db"           koanf:"cache_redis_db"`
+	CacheKeyPrefix               string  `json:"cache_key_prefix"         koanf:"cache_key_prefix"`
 	DataDir                      string  `json:"data_dir"                 koanf:"data_dir"                 validate:"required,min=1"`
 	LogLevel                     string  `json:"log_level"                koanf:"log_level"                validate:"required,oneof=debug info warn error"`
 	RaftNodeID                   uint64  `json:"raft_node_id"             koanf:"raft_node_id"`
@@ -55,39 +63,6 @@ type Config struct {
 	IndexMaxRetries              int     `json:"index_max_retries"        koanf:"index_max_retries"`
 	IndexQueueSize               int     `json:"index_queue_size"         koanf:"index_queue_size"`
 	IndexRateLimit               int     `json:"index_rate_limit"         koanf:"index_rate_limit"`
-}
-
-func Default() Config {
-	return Config{
-		HTTPAddress:                  ":8080",
-		HTTPBodyLimit:                1 << 30,
-		StorageAddress:               "127.0.0.1:8080",
-		S3Region:                     "us-east-1",
-		DataDir:                      "./data",
-		LogLevel:                     "info",
-		RaftNodeID:                   1,
-		RaftShardID:                  1,
-		RaftAddress:                  "127.0.0.1:63000",
-		RaftDataDir:                  "raft",
-		RaftBootstrap:                true,
-		RaftOperationTimeout:         "5s",
-		GossipBindAddress:            "0.0.0.0:7946",
-		PendingObjectTTL:             "1h",
-		RepairInterval:               "10m",
-		RepairOnStart:                true,
-		RepairMaxBatch:               100,
-		RepairMaxRetries:             2,
-		RepairRetryBackoff:           "1s",
-		RepairRetryMaxBackoff:        "10s",
-		RepairRetryBackoffMultiplier: 2,
-		DedupeInterval:               "30m",
-		DedupeOnStart:                true,
-		DedupeMaxFixes:               100,
-		IndexTimeout:                 "30s",
-		IndexRetryBackoff:            "1s",
-		IndexMaxRetries:              2,
-		IndexQueueSize:               1024,
-	}
 }
 
 func Load(opts ...configx.Option) (Config, error) {
@@ -178,6 +153,12 @@ func trim(cfg Config) Config {
 	cfg.S3AccessKey = strings.TrimSpace(cfg.S3AccessKey)
 	cfg.S3SecretKey = strings.TrimSpace(cfg.S3SecretKey)
 	cfg.S3Region = strings.TrimSpace(cfg.S3Region)
+	cfg.CacheBackend = strings.ToLower(strings.TrimSpace(cfg.CacheBackend))
+	cfg.CacheTTL = strings.TrimSpace(cfg.CacheTTL)
+	cfg.CacheRedisAddress = strings.TrimSpace(cfg.CacheRedisAddress)
+	cfg.CacheRedisUsername = strings.TrimSpace(cfg.CacheRedisUsername)
+	cfg.CacheRedisPassword = strings.TrimSpace(cfg.CacheRedisPassword)
+	cfg.CacheKeyPrefix = strings.TrimSpace(cfg.CacheKeyPrefix)
 	cfg.LogLevel = strings.TrimSpace(cfg.LogLevel)
 	cfg.RaftAddress = strings.TrimSpace(cfg.RaftAddress)
 	cfg.RaftDataDir = strings.TrimSpace(cfg.RaftDataDir)
@@ -210,39 +191,6 @@ func validateRequired(cfg Config) error {
 		return errors.New("invalid config: gossip_bind_address is required")
 	}
 	return nil
-}
-
-func applyZeroDefaults(cfg Config) Config {
-	if cfg.RaftNodeID == 0 {
-		cfg.RaftNodeID = 1
-	}
-	if cfg.StorageAddress == "" {
-		cfg.StorageAddress = storageAddressFromHTTPAddress(cfg.HTTPAddress)
-	}
-	if cfg.HTTPBodyLimit <= 0 {
-		cfg.HTTPBodyLimit = Default().HTTPBodyLimit
-	}
-	if cfg.RaftShardID == 0 {
-		cfg.RaftShardID = 1
-	}
-	if cfg.RaftDataDir == "" {
-		cfg.RaftDataDir = "raft"
-	}
-	if cfg.PendingObjectTTL == "" {
-		cfg.PendingObjectTTL = Default().PendingObjectTTL
-	}
-	if cfg.RaftOperationTimeout == "" {
-		cfg.RaftOperationTimeout = Default().RaftOperationTimeout
-	}
-	if cfg.GossipBindAddress == "" {
-		cfg.GossipBindAddress = Default().GossipBindAddress
-	}
-	if cfg.S3Region == "" {
-		cfg.S3Region = Default().S3Region
-	}
-	cfg = applyRepairZeroDefaults(cfg)
-	cfg = applyDedupeZeroDefaults(cfg)
-	return applyIndexZeroDefaults(cfg)
 }
 
 func applyRepairZeroDefaults(cfg Config) Config {

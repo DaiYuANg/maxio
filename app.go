@@ -10,6 +10,7 @@ import (
 
 	"github.com/arcgolabs/configx"
 	"github.com/arcgolabs/dix"
+	"github.com/lyonbrown4d/maxio/cache"
 	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/internal/config"
@@ -273,6 +274,7 @@ func defaultModules(configOptions ...configx.Option) []dix.Module {
 		metadata.Module(),
 		engine.Module(),
 		store.Module(),
+		cache.Module(),
 		index.Module(),
 		object.Module(),
 		scheduler.Module(),

@@ -9,7 +9,6 @@ import (
 	"github.com/arcgolabs/eventx"
 	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/store"
 )
 
 func Module() dix.Module {
@@ -30,7 +29,7 @@ func Module() dix.Module {
 }
 
 func newServiceFromRuntimeConfig(
-	storage *store.Store,
+	storage Store,
 	search *index.SearchEngine,
 	bus eventx.BusRuntime,
 	logger *slog.Logger,
