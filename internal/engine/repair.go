@@ -48,23 +48,15 @@ func (e *Engine) RepairObject(ctx context.Context, bucket, key string) (RepairRe
 }
 
 func (e *Engine) readRepairShards(ctx context.Context, layout *Layout) ([][]byte, []int, error) {
-	total := e.coder.TotalChunks()
-	shards := make([][]byte, total)
+	shards, _, err := e.readShardSetForRecovery(ctx, layout)
+	if err != nil {
+		return nil, nil, fmt.Errorf("engine: read repair shards: %w", err)
+	}
 	missing := make([]int, 0)
-	for i := range total {
-		data, err := e.readShard(ctx, layout, i)
-		if err != nil {
-			if isUnavailableShardError(err) {
-				missing = append(missing, i)
-				continue
-			}
-			return nil, nil, fmt.Errorf("engine: read shard %d for repair: %w", i, err)
-		}
-		if data == nil {
+	for i := range shards {
+		if shards[i] == nil {
 			missing = append(missing, i)
-			continue
 		}
-		shards[i] = data
 	}
 	return shards, missing, nil
 }
@@ -74,9 +66,10 @@ func (e *Engine) writeRepairedShards(ctx context.Context, layout *Layout, shards
 		if len(shards[index]) == 0 && layout.Size > 0 {
 			return fmt.Errorf("%w: shard %d was not reconstructed", ErrShardRecoveryFailed, index)
 		}
-		if err := e.writeShard(ctx, e.shardPlacement(layout, index), layout.ShardDir, layout.Hash, index, shards[index]); err != nil {
-			return fmt.Errorf("engine: write repaired shard %d: %w", index, err)
-		}
+	}
+	placements := e.shardPlacements(layout)
+	if err := e.writeShardIndexes(ctx, placements, layout.ShardDir, layout.Hash, shards, missing); err != nil {
+		return fmt.Errorf("engine: write repaired shards: %w", err)
 	}
 	return nil
 }

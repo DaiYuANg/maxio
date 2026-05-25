@@ -222,6 +222,15 @@ func (e *Engine) shardPlacement(layout *Layout, index int) model.ShardPlacement 
 	return e.localShardPlacement(index)
 }
 
+func (e *Engine) shardPlacements(layout *Layout) []model.ShardPlacement {
+	total := e.coder.TotalChunks()
+	placements := make([]model.ShardPlacement, total)
+	for index := range placements {
+		placements[index] = e.shardPlacement(layout, index)
+	}
+	return placements
+}
+
 func cloneShardPlacements(input []model.ShardPlacement) []model.ShardPlacement {
 	if len(input) == 0 {
 		return nil

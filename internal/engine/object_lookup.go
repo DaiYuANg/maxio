@@ -172,15 +172,9 @@ func (e *Engine) canRebuild(ctx context.Context, layout *Layout) bool {
 }
 
 func (e *Engine) rebuildShards(ctx context.Context, layout *Layout) error {
-	total := e.coder.TotalChunks()
-	shards := make([][]byte, total)
-
-	for i := range total {
-		data, err := e.readShardForRecovery(ctx, layout, i)
-		if err != nil {
-			return fmt.Errorf("engine: read shard for rebuild: %w", err)
-		}
-		shards[i] = data
+	shards, _, err := e.readShardSetForRecovery(ctx, layout)
+	if err != nil {
+		return fmt.Errorf("engine: read shards for rebuild: %w", err)
 	}
 
 	// Use coder to rebuild missing parity shards
@@ -190,32 +184,15 @@ func (e *Engine) rebuildShards(ctx context.Context, layout *Layout) error {
 	}
 
 	// Write rebuilt shards
-	for i := range total {
-		if shards[i] != nil {
-			if err := e.writeShard(ctx, e.shardPlacement(layout, i), layout.ShardDir, layout.Hash, i, shards[i]); err != nil {
-				return fmt.Errorf("engine: write rebuilt shard: %w", err)
-			}
-		}
+	placements := e.shardPlacements(layout)
+	if err := e.writeShardSet(ctx, placements, layout.ShardDir, layout.Hash, shards); err != nil {
+		return fmt.Errorf("engine: write rebuilt shards: %w", err)
 	}
 	return nil
 }
 
 func (e *Engine) readAvailableShards(ctx context.Context, layout *Layout) ([][]byte, int, error) {
-	total := e.coder.TotalChunks()
-	shards := make([][]byte, total)
-	available := 0
-	for i := range total {
-		data, err := e.readShardForRecovery(ctx, layout, i)
-		if err != nil {
-			return nil, 0, fmt.Errorf("engine: read shard %d: %w", i, err)
-		}
-		if data == nil {
-			continue
-		}
-		shards[i] = data
-		available++
-	}
-	return shards, available, nil
+	return e.readShardSetForRecovery(ctx, layout)
 }
 
 func (e *Engine) ensureReadableShards(ctx context.Context, layout *Layout, shards [][]byte, available int) error {
@@ -239,21 +216,19 @@ func (e *Engine) ensureReadableShards(ctx context.Context, layout *Layout, shard
 }
 
 func (e *Engine) fillMissingShards(ctx context.Context, layout *Layout, shards [][]byte) (int, error) {
+	refreshed, _, err := e.readShardSetForRecovery(ctx, layout)
+	if err != nil {
+		return 0, fmt.Errorf("engine: re-read shards: %w", err)
+	}
+
 	available := 0
 	for i := range shards {
+		if shards[i] == nil {
+			shards[i] = refreshed[i]
+		}
 		if shards[i] != nil {
 			available++
-			continue
 		}
-		data, err := e.readShardForRecovery(ctx, layout, i)
-		if err != nil {
-			return 0, fmt.Errorf("engine: re-read shard %d: %w", i, err)
-		}
-		if data == nil {
-			continue
-		}
-		shards[i] = data
-		available++
 	}
 	return available, nil
 }

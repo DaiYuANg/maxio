@@ -73,10 +73,8 @@ func (e *Engine) PutBlobBytes(ctx context.Context, key string, data []byte) (Blo
 	}
 	checksums := shardChecksums(shards)
 	sizes := shardSizes(shards)
-	for i, shard := range shards {
-		if writeErr := e.writeShard(ctx, placements[i], shardDir, hash, i, shard); writeErr != nil {
-			return BlobInfo{}, fmt.Errorf("engine: write shard %d: %w", i, writeErr)
-		}
+	if err := e.writeShardSet(ctx, placements, shardDir, hash, shards); err != nil {
+		return BlobInfo{}, err
 	}
 
 	return BlobInfo{
