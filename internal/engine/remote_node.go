@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net"
 	"net/url"
 	"os"
+	"time"
 	"strconv"
 	"strings"
 )
@@ -17,6 +19,25 @@ const (
 	internalStorageShardsPath = "/_internal/storage/shards"
 	maxioClusterHeader        = "X-Maxio-Cluster"
 )
+
+const (
+	defaultRemoteRequestTimeout = 30 * time.Second
+)
+
+var defaultRemoteHTTPTransport = &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+	MaxIdleConns:          128,
+	MaxIdleConnsPerHost:   32,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   5 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
+var defaultRemoteHTTPClient = &http.Client{
+	Transport: defaultRemoteHTTPTransport,
+	Timeout:   defaultRemoteRequestTimeout,
+}
 
 type remoteStorageNode struct {
 	id           string
@@ -41,7 +62,7 @@ func newRemoteStorageNode(id, address string, client *http.Client) (*remoteStora
 		return nil, fmt.Errorf("normalize storage node address: %w", err)
 	}
 	if client == nil {
-		client = http.DefaultClient
+		client = defaultRemoteHTTPClient
 	}
 	return &remoteStorageNode{
 		id:      id,

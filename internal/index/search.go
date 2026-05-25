@@ -21,7 +21,12 @@ type SearchEngine struct {
 	index  bleve.Index
 	ready  bool
 	mu     sync.RWMutex
-	items  map[string]model.ObjectMeta
+	items  map[string]*model.ObjectMeta
+}
+
+type IndexDocument struct {
+	Meta model.ObjectMeta
+	Text string
 }
 
 func NewSearchEngine(cfg config.Config, logger *slog.Logger) (*SearchEngine, error) {
@@ -36,7 +41,7 @@ func NewSearchEngine(cfg config.Config, logger *slog.Logger) (*SearchEngine, err
 		logger: logger,
 		index:  idx,
 		ready:  true,
-		items:  make(map[string]model.ObjectMeta),
+		items:  make(map[string]*model.ObjectMeta),
 	}, nil
 }
 
@@ -47,14 +52,14 @@ func NewInMemorySearchEngine() *SearchEngine {
 		slog.Default().Error("search index init failed", "error", err)
 		return &SearchEngine{
 			logger: slog.Default(),
-			items:  make(map[string]model.ObjectMeta),
+			items:  make(map[string]*model.ObjectMeta),
 		}
 	}
 	return &SearchEngine{
 		logger: slog.Default(),
 		index:  idx,
 		ready:  true,
-		items:  make(map[string]model.ObjectMeta),
+		items:  make(map[string]*model.ObjectMeta),
 	}
 }
 
@@ -78,21 +83,76 @@ func openPersistentIndex(cfg config.Config) (bleve.Index, error) {
 }
 
 func (s *SearchEngine) Upsert(meta model.ObjectMeta) {
-	s.UpsertDocument(meta, "")
+	if _, err := s.UpsertDocuments([]IndexDocument{{Meta: meta}}); err != nil {
+		s.logger.Warn("upsert search index failed", "error", err)
+	}
 }
 
 func (s *SearchEngine) UpsertDocument(meta model.ObjectMeta, text string) {
-	id := objectID(meta.Bucket, meta.Key)
-	doc := documentFromMeta(meta, text)
-	if s.ready {
-		if err := s.index.Index(id, doc); err != nil {
-			s.logger.Warn("upsert search index failed", "error", err)
+	if _, err := s.UpsertDocuments([]IndexDocument{{Meta: meta, Text: text}}); err != nil {
+		s.logger.Warn("upsert search index failed", "error", err)
+	}
+}
+
+func (s *SearchEngine) UpsertDocuments(docs []IndexDocument) (int, error) {
+	if s == nil || len(docs) == 0 {
+		return 0, nil
+	}
+	if !s.ready {
+		s.upsertMemoryDocuments(docs)
+		return len(docs), nil
+	}
+
+	batch := s.index.NewBatch()
+	for i := range docs {
+		doc := docs[i]
+		id := objectID(doc.Meta.Bucket, doc.Meta.Key)
+		if err := batch.Index(id, documentFromMeta(doc.Meta, doc.Text)); err != nil {
+			return 0, fmt.Errorf("prepare search index batch: %w", err)
 		}
 	}
 
+	if err := s.index.Batch(batch); err != nil {
+		s.logger.Warn("upsert search index batch failed", "error", err)
+		return s.indexSingleDocuments(docs, err)
+	}
+
+	s.upsertMemoryDocuments(docs)
+	return len(docs), nil
+}
+
+func (s *SearchEngine) indexSingleDocuments(docs []IndexDocument, batchErr error) (int, error) {
+	successes := 0
+	for i := range docs {
+		doc := docs[i]
+		if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
+			continue
+		}
+		id := objectID(doc.Meta.Bucket, doc.Meta.Key)
+		if err := s.index.Index(id, documentFromMeta(doc.Meta, doc.Text)); err != nil {
+			batchErr = errors.Join(batchErr, fmt.Errorf("upsert search document %s: %w", id, err))
+			continue
+		}
+		successes++
+	}
+	s.upsertMemoryDocuments(docs)
+	if batchErr != nil {
+		return successes, batchErr
+	}
+	return successes, nil
+}
+
+func (s *SearchEngine) upsertMemoryDocuments(docs []IndexDocument) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.items[id] = meta
+	for i := range docs {
+		doc := docs[i]
+		if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
+			continue
+		}
+		meta := doc.Meta
+		s.items[objectID(doc.Meta.Bucket, doc.Meta.Key)] = &meta
+	}
 }
 
 func (s *SearchEngine) Remove(bucket, key string) {
@@ -164,12 +224,14 @@ func (s *SearchEngine) resultFromHits(query model.SearchQuery, hits []searchHit)
 	for _, hit := range hits {
 		meta, ok := s.items[hit.ID]
 		if !ok {
-			meta = metaFromFields(hit.Fields)
-		}
-		if meta.Bucket == "" || meta.Key == "" {
+			fromIndex := metaFromFields(hit.Fields)
+			if fromIndex.Bucket == "" || fromIndex.Key == "" {
+				continue
+			}
+			items.Add(fromIndex)
 			continue
 		}
-		items.Add(meta)
+		items.Add(*meta)
 	}
 
 	return limitedSearchResult(query, items)
@@ -180,10 +242,12 @@ func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchRes
 	defer s.mu.RUnlock()
 
 	items := list.NewListWithCapacity[model.ObjectMeta](len(s.items))
-	for key := range s.items {
-		meta := s.items[key]
-		if matchesQuery(meta, query) {
-			items.Add(meta)
+	for _, meta := range s.items {
+		if meta == nil {
+			continue
+		}
+		if matchesQuery(*meta, query) {
+			items.Add(*meta)
 		}
 	}
 	return limitedSearchResult(query, items)

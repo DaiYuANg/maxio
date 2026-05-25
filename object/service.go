@@ -50,6 +50,7 @@ type Service struct {
 	indexMu sync.RWMutex
 	index   IndexStatus
 	indexCh chan indexTask
+	indexWg sync.WaitGroup
 }
 
 func NewService(

@@ -23,31 +23,7 @@ func stageObject(reader io.Reader) (*stagedObject, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create temp file: %w", err)
 	}
-	if err := writeStagedObject(file, reader); err != nil {
-		if cleanupErr := closeAndRemove(file); cleanupErr != nil {
-			return nil, fmt.Errorf("%w; cleanup temp file: %w", err, cleanupErr)
-		}
-		return nil, err
-	}
-	return newStagedObject(file)
-}
-
-func writeStagedObject(file *os.File, reader io.Reader) error {
-	if _, err := io.Copy(file, reader); err != nil {
-		return fmt.Errorf("write temp file: %w", err)
-	}
-	return nil
-}
-
-func newStagedObject(file *os.File) (*stagedObject, error) {
-	size, err := fileSize(file)
-	if err != nil {
-		if cleanupErr := closeAndRemove(file); cleanupErr != nil {
-			return nil, fmt.Errorf("%w; cleanup temp file: %w", err, cleanupErr)
-		}
-		return nil, err
-	}
-	hash, err := hashFile(file)
+	size, hash, err := writeStagedObject(file, reader)
 	if err != nil {
 		if cleanupErr := closeAndRemove(file); cleanupErr != nil {
 			return nil, fmt.Errorf("%w; cleanup temp file: %w", err, cleanupErr)
@@ -61,23 +37,17 @@ func newStagedObject(file *os.File) (*stagedObject, error) {
 	}, nil
 }
 
-func fileSize(file *os.File) (int64, error) {
-	info, err := file.Stat()
-	if err != nil {
-		return 0, fmt.Errorf("stat staged object: %w", err)
-	}
-	return info.Size(), nil
-}
-
-func hashFile(file *os.File) (string, error) {
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("seek staged object: %w", err)
-	}
+func writeStagedObject(file *os.File, reader io.Reader) (int64, string, error) {
 	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return "", fmt.Errorf("hash staged object: %w", err)
+	writer := io.MultiWriter(file, hasher)
+	size, err := io.Copy(writer, reader)
+	if err != nil {
+		return 0, "", fmt.Errorf("write temp file: %w", err)
 	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return 0, "", fmt.Errorf("seek staged object: %w", err)
+	}
+	return size, hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func (s *stagedObject) Reader() (io.Reader, error) {

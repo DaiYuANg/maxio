@@ -17,6 +17,9 @@ func Module() dix.Module {
 			dix.OnStart(func(ctx context.Context, service *Service) error {
 				return service.StartIndexWorker(ctx)
 			}),
+			dix.OnStop(func(_ context.Context, service *Service) error {
+				return service.stopIndexWorker()
+			}),
 		),
 	)
 }
