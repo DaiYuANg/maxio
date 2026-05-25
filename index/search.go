@@ -10,7 +10,6 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
-	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/model"
 )
 
@@ -29,7 +28,7 @@ type IndexDocument struct {
 	Text string
 }
 
-func NewSearchEngine(cfg config.Config, logger *slog.Logger) (*SearchEngine, error) {
+func NewSearchEngine(cfg Config, logger *slog.Logger) (*SearchEngine, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -63,7 +62,8 @@ func NewInMemorySearchEngine() *SearchEngine {
 	}
 }
 
-func openPersistentIndex(cfg config.Config) (bleve.Index, error) {
+func openPersistentIndex(cfg Config) (bleve.Index, error) {
+	cfg = cfg.normalized()
 	path := filepath.Join(cfg.DataDir, indexDir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, fmt.Errorf("create search index parent: %w", err)

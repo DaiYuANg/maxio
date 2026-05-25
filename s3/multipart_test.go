@@ -11,8 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/object"
@@ -96,7 +95,7 @@ func newMultipartTestService(t *testing.T) (*maxios3.Service, *object.Service) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	objects := object.NewService(storage, index.NewInMemorySearchEngine(), nil, slog.New(slog.DiscardHandler), config.Config{})
+	objects := object.NewService(storage, index.NewInMemorySearchEngine(), nil, slog.New(slog.DiscardHandler), object.Config{})
 	if err := objects.CreateBucket(ctx, "bucket"); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}

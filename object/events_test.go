@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/arcgolabs/eventx"
-	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/object"
@@ -145,7 +144,7 @@ func newEventTestService(t *testing.T) (*object.Service, *eventRecorder) {
 	}
 	t.Cleanup(unsubscribe)
 
-	objects := object.NewService(storage, nil, bus, slog.New(slog.DiscardHandler), config.Config{})
+	objects := object.NewService(storage, nil, bus, slog.New(slog.DiscardHandler), object.Config{})
 	return objects, recorder
 }
 

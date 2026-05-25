@@ -205,7 +205,7 @@ func newObjectRouter(t *testing.T, cfg config.Config, logger *slog.Logger) http.
 	if err != nil {
 		t.Fatalf("create store: %v", err)
 	}
-	objects := object.NewService(storage, nil, nil, slog.New(slog.DiscardHandler), config.Config{})
+	objects := object.NewService(storage, nil, nil, slog.New(slog.DiscardHandler), object.Config{})
 	deps := handler.NewDependencies(objects, nil, nil, nil, nil, nil)
 	service := handler.NewService(deps, logger, cfg)
 	router := http.NewServeMux()

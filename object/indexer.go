@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/arcgolabs/eventx"
-	"github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/index"
 )
 
 type IndexStatus struct {

@@ -6,15 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/model"
 )
 
 func TestSearchEnginePersistsFullTextIndex(t *testing.T) {
 	t.Parallel()
 
-	cfg := config.Config{DataDir: t.TempDir()}
+	cfg := index.Config{DataDir: t.TempDir()}
 	engine := newSearchEngine(t, cfg)
 	meta := model.ObjectMeta{
 		Bucket:      "docs",
@@ -54,7 +53,7 @@ func TestExtractTextSupportsTextContent(t *testing.T) {
 	}
 }
 
-func newSearchEngine(t *testing.T, cfg config.Config) *index.SearchEngine {
+func newSearchEngine(t *testing.T, cfg index.Config) *index.SearchEngine {
 	t.Helper()
 
 	engine, err := index.NewSearchEngine(cfg, slog.New(slog.DiscardHandler))

@@ -138,7 +138,7 @@ func newLifecycleObjectService(t *testing.T, objects ...model.ObjectMeta) *objec
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	return object.NewService(storeModule, nil, nil, slog.New(slog.DiscardHandler), config.Config{})
+	return object.NewService(storeModule, nil, nil, slog.New(slog.DiscardHandler), object.Config{})
 }
 
 func newLifecycleEngine(t *testing.T) *engine.Engine {

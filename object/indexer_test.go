@@ -6,8 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/model"
@@ -76,7 +75,7 @@ func newIndexTestService(t *testing.T) *object.Service {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	return object.NewService(storage, index.NewInMemorySearchEngine(), nil, slog.New(slog.DiscardHandler), config.Config{})
+	return object.NewService(storage, index.NewInMemorySearchEngine(), nil, slog.New(slog.DiscardHandler), object.Config{})
 }
 
 func createIndexTestBucket(ctx context.Context, t *testing.T, objects *object.Service) {

@@ -9,8 +9,7 @@ import (
 
 	"github.com/arcgolabs/eventx"
 	"github.com/lyonbrown4d/maxio/engine"
-	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/model"
 )
@@ -46,7 +45,7 @@ type Service struct {
 	store   *store.Store
 	search  *index.SearchEngine
 	bus     eventx.BusRuntime
-	cfg     config.Config
+	cfg     Config
 	indexMu sync.RWMutex
 	index   IndexStatus
 	indexCh chan indexTask
@@ -58,7 +57,7 @@ func NewService(
 	search *index.SearchEngine,
 	bus eventx.BusRuntime,
 	logger *slog.Logger,
-	cfg config.Config,
+	cfg Config,
 ) *Service {
 	if logger == nil {
 		logger = slog.Default()
@@ -68,7 +67,7 @@ func NewService(
 		store:  storage,
 		search: search,
 		bus:    bus,
-		cfg:    cfg,
+		cfg:    cfg.normalized(),
 	}
 }
 
