@@ -8,8 +8,11 @@ import (
 	"strings"
 )
 
-func splitS3Path(rawPath string) (string, string, error) {
-	rawPath = strings.TrimPrefix(rawPath, compatPrefix)
+func splitS3Path(rawPath, prefix string) (string, string, error) {
+	prefix = normalizePathPrefix(prefix)
+	if prefix != "" {
+		rawPath = strings.TrimPrefix(rawPath, prefix)
+	}
 	cleaned := strings.Trim(path.Clean("/"+rawPath), "/")
 	if cleaned == "" {
 		return "", "", nil
@@ -29,8 +32,17 @@ func splitS3Path(rawPath string) (string, string, error) {
 	return bucket, key, nil
 }
 
-func isCompatPrefix(rawPath string) bool {
-	return rawPath == compatPrefix || strings.HasPrefix(rawPath, compatPrefix+"/")
+func isCompatPrefix(rawPath, prefix string) bool {
+	prefix = normalizePathPrefix(prefix)
+	return prefix != "" && (rawPath == prefix || strings.HasPrefix(rawPath, prefix+"/"))
+}
+
+func normalizePathPrefix(prefix string) string {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" || prefix == "/" {
+		return ""
+	}
+	return "/" + strings.Trim(path.Clean("/"+prefix), "/")
 }
 
 func isReservedNativePath(rawPath string) bool {

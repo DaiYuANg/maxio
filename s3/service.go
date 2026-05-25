@@ -13,7 +13,7 @@ import (
 const (
 	amzRequestIDHeader = "x-amz-request-id"
 	contentTypeXML     = "application/xml"
-	compatPrefix       = "/s3"
+	defaultPathPrefix  = "/s3"
 )
 
 // ObjectStore is the object-service surface required by the S3 compatibility layer.
@@ -28,14 +28,6 @@ type ObjectStore interface {
 	DeleteObject(ctx context.Context, bucket, key string) (object.ObjectMeta, error)
 }
 
-// Config controls the standalone S3 compatibility layer.
-type Config struct {
-	DataDir   string
-	AccessKey string
-	SecretKey string
-	Region    string
-}
-
 type Service struct {
 	objects   ObjectStore
 	logger    *slog.Logger
@@ -43,23 +35,11 @@ type Service struct {
 	multipart *multipartStore
 }
 
-func NewService(objects ObjectStore, logger *slog.Logger, cfg Config) *Service {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Service{
-		objects:   objects,
-		logger:    logger,
-		cfg:       cfg,
-		multipart: newMultipartStore(cfg),
-	}
-}
-
 func (s *Service) Match(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	if isCompatPrefix(r.URL.Path) {
+	if isCompatPrefix(r.URL.Path, s.PathPrefix()) {
 		return true
 	}
 	if isReservedNativePath(r.URL.Path) {
@@ -79,7 +59,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bucket, key, err := splitS3Path(r.URL.Path)
+	bucket, key, err := splitS3Path(r.URL.Path, s.PathPrefix())
 	if err != nil {
 		s.writeError(w, http.StatusBadRequest, "InvalidURI", err.Error())
 		return

@@ -21,9 +21,10 @@ func Module() dix.Module {
 
 func newServiceFromRuntimeConfig(objects *object.Service, logger *slog.Logger, cfg config.Config) *Service {
 	return NewService(objects, logger, Config{
-		DataDir:   cfg.DataDir,
-		AccessKey: cfg.S3AccessKey,
-		SecretKey: cfg.S3SecretKey,
-		Region:    cfg.S3Region,
+		DataDir:    cfg.DataDir,
+		PathPrefix: "/s3",
+		AccessKey:  cfg.S3AccessKey,
+		SecretKey:  cfg.S3SecretKey,
+		Region:     cfg.S3Region,
 	})
 }

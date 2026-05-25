@@ -62,8 +62,12 @@ func NewEndpoint(service *Service) *Endpoint {
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
+	prefix := defaultPathPrefix
+	if e != nil && e.service != nil {
+		prefix = e.service.PathPrefix()
+	}
 	return httpx.EndpointSpec{
-		Prefix:        compatPrefix,
+		Prefix:        prefix,
 		Tags:          httpx.Tags("s3"),
 		SummaryPrefix: "S3",
 	}

@@ -56,7 +56,7 @@ func parseCopySource(value string) (string, string, error) {
 	} else if before, _, ok := strings.Cut(value, "?"); ok {
 		value = before
 	}
-	bucket, key, err := splitS3Path(value)
+	bucket, key, err := splitS3Path(value, "")
 	if err != nil {
 		return "", "", err
 	}
