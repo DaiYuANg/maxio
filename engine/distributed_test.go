@@ -13,10 +13,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/handler"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 type inMemoryStorageNode struct {

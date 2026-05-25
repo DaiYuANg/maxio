@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 type RebalanceResult struct {

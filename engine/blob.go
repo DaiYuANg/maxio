@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 // BlobInfo describes a stored content blob independent from object metadata.
@@ -18,7 +16,7 @@ type BlobInfo struct {
 	ETag            string
 	Size            int64
 	ShardDir        string
-	ShardPlacements []model.ShardPlacement
+	ShardPlacements []ShardPlacement
 	ShardChecksums  []string
 	ShardSizes      []int64
 }

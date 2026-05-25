@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const (
@@ -23,7 +21,7 @@ type PlacementRequest struct {
 }
 
 type PlacementPlan struct {
-	Shards []model.ShardPlacement
+	Shards []ShardPlacement
 }
 
 type PlacementPlanner interface {
@@ -50,9 +48,9 @@ func (planner *SingleNodePlacementPlanner) Plan(ctx context.Context, request Pla
 	if request.ShardCount < 1 {
 		return PlacementPlan{}, errors.New("placement shard count must be greater than zero")
 	}
-	placements := make([]model.ShardPlacement, request.ShardCount)
+	placements := make([]ShardPlacement, request.ShardCount)
 	for index := range placements {
-		placements[index] = model.ShardPlacement{
+		placements[index] = ShardPlacement{
 			Index:       index,
 			NodeID:      planner.node.ID(),
 			NodeAddress: planner.node.Address(),
@@ -98,11 +96,11 @@ func (planner *RoundRobinPlacementPlanner) Plan(ctx context.Context, request Pla
 	if len(planner.nodes) == 0 {
 		return PlacementPlan{}, errors.New("placement planner needs at least one storage node")
 	}
-	placements := make([]model.ShardPlacement, request.ShardCount)
+	placements := make([]ShardPlacement, request.ShardCount)
 	for index := range placements {
 		node := planner.nodes[index%len(planner.nodes)]
 		nodeID := strings.TrimSpace(node.ID())
-		placements[index] = model.ShardPlacement{
+		placements[index] = ShardPlacement{
 			Index:       index,
 			NodeID:      nodeID,
 			NodeAddress: strings.TrimSpace(node.Address()),
@@ -134,7 +132,7 @@ func (e *Engine) configureLocalNodeLocked(id, address string) {
 	e.registerStorageNodeLocked(node)
 }
 
-func (e *Engine) PlanShardPlacement(ctx context.Context, request PlacementRequest) ([]model.ShardPlacement, error) {
+func (e *Engine) PlanShardPlacement(ctx context.Context, request PlacementRequest) ([]ShardPlacement, error) {
 	e.mu.RLock()
 	planner := e.planner
 	e.mu.RUnlock()
@@ -167,7 +165,7 @@ func validatePlacementPlan(plan PlacementPlan, shardCount int) error {
 	return nil
 }
 
-func (e *Engine) resolveBlobPlacements(ctx context.Context, bucket, key string, blob BlobInfo) []model.ShardPlacement {
+func (e *Engine) resolveBlobPlacements(ctx context.Context, bucket, key string, blob BlobInfo) []ShardPlacement {
 	if len(blob.ShardPlacements) == e.coder.TotalChunks() {
 		return cloneShardPlacements(blob.ShardPlacements)
 	}
@@ -183,28 +181,28 @@ func (e *Engine) resolveBlobPlacements(ctx context.Context, bucket, key string, 
 	return placements
 }
 
-func (e *Engine) localShardPlacements() []model.ShardPlacement {
+func (e *Engine) localShardPlacements() []ShardPlacement {
 	total := e.coder.TotalChunks()
-	placements := make([]model.ShardPlacement, total)
+	placements := make([]ShardPlacement, total)
 	for index := range placements {
 		placements[index] = e.localShardPlacement(index)
 	}
 	return placements
 }
 
-func (e *Engine) localShardPlacement(index int) model.ShardPlacement {
+func (e *Engine) localShardPlacement(index int) ShardPlacement {
 	e.mu.RLock()
 	node := e.nodes[e.localNodeID]
 	e.mu.RUnlock()
 	if node == nil {
-		return model.ShardPlacement{
+		return ShardPlacement{
 			Index:       index,
 			NodeID:      DefaultLocalNodeID,
 			NodeAddress: DefaultLocalNodeAddress,
 			Local:       true,
 		}
 	}
-	return model.ShardPlacement{
+	return ShardPlacement{
 		Index:       index,
 		NodeID:      node.ID(),
 		NodeAddress: node.Address(),
@@ -212,7 +210,7 @@ func (e *Engine) localShardPlacement(index int) model.ShardPlacement {
 	}
 }
 
-func (e *Engine) shardPlacement(layout *Layout, index int) model.ShardPlacement {
+func (e *Engine) shardPlacement(layout *Layout, index int) ShardPlacement {
 	if layout != nil && index >= 0 && index < len(layout.ShardPlacements) {
 		placement := layout.ShardPlacements[index]
 		if strings.TrimSpace(placement.NodeID) != "" {
@@ -222,20 +220,20 @@ func (e *Engine) shardPlacement(layout *Layout, index int) model.ShardPlacement 
 	return e.localShardPlacement(index)
 }
 
-func (e *Engine) shardPlacements(layout *Layout) []model.ShardPlacement {
+func (e *Engine) shardPlacements(layout *Layout) []ShardPlacement {
 	total := e.coder.TotalChunks()
-	placements := make([]model.ShardPlacement, total)
+	placements := make([]ShardPlacement, total)
 	for index := range placements {
 		placements[index] = e.shardPlacement(layout, index)
 	}
 	return placements
 }
 
-func cloneShardPlacements(input []model.ShardPlacement) []model.ShardPlacement {
+func cloneShardPlacements(input []ShardPlacement) []ShardPlacement {
 	if len(input) == 0 {
 		return nil
 	}
-	output := make([]model.ShardPlacement, len(input))
+	output := make([]ShardPlacement, len(input))
 	copy(output, input)
 	return output
 }

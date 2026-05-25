@@ -1,6 +1,6 @@
 package metadata
 
-import "github.com/lyonbrown4d/maxio/internal/model"
+import "github.com/lyonbrown4d/maxio/model"
 
 func cloneBlobRefPlacements(input []model.ShardPlacement) []model.ShardPlacement {
 	if len(input) == 0 {

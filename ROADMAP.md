@@ -10,6 +10,9 @@ treated as a production-grade object storage service.
 ## Current status
 
 - The application is library-first and can be embedded through the root Go package.
+- Core components are moving toward composable library packages: `engine`,
+  `model`, `object`, and `s3` can now be imported directly, while the root
+  runtime still assembles them with dix for the full server.
 - Runtime composition is dix-first, with config, logging, event bus, HTTP, Raft,
   metadata, storage, index, S3 endpoint registration, scheduler, and repair
   assembled as modules.

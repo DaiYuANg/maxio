@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	dbsm "github.com/lni/dragonboat/v4/statemachine"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func encodeMetadataEnvelope(envelope metadataEnvelope) (dbsm.Result, error) {

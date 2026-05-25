@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/store"

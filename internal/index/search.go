@@ -11,7 +11,7 @@ import (
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 const indexDir = "index/bleve"

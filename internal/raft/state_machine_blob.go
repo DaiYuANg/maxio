@@ -3,7 +3,7 @@ package raft
 import (
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func (s *raftStateMachine) createBlobRef(

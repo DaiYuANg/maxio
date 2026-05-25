@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/engine"
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/store"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func TestStoreRecoverRestoresCommittedLayoutAfterExpiredOverwrite(t *testing.T) {

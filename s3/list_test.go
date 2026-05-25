@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	maxios3 "github.com/lyonbrown4d/maxio/internal/s3"
 	"github.com/lyonbrown4d/maxio/object"
+	maxios3 "github.com/lyonbrown4d/maxio/s3"
 )
 
 type listObjectsV2TestResult struct {

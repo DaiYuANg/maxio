@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
-	maxios3 "github.com/lyonbrown4d/maxio/internal/s3"
+	maxios3 "github.com/lyonbrown4d/maxio/s3"
 )
 
 type s3ErrorTestResult struct {
@@ -75,11 +74,11 @@ func TestS3PresignedURLReadsObject(t *testing.T) {
 	region := "us-east-1"
 	_, objects := newMultipartTestService(t)
 	putListObject(t, objects, "presigned.txt")
-	service := maxios3.NewService(objects, slog.New(slog.DiscardHandler), config.Config{
-		DataDir:     t.TempDir(),
-		S3AccessKey: accessID,
-		S3SecretKey: material,
-		S3Region:    region,
+	service := maxios3.NewService(objects, slog.New(slog.DiscardHandler), maxios3.Config{
+		DataDir:   t.TempDir(),
+		AccessKey: accessID,
+		SecretKey: material,
+		Region:    region,
 	})
 	request := newSignedRequest(t, "http://maxio.local/s3/bucket/presigned.txt?response-content-type=text%2Fplain")
 	signPresignedRequest(t, request, accessID, material, region, time.Now().UTC(), 60)

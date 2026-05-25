@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/object"
 )

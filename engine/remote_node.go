@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
-	"time"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (

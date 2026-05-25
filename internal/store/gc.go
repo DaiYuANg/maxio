@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 type pendingCleanup struct {

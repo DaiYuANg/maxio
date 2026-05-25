@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )

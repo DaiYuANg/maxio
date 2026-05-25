@@ -9,8 +9,8 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/store"
+	"github.com/lyonbrown4d/maxio/model"
 	"github.com/lyonbrown4d/maxio/object"
 )
 

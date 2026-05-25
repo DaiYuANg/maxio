@@ -112,7 +112,7 @@ func (err *deleteObjectItemError) toResult() deleteErrorResult {
 }
 
 func (s *Service) region() string {
-	region := strings.TrimSpace(s.cfg.S3Region)
+	region := strings.TrimSpace(s.cfg.Region)
 	if region == "" {
 		return "us-east-1"
 	}

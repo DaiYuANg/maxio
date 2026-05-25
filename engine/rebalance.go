@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 type ShardMove struct {
-	Index int                  `json:"index"`
-	From  model.ShardPlacement `json:"from"`
-	To    model.ShardPlacement `json:"to"`
+	Index int            `json:"index"`
+	From  ShardPlacement `json:"from"`
+	To    ShardPlacement `json:"to"`
 }
 
 type RebalanceObjectResult struct {
@@ -54,7 +52,7 @@ func (e *Engine) rebalanceLayoutPlacements(
 	ctx context.Context,
 	layout *Layout,
 	fromNodeID string,
-) ([]model.ShardPlacement, []ShardMove, error) {
+) ([]ShardPlacement, []ShardMove, error) {
 	placements := cloneShardPlacements(layout.ShardPlacements)
 	moved := make([]ShardMove, 0)
 	for index := range placements {
@@ -74,7 +72,7 @@ func (e *Engine) rebalanceLayoutPlacements(
 	return placements, moved, nil
 }
 
-func (e *Engine) rebalanceTargetPlacement(index int, fromNodeID string) (model.ShardPlacement, error) {
+func (e *Engine) rebalanceTargetPlacement(index int, fromNodeID string) (ShardPlacement, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -86,11 +84,11 @@ func (e *Engine) rebalanceTargetPlacement(index int, fromNodeID string) (model.S
 		}
 	}
 	if len(candidates) == 0 {
-		return model.ShardPlacement{}, errors.New("rebalance target node is unavailable")
+		return ShardPlacement{}, errors.New("rebalance target node is unavailable")
 	}
 	node := candidates[index%len(candidates)]
 	nodeID := node.ID()
-	return model.ShardPlacement{
+	return ShardPlacement{
 		Index:       index,
 		NodeID:      nodeID,
 		NodeAddress: node.Address(),
@@ -98,7 +96,7 @@ func (e *Engine) rebalanceTargetPlacement(index int, fromNodeID string) (model.S
 	}, nil
 }
 
-func (e *Engine) moveShard(ctx context.Context, layout *Layout, index int, target model.ShardPlacement) error {
+func (e *Engine) moveShard(ctx context.Context, layout *Layout, index int, target ShardPlacement) error {
 	data, err := e.readShard(ctx, layout, index)
 	if err != nil {
 		return fmt.Errorf("read shard %d for rebalance: %w", index, err)
@@ -119,7 +117,7 @@ func (e *Engine) cleanupMovedShards(ctx context.Context, layout *Layout, moved [
 	return cleanupErrors
 }
 
-func (e *Engine) deleteShard(ctx context.Context, placement model.ShardPlacement, shardDir, hash string, index int) error {
+func (e *Engine) deleteShard(ctx context.Context, placement ShardPlacement, shardDir, hash string, index int) error {
 	node, err := e.storageNode(placement)
 	if err != nil {
 		return err

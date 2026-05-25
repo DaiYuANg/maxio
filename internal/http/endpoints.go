@@ -2,7 +2,7 @@ package http
 
 import (
 	"github.com/arcgolabs/httpx"
-	"github.com/lyonbrown4d/maxio/internal/s3"
+	"github.com/lyonbrown4d/maxio/s3"
 )
 
 type endpointRegistry struct {

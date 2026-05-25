@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/engine"
+	"github.com/lyonbrown4d/maxio/engine"
 )
 
 type testStorageNode struct {

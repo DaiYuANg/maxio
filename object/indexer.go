@@ -34,7 +34,7 @@ type indexTask struct {
 }
 
 const (
-	defaultIndexBatchSize   = 32
+	defaultIndexBatchSize = 32
 )
 
 func (s *Service) StartIndexWorker(ctx context.Context) error {

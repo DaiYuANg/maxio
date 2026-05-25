@@ -8,7 +8,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/index"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func TestSearchEnginePersistsFullTextIndex(t *testing.T) {

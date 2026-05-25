@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 type rebalancePlanResponse struct {

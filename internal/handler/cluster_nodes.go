@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 

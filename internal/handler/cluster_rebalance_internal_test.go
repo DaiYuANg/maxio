@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func TestValidateClusterMemberRebalanceAcceptsPresentReplica(t *testing.T) {

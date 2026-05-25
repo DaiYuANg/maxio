@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (e *Engine) readShardSetForRecovery(ctx context.Context, layout *Layout) ([][]byte, int, error) {
@@ -50,7 +48,7 @@ func (e *Engine) readShardSetForRecovery(ctx context.Context, layout *Layout) ([
 
 func (e *Engine) writeShardSet(
 	ctx context.Context,
-	placements []model.ShardPlacement,
+	placements []ShardPlacement,
 	shardDir string,
 	hash string,
 	shards [][]byte,
@@ -64,7 +62,7 @@ func (e *Engine) writeShardSet(
 
 func (e *Engine) writeShardIndexes(
 	ctx context.Context,
-	placements []model.ShardPlacement,
+	placements []ShardPlacement,
 	shardDir string,
 	hash string,
 	shards [][]byte,
@@ -92,7 +90,7 @@ func (e *Engine) writeShardIndexes(
 	return firstConcurrentError(errCh)
 }
 
-func validateShardWriteInputs(placements []model.ShardPlacement, shards [][]byte, indexes []int) error {
+func validateShardWriteInputs(placements []ShardPlacement, shards [][]byte, indexes []int) error {
 	if len(indexes) == 0 {
 		return nil
 	}
@@ -109,7 +107,7 @@ func validateShardWriteInputs(placements []model.ShardPlacement, shards [][]byte
 
 func (e *Engine) writeShardIndex(
 	ctx context.Context,
-	placements []model.ShardPlacement,
+	placements []ShardPlacement,
 	shardDir string,
 	hash string,
 	shards [][]byte,

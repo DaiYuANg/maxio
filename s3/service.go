@@ -1,11 +1,12 @@
 package s3
 
 import (
+	"context"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/object"
 )
 
@@ -15,14 +16,34 @@ const (
 	compatPrefix       = "/s3"
 )
 
+// ObjectStore is the object-service surface required by the S3 compatibility layer.
+type ObjectStore interface {
+	ListBuckets(ctx context.Context) ([]object.Bucket, error)
+	CreateBucket(ctx context.Context, name string) error
+	DeleteBucket(ctx context.Context, name string) error
+	ListObjects(ctx context.Context, bucket, prefix string) ([]object.ObjectMeta, error)
+	PutObject(ctx context.Context, bucket, key string, reader io.Reader, opts object.PutOptions) (object.ObjectMeta, error)
+	GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, object.ObjectMeta, error)
+	StatObject(ctx context.Context, bucket, key string) (object.ObjectMeta, error)
+	DeleteObject(ctx context.Context, bucket, key string) (object.ObjectMeta, error)
+}
+
+// Config controls the standalone S3 compatibility layer.
+type Config struct {
+	DataDir   string
+	AccessKey string
+	SecretKey string
+	Region    string
+}
+
 type Service struct {
-	objects   *object.Service
+	objects   ObjectStore
 	logger    *slog.Logger
-	cfg       config.Config
+	cfg       Config
 	multipart *multipartStore
 }
 
-func NewService(objects *object.Service, logger *slog.Logger, cfg config.Config) *Service {
+func NewService(objects ObjectStore, logger *slog.Logger, cfg Config) *Service {
 	if logger == nil {
 		logger = slog.Default()
 	}

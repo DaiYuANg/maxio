@@ -14,8 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
-	maxios3 "github.com/lyonbrown4d/maxio/internal/s3"
+	maxios3 "github.com/lyonbrown4d/maxio/s3"
 )
 
 const (
@@ -36,10 +35,10 @@ func TestServeHTTPWithSigV4HeaderAllowsValidSignature(t *testing.T) {
 	signHeaderRequest(t, req, accessID, material, region, "20260516T010203Z")
 
 	recorder := httptest.NewRecorder()
-	maxios3.NewService(nil, nil, config.Config{
-		S3AccessKey: accessID,
-		S3SecretKey: material,
-		S3Region:    region,
+	maxios3.NewService(nil, nil, maxios3.Config{
+		AccessKey: accessID,
+		SecretKey: material,
+		Region:    region,
 	}).ServeHTTP(recorder, req)
 
 	if recorder.Code == http.StatusForbidden {
@@ -58,10 +57,10 @@ func TestServeHTTPWithPresignedURLAllowsValidSignature(t *testing.T) {
 	signPresignedRequest(t, req, accessID, material, region, time.Now().UTC(), 60)
 
 	recorder := httptest.NewRecorder()
-	maxios3.NewService(nil, nil, config.Config{
-		S3AccessKey: accessID,
-		S3SecretKey: material,
-		S3Region:    region,
+	maxios3.NewService(nil, nil, maxios3.Config{
+		AccessKey: accessID,
+		SecretKey: material,
+		Region:    region,
 	}).ServeHTTP(recorder, req)
 
 	if recorder.Code == http.StatusForbidden {
@@ -80,10 +79,10 @@ func TestServeHTTPWithPresignedURLRejectsExpiredSignature(t *testing.T) {
 	signPresignedRequest(t, req, accessID, material, region, time.Now().UTC().Add(-2*time.Hour), 1)
 
 	recorder := httptest.NewRecorder()
-	maxios3.NewService(nil, nil, config.Config{
-		S3AccessKey: accessID,
-		S3SecretKey: material,
-		S3Region:    region,
+	maxios3.NewService(nil, nil, maxios3.Config{
+		AccessKey: accessID,
+		SecretKey: material,
+		Region:    region,
 	}).ServeHTTP(recorder, req)
 
 	if recorder.Code != http.StatusForbidden {

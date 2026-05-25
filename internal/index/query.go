@@ -5,7 +5,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2"
 	qry "github.com/blevesearch/bleve/v2/search/query"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func (s *SearchEngine) buildQuery(criteria model.SearchQuery) qry.Query {

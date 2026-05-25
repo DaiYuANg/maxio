@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func (s *raftStateMachine) applyMetadataCommand(cmd MetadataCommand) (MetadataResult, string) {

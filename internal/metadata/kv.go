@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/arcgolabs/collectionx/list"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 var (

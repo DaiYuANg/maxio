@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/spf13/afero"
 )
 
@@ -42,16 +41,16 @@ type Engine struct {
 
 // ObjectMeta stores object metadata (moved from metadata module).
 type ObjectMeta struct {
-	Bucket          string                 `json:"bucket"`
-	Key             string                 `json:"key"`
-	Hash            string                 `json:"hash"`
-	ETag            string                 `json:"etag"`
-	Size            int64                  `json:"size"`
-	ContentType     string                 `json:"content_type"`
-	UpdatedAt       time.Time              `json:"updated_at"`
-	ShardPlacements []model.ShardPlacement `json:"shard_placements,omitempty"`
-	ShardChecksums  []string               `json:"shard_checksums,omitempty"`
-	ShardSizes      []int64                `json:"shard_sizes,omitempty"`
+	Bucket          string           `json:"bucket"`
+	Key             string           `json:"key"`
+	Hash            string           `json:"hash"`
+	ETag            string           `json:"etag"`
+	Size            int64            `json:"size"`
+	ContentType     string           `json:"content_type"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+	ShardPlacements []ShardPlacement `json:"shard_placements,omitempty"`
+	ShardChecksums  []string         `json:"shard_checksums,omitempty"`
+	ShardSizes      []int64          `json:"shard_sizes,omitempty"`
 }
 
 // ObjectInfo is ObjectMeta + erasure coding info.

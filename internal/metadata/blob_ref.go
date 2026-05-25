@@ -3,7 +3,7 @@ package metadata
 import (
 	"context"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, bool, error) {

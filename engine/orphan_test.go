@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/engine"
+	"github.com/lyonbrown4d/maxio/engine"
 )
 
 func TestCleanupOrphanShardSetsRemovesUnreferencedLocalBlob(t *testing.T) {

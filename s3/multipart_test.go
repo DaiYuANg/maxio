@@ -14,9 +14,9 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	maxios3 "github.com/lyonbrown4d/maxio/internal/s3"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/object"
+	maxios3 "github.com/lyonbrown4d/maxio/s3"
 )
 
 type initiateMultipartResult struct {
@@ -100,7 +100,7 @@ func newMultipartTestService(t *testing.T) (*maxios3.Service, *object.Service) {
 	if err := objects.CreateBucket(ctx, "bucket"); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}
-	return maxios3.NewService(objects, slog.New(slog.DiscardHandler), config.Config{DataDir: t.TempDir()}), objects
+	return maxios3.NewService(objects, slog.New(slog.DiscardHandler), maxios3.Config{DataDir: t.TempDir()}), objects
 }
 
 func initiateMultipartUpload(t *testing.T, service *maxios3.Service, target string) string {

@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/engine"
+	"github.com/lyonbrown4d/maxio/engine"
 )
 
 func TestRepairObjectRestoresMissingLocalShard(t *testing.T) {

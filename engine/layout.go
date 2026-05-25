@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 // Layout maps object keys to their shard locations.
@@ -16,7 +14,7 @@ type Layout struct {
 	ShardDir        string
 	Hash            string
 	Shards          []Shard
-	ShardPlacements []model.ShardPlacement
+	ShardPlacements []ShardPlacement
 	ShardChecksums  []string
 	ShardSizes      []int64
 	Bucket          string

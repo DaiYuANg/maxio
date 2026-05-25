@@ -14,15 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/object"
 	"github.com/spf13/afero"
 )
 
-func newMultipartStore(cfg config.Config) *multipartStore {
+func newMultipartStore(cfg Config) *multipartStore {
 	dataDir := strings.TrimSpace(cfg.DataDir)
 	if dataDir == "" {
-		dataDir = config.Default().DataDir
+		dataDir = "./data"
 	}
 	return &multipartStore{root: filepath.Join(dataDir, multipartRootDir)}
 }

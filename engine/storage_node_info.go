@@ -1,10 +1,6 @@
 package engine
 
-import (
-	"strings"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
-)
+import "strings"
 
 type StorageNodeInfo struct {
 	ID          string `json:"id"`
@@ -69,7 +65,7 @@ func (e *Engine) storageNodeOwnershipLocked() map[string]storageNodeOwnership {
 func countLayoutOwnership(
 	ownership map[string]storageNodeOwnership,
 	localNodeID string,
-	placements []model.ShardPlacement,
+	placements []ShardPlacement,
 	sizes []int64,
 ) {
 	seenObjects := make(map[string]struct{})

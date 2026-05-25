@@ -14,20 +14,20 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	maxios3 "github.com/lyonbrown4d/maxio/internal/s3"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/object"
+	maxios3 "github.com/lyonbrown4d/maxio/s3"
 )
 
 func newAWSSDKTestClient(t *testing.T) (*awss3.Client, func()) {
 	t.Helper()
 
 	objects := newAWSSDKObjectService(t)
-	service := maxios3.NewService(objects, slog.New(slog.DiscardHandler), config.Config{
-		DataDir:     t.TempDir(),
-		S3AccessKey: awsSDKAccessKey,
-		S3SecretKey: awsSDKSigningMaterial(),
-		S3Region:    awsSDKRegion,
+	service := maxios3.NewService(objects, slog.New(slog.DiscardHandler), maxios3.Config{
+		DataDir:   t.TempDir(),
+		AccessKey: awsSDKAccessKey,
+		SecretKey: awsSDKSigningMaterial(),
+		Region:    awsSDKRegion,
 	})
 	server := httptest.NewServer(service)
 	client := awss3.New(awss3.Options{

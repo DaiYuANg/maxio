@@ -88,8 +88,8 @@ func (s *Service) authorizePresigned(r *http.Request, accessKey, signingSecret s
 }
 
 func (s *Service) s3Credentials() (string, string, error) {
-	accessKey := strings.TrimSpace(s.cfg.S3AccessKey)
-	signingSecret := strings.TrimSpace(s.cfg.S3SecretKey)
+	accessKey := strings.TrimSpace(s.cfg.AccessKey)
+	signingSecret := strings.TrimSpace(s.cfg.SecretKey)
 	if accessKey == "" && signingSecret == "" {
 		return "", "", nil
 	}
@@ -104,7 +104,7 @@ func (s *Service) validateSigV4Authorization(auth sigV4Authorization, accessKey 
 		return errSigV4AccessDenied
 	}
 
-	region := strings.TrimSpace(s.cfg.S3Region)
+	region := strings.TrimSpace(s.cfg.Region)
 	if region == "" {
 		region = "us-east-1"
 	}

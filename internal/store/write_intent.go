@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 func newWriteIntent(bucket, key, hash string, at time.Time) *model.WriteIntent {

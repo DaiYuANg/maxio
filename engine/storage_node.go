@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 type StorageNode interface {
@@ -108,7 +106,7 @@ func raftStorageNodeID(replicaID uint64) string {
 	return fmt.Sprintf("raft-%d", replicaID)
 }
 
-func (e *Engine) writeShard(ctx context.Context, placement model.ShardPlacement, shardDir, hash string, index int, data []byte) error {
+func (e *Engine) writeShard(ctx context.Context, placement ShardPlacement, shardDir, hash string, index int, data []byte) error {
 	node, err := e.storageNode(placement)
 	if err != nil {
 		return err
@@ -150,7 +148,7 @@ func verifyShardChecksum(layout *Layout, index int, data []byte) error {
 	return nil
 }
 
-func (e *Engine) storageNode(placement model.ShardPlacement) (StorageNode, error) {
+func (e *Engine) storageNode(placement ShardPlacement) (StorageNode, error) {
 	nodeID := strings.TrimSpace(placement.NodeID)
 	if nodeID == "" {
 		nodeID = e.localNodeID

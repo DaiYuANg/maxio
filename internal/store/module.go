@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/arcgolabs/dix"
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 )
 

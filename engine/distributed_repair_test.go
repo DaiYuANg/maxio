@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/internal/engine"
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/engine"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 const remoteRepairObjectKey = "remote-repair-key.txt"

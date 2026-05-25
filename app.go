@@ -10,20 +10,20 @@ import (
 
 	"github.com/arcgolabs/configx"
 	"github.com/arcgolabs/dix"
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/dedupe"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/http"
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/repair"
-	"github.com/lyonbrown4d/maxio/internal/s3"
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/object"
+	"github.com/lyonbrown4d/maxio/s3"
 )
 
 const defaultStopTimeout = 10 * time.Second
@@ -204,6 +204,30 @@ func (app *App) Objects() (*object.Service, error) {
 		return nil, fmt.Errorf("resolve object service: %w", err)
 	}
 	return objects, nil
+}
+
+// Engine returns the erasure-coded storage engine for library callers.
+func (app *App) Engine() (*engine.Engine, error) {
+	if app == nil || app.runtime == nil {
+		return nil, errors.New("engine unavailable: runtime is nil")
+	}
+	storageEngine, err := dix.ResolveAs[*engine.Engine](app.runtime.Container())
+	if err != nil {
+		return nil, fmt.Errorf("resolve engine: %w", err)
+	}
+	return storageEngine, nil
+}
+
+// S3 returns the S3-compatible service for library callers.
+func (app *App) S3() (*s3.Service, error) {
+	if app == nil || app.runtime == nil {
+		return nil, errors.New("s3 service unavailable: runtime is nil")
+	}
+	service, err := dix.ResolveAs[*s3.Service](app.runtime.Container())
+	if err != nil {
+		return nil, fmt.Errorf("resolve s3 service: %w", err)
+	}
+	return service, nil
 }
 
 func runtimeContext(ctx context.Context) context.Context {

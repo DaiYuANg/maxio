@@ -8,11 +8,11 @@ import (
 	"sync"
 
 	"github.com/arcgolabs/eventx"
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/index"
-	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/store"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 var (

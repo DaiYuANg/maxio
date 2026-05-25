@@ -9,12 +9,12 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/engine"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/model"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/store"
+	"github.com/lyonbrown4d/maxio/model"
 	"github.com/lyonbrown4d/maxio/object"
 	"github.com/spf13/afero"
 )

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 const maxExtractBytes = 8 << 20

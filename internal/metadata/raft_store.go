@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 type RaftMetadata struct {

@@ -4,7 +4,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 // PutOptions captures protocol-level object metadata that is persisted in the
