@@ -8,42 +8,12 @@ import (
 	"sync"
 
 	"github.com/arcgolabs/eventx"
-	"github.com/lyonbrown4d/maxio/engine"
-	"github.com/lyonbrown4d/maxio/index"
-	"github.com/lyonbrown4d/maxio/internal/store"
-	"github.com/lyonbrown4d/maxio/model"
 )
-
-var (
-	ErrNotFound            = store.ErrNotFound
-	ErrBucketExists        = store.ErrBucketExists
-	ErrBucketNotFound      = store.ErrBucketNotFound
-	ErrBadRequest          = store.ErrBadRequest
-	ErrEngineFailed        = store.ErrEngineFailed
-	ErrObjectCorrupted     = engine.ErrObjectCorrupted
-	ErrShardRecoveryFailed = engine.ErrShardRecoveryFailed
-)
-
-type Bucket = model.Bucket
-type ObjectMeta = model.ObjectMeta
-type SearchQuery = model.SearchQuery
-type SearchResult = model.SearchResult
-type Health = engine.Health
-type RepairResult = engine.RepairResult
-type ScrubResult = engine.ScrubResult
-type DedupeOptions = store.DedupeOptions
-type DedupeResult = store.DedupeResult
-type RebalanceResult = store.RebalanceResult
-type RecoveryResult = store.RecoveryResult
-type RecoveryPlan = store.RecoveryPlan
-type RecoveryStatus = store.RecoveryStatus
-
-type PutOptions = store.PutOptions
 
 type Service struct {
 	logger  *slog.Logger
-	store   *store.Store
-	search  *index.SearchEngine
+	store   Store
+	search  SearchIndex
 	bus     eventx.BusRuntime
 	cfg     Config
 	indexMu sync.RWMutex
@@ -53,8 +23,8 @@ type Service struct {
 }
 
 func NewService(
-	storage *store.Store,
-	search *index.SearchEngine,
+	storage Store,
+	search SearchIndex,
 	bus eventx.BusRuntime,
 	logger *slog.Logger,
 	cfg Config,
@@ -164,7 +134,7 @@ func (s *Service) RepairObject(ctx context.Context, bucket, key string) (RepairR
 }
 
 func (s *Service) PlanDedupe(ctx context.Context) (DedupeResult, error) {
-	result, err := s.store.Dedupe(ctx, store.DedupeOptions{
+	result, err := s.store.Dedupe(ctx, DedupeOptions{
 		DryRun:   true,
 		MaxFixes: s.cfg.DedupeMaxFixes,
 	})
@@ -175,7 +145,7 @@ func (s *Service) PlanDedupe(ctx context.Context) (DedupeResult, error) {
 }
 
 func (s *Service) RunDedupe(ctx context.Context) (DedupeResult, error) {
-	result, err := s.store.Dedupe(ctx, store.DedupeOptions{
+	result, err := s.store.Dedupe(ctx, DedupeOptions{
 		MaxFixes: s.cfg.DedupeMaxFixes,
 	})
 	if err != nil {
@@ -193,7 +163,7 @@ func (s *Service) RebalanceNode(ctx context.Context, nodeID string) (RebalanceRe
 }
 
 func (s *Service) Recover(ctx context.Context) (RecoveryResult, error) {
-	result, err := s.store.Recover(ctx, store.RecoveryOptions{
+	result, err := s.store.Recover(ctx, RecoveryOptions{
 		PendingTTL:          s.cfg.PendingObjectTTLDuration(),
 		CleanupOrphanShards: true,
 	})
