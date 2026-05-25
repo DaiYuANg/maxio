@@ -101,6 +101,8 @@ treated as a production-grade object storage service.
   `X-Maxio-Cluster` by default.
 - S3 compatibility coverage now includes presigned reads, range reads, invalid
   range XML errors, stable ETags, list ETags, and a documented supported subset.
+- S3 compatibility coverage now exercises the supported object, range,
+  presign, and multipart paths through the official AWS SDK for Go v2 client.
 - Operational delivery now documents data layout, backup, restore, and upgrade
   procedures alongside the deployment guide.
 - CI now runs GitHub Actions checks for Go tests, golangci-lint, package
