@@ -11,9 +11,9 @@ import (
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/httpx"
 	httpxfiber "github.com/arcgolabs/httpx/adapter/fiber"
-	fiberapp "github.com/gofiber/fiber/v2"
-	fiberadapter "github.com/gofiber/fiber/v2/middleware/adaptor"
-	fiberhtml "github.com/gofiber/template/html/v2"
+	fiberapp "github.com/gofiber/fiber/v3"
+	fiberadapter "github.com/gofiber/fiber/v3/middleware/adaptor"
+	fiberhtml "github.com/gofiber/template/html/v3"
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/http/web"
@@ -111,7 +111,7 @@ func stopHTTPRuntime(_ context.Context, rt *httpRuntime) error {
 	return nil
 }
 
-func (rt *httpRuntime) handleAdmin(c *fiberapp.Ctx) error {
+func (rt *httpRuntime) handleAdmin(c fiberapp.Ctx) error {
 	c.Set("Cache-Control", "no-store")
 	if err := c.Render("admin", fiberapp.Map{
 		"Product": "MaxIO",

@@ -7,8 +7,8 @@ require (
 	github.com/arcgolabs/configx v0.3.2
 	github.com/arcgolabs/dix v0.10.0
 	github.com/arcgolabs/eventx v0.1.2
-	github.com/arcgolabs/httpx v0.1.6
-	github.com/arcgolabs/httpx/adapter/fiber v0.1.6
+	github.com/arcgolabs/httpx v0.1.7
+	github.com/arcgolabs/httpx/adapter/fiber v0.1.7
 	github.com/arcgolabs/logx v0.1.2
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.17
@@ -16,8 +16,8 @@ require (
 	github.com/blevesearch/bleve/v2 v2.6.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/go-co-op/gocron/v2 v2.21.1
-	github.com/gofiber/fiber/v2 v2.52.13
-	github.com/gofiber/template/html/v2 v2.1.3
+	github.com/gofiber/fiber/v3 v3.3.0
+	github.com/gofiber/template/html/v3 v3.0.4
 	github.com/hashicorp/memberlist v0.5.4
 	github.com/klauspost/reedsolomon v1.14.0
 	github.com/lni/dragonboat/v4 v4.0.0-20250723143628-076c7f6497dc
@@ -72,7 +72,7 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20241215232642-bb51bb14a506 // indirect
 	github.com/cockroachdb/pebble v0.0.0-20221207173255-0f086d933dac // indirect
 	github.com/cockroachdb/redact v1.1.8 // indirect
-	github.com/danielgtaylor/huma/v2 v2.37.3 // indirect
+	github.com/danielgtaylor/huma/v2 v2.38.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -82,8 +82,10 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.30.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/gofiber/template v1.8.3 // indirect
-	github.com/gofiber/utils v1.1.0 // indirect
+	github.com/gofiber/fiber/v2 v2.52.13 // indirect
+	github.com/gofiber/schema v1.7.1 // indirect
+	github.com/gofiber/template/v2 v2.1.0 // indirect
+	github.com/gofiber/utils/v2 v2.0.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -126,6 +128,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/panjf2000/ants/v2 v2.12.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
+	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
@@ -142,6 +145,7 @@ require (
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.71.0 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
