@@ -22,9 +22,7 @@ type Config struct {
 	AdminToken                   string  `json:"admin_token"              koanf:"admin_token"`
 	ClusterToken                 string  `json:"cluster_token"            koanf:"cluster_token"`
 	APIToken                     string  `json:"api_token"                koanf:"api_token"`
-	S3AccessKey                  string  `json:"s3_access_key"            koanf:"s3_access_key"`
-	S3SecretKey                  string  `json:"s3_secret_key"            koanf:"s3_secret_key"`
-	S3Region                     string  `json:"s3_region"                koanf:"s3_region"`
+	EnableNativeObjectAPI        bool    `json:"enable_native_object_api" koanf:"enable_native_object_api"`
 	CacheBackend                 string  `json:"cache_backend"            koanf:"cache_backend"            validate:"required,oneof=none memory redis"`
 	CacheTTL                     string  `json:"cache_ttl"                koanf:"cache_ttl"                validate:"required,min=1"`
 	CacheMaxCost                 int     `json:"cache_max_cost"           koanf:"cache_max_cost"`
@@ -150,9 +148,6 @@ func trim(cfg Config) Config {
 	cfg.AdminToken = strings.TrimSpace(cfg.AdminToken)
 	cfg.ClusterToken = strings.TrimSpace(cfg.ClusterToken)
 	cfg.APIToken = strings.TrimSpace(cfg.APIToken)
-	cfg.S3AccessKey = strings.TrimSpace(cfg.S3AccessKey)
-	cfg.S3SecretKey = strings.TrimSpace(cfg.S3SecretKey)
-	cfg.S3Region = strings.TrimSpace(cfg.S3Region)
 	cfg.CacheBackend = strings.ToLower(strings.TrimSpace(cfg.CacheBackend))
 	cfg.CacheTTL = strings.TrimSpace(cfg.CacheTTL)
 	cfg.CacheRedisAddress = strings.TrimSpace(cfg.CacheRedisAddress)

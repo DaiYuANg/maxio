@@ -24,7 +24,6 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/object"
-	"github.com/lyonbrown4d/maxio/s3"
 )
 
 const defaultStopTimeout = 10 * time.Second
@@ -219,18 +218,6 @@ func (app *App) Engine() (*engine.Engine, error) {
 	return storageEngine, nil
 }
 
-// S3 returns the S3-compatible service for library callers.
-func (app *App) S3() (*s3.Service, error) {
-	if app == nil || app.runtime == nil {
-		return nil, errors.New("s3 service unavailable: runtime is nil")
-	}
-	service, err := dix.ResolveAs[*s3.Service](app.runtime.Container())
-	if err != nil {
-		return nil, fmt.Errorf("resolve s3 service: %w", err)
-	}
-	return service, nil
-}
-
 func runtimeContext(ctx context.Context) context.Context {
 	if ctx != nil {
 		return ctx
@@ -280,7 +267,6 @@ func defaultModules(configOptions ...configx.Option) []dix.Module {
 		scheduler.Module(),
 		repair.Module(),
 		dedupe.Module(),
-		s3.Module(),
 		handler.Module(),
 		http.Module(),
 	}

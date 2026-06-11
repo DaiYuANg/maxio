@@ -84,6 +84,22 @@ func TestAPIAuthProtectsObjectRoutes(t *testing.T) {
 	}
 }
 
+func TestNativeObjectAPIDisabledRejectsBucketRoute(t *testing.T) {
+	cfg := config.Config{EnableNativeObjectAPI: false}
+	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos", nil, nil)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
+func TestNativeObjectAPIDisabledRejectsObjectRoute(t *testing.T) {
+	cfg := config.Config{EnableNativeObjectAPI: false}
+	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos/cat.jpg", nil, nil)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
 func TestAPIAuthDoesNotProtectReadiness(t *testing.T) {
 	recorder := serveHandlerGet(t, config.Config{APIToken: "api-secret"}, "/readyz", nil)
 	if recorder.Code != http.StatusServiceUnavailable {
@@ -206,7 +222,7 @@ func newObjectRouter(t *testing.T, cfg config.Config, logger *slog.Logger) http.
 		t.Fatalf("create store: %v", err)
 	}
 	objects := object.NewService(storage, nil, nil, slog.New(slog.DiscardHandler), object.Config{})
-	deps := handler.NewDependencies(objects, nil, nil, nil, nil, nil)
+	deps := handler.NewDependencies(objects, nil, nil, nil, nil)
 	service := handler.NewService(deps, logger, cfg)
 	router := http.NewServeMux()
 	service.RegisterHTTP(router)
@@ -240,7 +256,7 @@ func serveStorageShardPut(
 	if err != nil {
 		t.Fatalf("create engine: %v", err)
 	}
-	deps := handler.NewDependencies(nil, eng, nil, nil, nil, nil)
+	deps := handler.NewDependencies(nil, eng, nil, nil, nil)
 	service := handler.NewService(deps, slog.New(slog.DiscardHandler), cfg)
 	router := http.NewServeMux()
 	service.RegisterHTTP(router)

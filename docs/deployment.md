@@ -27,6 +27,32 @@ Use `config.example.json` as the baseline config. For local single-node runs, ke
 }
 ```
 
+## Object API mode
+
+MaxIO exposes native object APIs by default and control APIs in the same process.
+
+To run MaxIO as a cluster-management-only service, set:
+
+```json
+{
+  "enable_native_object_api": false
+}
+```
+
+In this mode, control paths remain available:
+
+- `/healthz`, `/readyz`
+- `/metrics`
+- `/_cluster/*`
+- `/_repair/*`
+- `/_dedupe/*`
+- `/_index/*`
+- `/_recovery/*`
+- `/_internal/*`
+
+Native bucket/object routes (`/`, `/<bucket>`, `/<bucket>/<key>`) return `404`
+when object API is disabled.
+
 Start the server with the default config path:
 
 ```sh
@@ -166,10 +192,12 @@ curl http://127.0.0.1:8080/readyz
 Set `admin_token` or `MAXIO_ADMIN_TOKEN` to protect management APIs.
 Set `cluster_token` or `MAXIO_CLUSTER_TOKEN` to protect internal shard APIs used between MaxIO nodes.
 Set `api_token` or `MAXIO_API_TOKEN` to protect bucket and object APIs.
-Set `s3_access_key`, `s3_secret_key`, and `s3_region` to require SigV4 header or presigned URL authentication for S3-compatible APIs.
-Set `http_body_limit` to control the maximum request body accepted by the Fiber HTTP adapter. The default is `1073741824` bytes so standard S3 multipart upload parts work out of the box.
+Set `http_body_limit` to control the maximum request body accepted by the Fiber HTTP adapter. The default is `1073741824` bytes.
 
 Native HTTP authorization is split by route class. Control-plane routes require the admin token when `admin_token` is set. Internal shard routes require the cluster token when `cluster_token` is set. Native bucket and object routes require object authorization when `api_token` is set; the API token grants object read/write access, and the admin token is accepted as an object superuser. The API token does not authorize control-plane routes.
+
+To disable native bucket/object routes in control-only deployments, set
+`enable_native_object_api` or `MAXIO_ENABLE_NATIVE_OBJECT_API=false`.
 
 Admin requests can use either header:
 
@@ -203,11 +231,8 @@ X-Maxio-API: <api-token>
 
 The admin token is also accepted for native bucket and object routes.
 
-If both S3 key fields are empty, S3-compatible APIs run without authentication for local development. If either S3 key field is configured, both must be configured and S3 clients must send `Authorization: AWS4-HMAC-SHA256 ...` plus `X-Amz-Date`, or use standard presigned URL query parameters.
-
-S3-compatible routes use SigV4 authentication instead of `api_token`. If both native API token auth and S3 auth are enabled, native bucket/object paths use `api_token` or `admin_token`, while `/s3` paths use `s3_access_key` and `s3_secret_key`.
-
-S3 multipart upload is supported through the compatibility path. In-progress upload state is staged under `data_dir/s3-multipart` and completed objects are committed through the normal MaxIO object write path.
+Object APIs use `api_token` for standard object access control. The admin token is
+also accepted for object APIs.
 
 `/healthz` and `/readyz` remain unauthenticated for load balancers.
 
@@ -231,20 +256,16 @@ client HTTPS -> reverse proxy / ingress / load balancer -> private MaxIO HTTP
 
 The TLS terminator is responsible for certificate provisioning, renewal, cipher policy, HTTP to HTTPS redirects, HSTS, and any public mTLS policy. MaxIO currently does not terminate TLS itself and does not reload TLS certificates.
 
-Forward these headers unchanged when admin, API, cluster, or S3 credentials are used:
+Forward these headers unchanged when admin, API, or cluster credentials are used:
 
 ```text
 Authorization
 X-Maxio-Control
 X-Maxio-Cluster
 X-Maxio-API
-X-Amz-Date
-X-Amz-Content-Sha256
 ```
 
-For SigV4 requests, preserve the request path, query string, and `Host` semantics used by the client when it signs the request. If the proxy rewrites `Host`, configure clients to sign the externally visible host and make the proxy forward that host consistently.
-
-The internal shard API `/_internal/storage/shards/*` must only be reachable by trusted MaxIO nodes or by a private service network. If `cluster_token` is configured, MaxIO remote shard transport automatically sends `X-Maxio-Cluster`. If `cluster_token` is empty, the transport falls back to `admin_token` for development and compatibility.
+The internal shard API `/_internal/storage/shards/*` must only be reachable by trusted MaxIO nodes or by a private service network. If `cluster_token` is configured, MaxIO remote shard transport automatically sends `X-Maxio-Cluster`. If `cluster_token` is empty, the transport falls back to `admin_token` for development.
 
 ## Multi-node bootstrap
 

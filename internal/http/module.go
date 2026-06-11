@@ -25,7 +25,6 @@ type httpRuntime struct {
 	server  httpx.ServerRuntime
 	app     *fiberapp.App
 	service *handler.Service
-	routes  endpointRegistry
 }
 
 func Module() dix.Module {
@@ -34,8 +33,7 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider1(newFiberApp),
 			dix.Provider2(newServerRuntime),
-			dix.Provider1(newEndpointRegistry),
-			dix.Provider6(newHTTPRuntime),
+			dix.Provider5(newHTTPRuntime),
 		),
 		dix.Hooks(
 			dix.OnStart(startHTTPRuntime),
@@ -65,7 +63,6 @@ func newHTTPRuntime(
 	server httpx.ServerRuntime,
 	app *fiberapp.App,
 	service *handler.Service,
-	routes endpointRegistry,
 ) *httpRuntime {
 	return &httpRuntime{
 		cfg:     cfg,
@@ -73,7 +70,6 @@ func newHTTPRuntime(
 		server:  server,
 		app:     app,
 		service: service,
-		routes:  routes,
 	}
 }
 
@@ -81,10 +77,6 @@ func startHTTPRuntime(ctx context.Context, rt *httpRuntime) error {
 	router := stdhttp.NewServeMux()
 	rt.service.RegisterHTTP(router)
 	nativeHandler := fiberadapter.HTTPHandler(router)
-	rt.app.All("/s3", nativeHandler)
-	rt.app.All("/s3/*", nativeHandler)
-
-	rt.routes.Register(rt.server)
 	rt.app.Get("/_admin", rt.handleAdmin)
 	rt.app.All("/*", nativeHandler)
 

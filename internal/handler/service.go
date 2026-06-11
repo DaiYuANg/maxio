@@ -85,14 +85,14 @@ func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeControlHTTPRequest(w, r, route, parts) {
 		return
 	}
-	if s.handleS3Route(w, r) {
+	if s.handleControlRoute(w, r, route, parts) {
+		return
+	}
+	if !s.cfg.EnableNativeObjectAPI && !isNativeObjectRoute(parts) {
+		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "native object API is disabled"})
 		return
 	}
 	if !s.authorizeNativeObjectHTTPRequest(w, r, route, parts) {
-		return
-	}
-
-	if s.handleControlRoute(w, r, route, parts) {
 		return
 	}
 
@@ -111,12 +111,14 @@ func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handleObject(w, r, bucket, key)
 }
 
-func (s *Service) handleS3Route(w http.ResponseWriter, r *http.Request) bool {
-	if s.s3 == nil || !s.s3.Match(r) {
-		return false
+func isNativeObjectRoute(parts []string) bool {
+	if len(parts) == 0 {
+		return true
 	}
-	s.s3.ServeHTTP(w, r)
-	return true
+	if len(parts) == 1 && parts[0] == "" {
+		return true
+	}
+	return !strings.HasPrefix(parts[0], "_")
 }
 
 func (s *Service) handleBuckets(w http.ResponseWriter, r *http.Request) {

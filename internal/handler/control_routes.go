@@ -16,8 +16,6 @@ func (s *Service) handleControlRoute(w http.ResponseWriter, r *http.Request, rou
 	case isMetricsRoute(route):
 		s.handleMetrics(w, r)
 		return true
-	case s.handleS3Route(w, r):
-		return true
 	}
 	return s.handleNamedControlRoute(w, r, route, parts)
 }

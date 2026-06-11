@@ -35,7 +35,6 @@ Typical runtime data:
 <data_dir>/
   raft/                       # Raft nodehost, WAL, snapshots, replicated metadata
   index/bleve/                # Derived Bleve search index
-  s3-multipart/<upload-id>/   # In-progress S3 multipart upload state
   <shard-dir>/<hash>/         # Object content shard set
     chunk-0000
     chunk-0001
@@ -129,7 +128,7 @@ shards.
 Operational classification: operationally critical local metadata.
 
 The committed Raft metadata also stores object and blob reference information,
-but the MVP does not expose a general-purpose "rebuild every missing layout file"
+and the MVP does not expose a general-purpose "rebuild every missing layout file"
 restore command. Treat layout `meta.json` files as part of the object data
 backup. If they are missing or inconsistent, use the recovery, dedupe, repair,
 and smoke-test flows to detect damage; do not hand-edit them in production.
@@ -158,35 +157,6 @@ curl -X POST \
 If an index backup is restored across MaxIO or Bleve version changes and search
 behaves unexpectedly, stop MaxIO, remove only `index/bleve`, restart, and rebuild
 the index.
-
-## S3 multipart staging
-
-Path shape:
-
-```text
-<data_dir>/s3-multipart/<upload-id>/metadata.json
-<data_dir>/s3-multipart/<upload-id>/parts/00001.part
-<data_dir>/s3-multipart/<upload-id>/parts/00002.part
-...
-```
-
-Contains in-progress S3 multipart upload state. Completed uploads are committed
-through the normal object write path and then no longer depend on this staging
-area.
-
-Operational classification: transient upload state.
-
-Rules:
-
-```text
-Include it only if you need to preserve in-progress multipart uploads.
-Exclude it after a clean quiesce if no multipart uploads are active.
-Loss of this directory invalidates in-progress multipart upload IDs.
-Clients must retry failed or missing multipart uploads.
-```
-
-MVP limitation: multipart staging is local filesystem state. There is no
-cluster-wide multipart upload migration or lifecycle cleanup API.
 
 ## Temporary put staging
 
@@ -217,7 +187,7 @@ Not safely rebuildable in the MVP:
 raft_data_dir, from shard files alone
 Object shard sets after unrecoverable erasure loss
 Arbitrary missing object layout files, without supported repair coverage
-In-progress multipart upload state, if s3-multipart is lost
+In-progress upload state, if upload staging is lost
 ```
 
 ## Backup priority
@@ -228,8 +198,7 @@ For a production backup, preserve these in order:
 1. Config, environment, tokens, and exact MaxIO version.
 2. raft_data_dir for each replica.
 3. data_dir for each storage node, including shard and layout directories.
-4. s3-multipart only when in-progress uploads must survive.
-5. index/bleve only when avoiding rebuild time matters.
+4. index/bleve only when avoiding rebuild time matters.
 ```
 
 See `docs/backup-restore-upgrade.md` for operational procedures.

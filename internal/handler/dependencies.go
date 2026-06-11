@@ -8,7 +8,6 @@ import (
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/object"
-	maxios3 "github.com/lyonbrown4d/maxio/s3"
 )
 
 type raftRuntime interface {
@@ -27,7 +26,6 @@ type Dependencies struct {
 	engine    *engine.Engine
 	raft      raftRuntime
 	discovery *discovery.Runtime
-	s3        *maxios3.Service
 	repair    *repair.Runtime
 }
 
@@ -37,7 +35,6 @@ func NewDependencies(
 	engineStore *engine.Engine,
 	raftRT *raftx.Runtime,
 	discoveryRuntime *discovery.Runtime,
-	s3Service *maxios3.Service,
 	repairRuntime *repair.Runtime,
 ) Dependencies {
 	var raftDep raftRuntime
@@ -49,7 +46,6 @@ func NewDependencies(
 		engine:    engineStore,
 		raft:      raftDep,
 		discovery: discoveryRuntime,
-		s3:        s3Service,
 		repair:    repairRuntime,
 	}
 }

@@ -2,7 +2,8 @@
 
 MaxIO is currently a runnable prototype with a library-first runtime, HTTP API,
 single-shard Dragonboat metadata, erasure-coded local storage, object indexing,
-event publishing, Web UI, and a Raft-backed background repair scheduler.
+event publishing, Web UI, and a Raft-backed background repair scheduler. Native
+object APIs can now be toggled off at runtime via `enable_native_object_api`.
 
 This document tracks the remaining work required before the project can be
 treated as a production-grade object storage service.
@@ -11,10 +12,10 @@ treated as a production-grade object storage service.
 
 - The application is library-first and can be embedded through the root Go package.
 - Core components are moving toward composable library packages: `engine`,
-  `model`, `object`, and `s3` can now be imported directly, while the root
-  runtime still assembles them with dix for the full server.
+  `model`, and `object` can now be imported directly, while the root runtime
+  still assembles them with dix for the full server.
 - Runtime composition is dix-first, with config, logging, event bus, HTTP, Raft,
-  metadata, storage, index, S3 endpoint registration, scheduler, and repair
+  metadata, storage, index, scheduler, and repair
   assembled as modules.
 - Metadata is backed by the Raft state machine rather than an external KV store.
 - Object data is written through the current storage engine with local erasure
@@ -102,10 +103,6 @@ treated as a production-grade object storage service.
 - P0 security now separates node-to-node shard transport from admin access with
   `cluster_token` / `MAXIO_CLUSTER_TOKEN`, and remote shard calls send
   `X-Maxio-Cluster` by default.
-- S3 compatibility coverage now includes presigned reads, range reads, invalid
-  range XML errors, stable ETags, list ETags, and a documented supported subset.
-- S3 compatibility coverage now exercises the supported object, range,
-  presign, and multipart paths through the official AWS SDK for Go v2 client.
 - Operational delivery now documents data layout, backup, restore, and upgrade
   procedures alongside the deployment guide.
 - CI now runs GitHub Actions checks for Go tests, golangci-lint, package
@@ -116,8 +113,6 @@ treated as a production-grade object storage service.
   built from UPX-compressed Linux binaries.
 - HTTP responses now include a generated or client-supplied request ID, and
   audit logs include the same request_id for request-to-log correlation.
-- Basic S3-compatible HTTP endpoints exist, but S3 compatibility is not yet a
-  production target.
 
 ## Production gaps
 
@@ -168,27 +163,27 @@ network without authentication and internal API protection.
 Acceptance criteria:
 
 - Admin APIs require authentication.
-- Object APIs require access key authentication and bucket/object authorization.
+- Object APIs require token authentication and planned future bucket/object policy.
 - Internal shard and cluster APIs require a cluster token or equivalent
   machine-to-machine authentication.
 - TLS can be configured for external HTTP traffic.
 - Audit logs exist for admin operations and object mutations.
 
-### P0.4 S3 core compatibility gate
+### P0.4 Object API contract gate
 
-Goal: the S3 layer supports the minimum behavior required by common SDK clients
-without pretending to be a complete S3 implementation.
+Goal: native object APIs have a stable, production-safe contract for control and data
+operations.
 
 Acceptance criteria:
 
-- AWS Signature V4 is implemented for supported S3 routes.
-- Access key and secret key management is available.
-- `PUT`, `GET`, `HEAD`, `DELETE`, `LIST`, bucket create/delete, range reads,
-  and presigned URLs are covered by compatibility tests.
-- Multipart upload is implemented or explicitly rejected with S3-compatible
-  errors until implemented.
-- XML errors, status codes, and ETag behavior are documented and tested for the
-  supported subset.
+- Native object routes expose a consistent error model, status-code behavior, and
+  pagination semantics.
+- Object operations are idempotent where appropriate and return explicit validation
+  errors for malformed requests.
+- `PUT`, `GET`, `HEAD`, `DELETE` object and bucket operations are stable under
+  common concurrent, retry, and partial-failure scenarios.
+- Content metadata, custom metadata headers, and search tags remain consistent across
+  overwrite/delete paths.
 
 ### P0.5 Observability gate
 
@@ -200,7 +195,7 @@ Acceptance criteria:
 - Health and readiness endpoints distinguish process up, metadata available,
   leader available, storage writable, and repair backlog states.
 - Metrics cover request latency, throughput, errors, Raft leader/state changes,
-  storage ownership, repair/scrub/dedupe progress, and S3 status classes.
+  storage ownership, repair/scrub/dedupe progress, and read/write status classes.
 - Structured logs include request IDs or trace IDs for object and admin
   operations.
 - Repair, scrub, dedupe, rebalance, and decommission expose last run, current
@@ -218,17 +213,18 @@ Acceptance criteria:
 - Data directory layout, backup, restore, and upgrade procedures are documented.
 - Configuration defaults are safe for local development, while production docs
   call out required secrets, data paths, and network ports.
-- Smoke-test commands are documented for startup, object write/read, S3 access,
-  repair status, and cluster node status.
+- Smoke-test commands are documented for startup, object write/read, repair status,
+  and cluster node status.
 
 ### MVP non-goals
 
-The first production MVP does not need to be a complete S3 clone, a globally
-distributed object store, or a chunk-level dedupe system.
+The first production MVP does not need to be a complete SDK compatibility layer,
+a globally distributed object store, or a chunk-level dedupe system.
 
 Explicit non-goals:
 
-- Full S3 API surface beyond the documented supported subset.
+- Full external protocol compatibility (including AWS S3 wire-level behavior) is out of
+  scope.
 - Cross-region replication.
 - Multi-tenant billing or quota management.
 - Chunk-level dedupe.
@@ -305,20 +301,17 @@ Required work:
 - Add rebalancing when nodes are added or removed.
 - Add read repair when stale or missing shards are detected during reads.
 
-### 6. S3 compatibility
+### 6. Native API hardening
 
-The S3 layer should remain a compatibility layer over the MaxIO core API. It is
-not ready for production yet.
+The native HTTP API is the primary control plane and object interface.
 
 Required work:
 
-- Add AWS Signature V4 authentication.
-- Add access keys, secret keys, and request authorization.
-- Implement multipart upload.
-- Implement presigned URLs.
-- Implement range reads and correct ETag semantics.
-- Align XML error responses and status codes with S3 behavior.
-- Add S3 compatibility tests.
+- Align error documents, status codes, and pagination behavior across all native
+  object routes.
+- Add concurrency-safety checks for overwrite, delete, and create semantics.
+- Add explicit timeout and range behavior guarantees for object reads.
+- Add compatibility tests for clients that rely on native route conventions.
 
 ### 7. Security and access control
 
@@ -358,7 +351,7 @@ Required work:
 - Add network partition and leader-change tests.
 - Add corrupted shard and missing shard tests.
 - Add concurrent put/get/delete/list tests.
-- Add S3 compatibility tests.
+- Add end-to-end API contract tests for native object routes.
 - Add long-running soak tests.
 
 ### 10. Packaging and operations
@@ -407,9 +400,9 @@ Required work:
 - Add rebalancing.
 - Add admin APIs and Web UI views for cluster operations.
 
-### Phase 5: Compatibility, security, and operations
+### Phase 5: Security, observability, and operations
 
-- Complete S3 SigV4 and multipart upload.
+- Complete native API contract hardening.
 - Add access control and admin authentication.
 - Add metrics, tracing, and audit logs.
 - Add deployment assets and operational documentation.
@@ -436,21 +429,18 @@ storage service in small, testable iterations.
 - Handle node loss, node replacement, and address changes.
 - Add admin APIs and Web UI screens for cluster membership operations.
 
-3. S3 compatibility
+3. Native API hardening
 
-- Add AWS Signature V4 authentication.
-- Add access keys, secret keys, and request authorization.
-- Implement multipart upload.
-- Implement presigned URLs.
-- Implement range reads and correct ETag semantics.
-- Align XML error responses and status codes with S3 behavior.
-- Add S3 compatibility tests.
+- Align error documents, status codes, and pagination behavior across all native
+  object routes.
+- Add client-facing compatibility tests for the native route convention.
+- Implement explicit request/response contracts for range and timeout behavior.
 
 4. Security
 
 - Add admin authentication.
-- Add access key and secret management.
-- Add bucket/object authorization.
+- Add API token rotation and scope validation.
+- Add bucket/object authorization model.
 - Support TLS configuration.
 - Add audit logs for data and admin operations.
 - Protect internal cluster and shard APIs.
@@ -472,7 +462,7 @@ storage service in small, testable iterations.
 - Add partial write and crash recovery tests.
 - Add corrupted shard and missing shard tests.
 - Add concurrent put/get/delete/list tests.
-- Add S3 compatibility tests.
+- Add native client contract tests for route conventions and edge-case behavior.
 
 7. Operations
 

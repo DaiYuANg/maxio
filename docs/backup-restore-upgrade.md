@@ -18,7 +18,7 @@ External crash-consistent or application-consistent volume snapshots.
 
 Plain recursive file copy while MaxIO is accepting writes is not a consistent
 backup method. Active writes can involve Raft WAL updates, local shard writes,
-layout files, multipart part files, and temporary OS staging files.
+layout files, upload staging files, and temporary OS staging files.
 
 ## Pre-backup checklist
 
@@ -31,7 +31,7 @@ MAXIO_DATA_DIR
 MAXIO_RAFT_DATA_DIR
 raft_node_id for every node
 raft_address and storage_address for every node
-admin/API/S3 auth configuration, stored securely
+admin/API token configuration, stored securely
 ```
 
 Check health:
@@ -117,15 +117,6 @@ Usually exclude, then rebuild:
 ```text
 data_dir/index/bleve
 ```
-
-Conditionally include:
-
-```text
-data_dir/s3-multipart
-```
-
-Include `s3-multipart` only when preserving in-progress multipart uploads is a
-requirement. If uploads are quiesced or clients can retry, it can be excluded.
 
 Do not back up only a subdirectory such as `objects/` or `index/`. The current
 engine stores shard and layout data directly under `data_dir/<shard-dir>/...`.
@@ -225,7 +216,7 @@ No built-in online snapshot API.
 No cluster-wide write freeze API.
 No single-object restore/import tool.
 No supported metadata reconstruction from shard files alone.
-No automated restore of lost multipart upload state.
+No automated restore of in-progress upload state.
 No automated validation that a restored backup is complete.
 ```
 
@@ -293,7 +284,7 @@ Upgrade cautions:
 Do not change raft_node_id during an upgrade.
 Do not delete or reinitialize raft_data_dir.
 Do not skip required intermediate versions unless the release notes allow it.
-Quiesce or expect retry for multipart uploads targeting the node being upgraded.
+Quiesce writes or expect retries for object uploads targeting the node being upgraded.
 ```
 
 ## Rollback
@@ -326,7 +317,7 @@ The following are not yet guaranteed by the MVP:
 Online file-copy backup consistency.
 Coordinated point-in-time snapshot orchestration.
 Automatic schema migration rollback.
-Cross-node migration of in-progress multipart uploads.
+Cross-node migration of in-progress uploads.
 Single-bucket or single-object point-in-time restore.
 Changing restored Raft replica IDs or cluster addresses during restore.
 ```
