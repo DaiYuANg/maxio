@@ -1,4 +1,4 @@
-// Package scheduler provides the cluster-aware background job scheduler.
+// Package scheduler provides a simple wrapper around gocron scheduling.
 package scheduler
 
 import (
@@ -10,13 +10,11 @@ import (
 
 	"github.com/arcgolabs/dix"
 	gocron "github.com/go-co-op/gocron/v2"
-	"github.com/lyonbrown4d/maxio/internal/raft"
 )
 
-// Runtime wraps gocron with MaxIO lifecycle and Raft-backed leader election.
+// Runtime wraps gocron with MaxIO lifecycle and optional leader-aware scheduling.
 type Runtime struct {
 	scheduler gocron.Scheduler
-	elector   *raftElector
 	logger    *slog.Logger
 }
 
@@ -24,7 +22,7 @@ func Module() dix.Module {
 	return dix.NewModule(
 		"scheduler",
 		dix.WithModuleProviders(
-			dix.ProviderErr2(newRuntime),
+			dix.ProviderErr1(newRuntime),
 		),
 		dix.Hooks(
 			dix.OnStart(startRuntime),
@@ -33,26 +31,30 @@ func Module() dix.Module {
 	)
 }
 
-func newRuntime(logger *slog.Logger, raftRuntime *raft.Runtime) (*Runtime, error) {
+func newRuntime(
+	logger *slog.Logger,
+) (*Runtime, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	elector := &raftElector{runtime: raftRuntime}
-	scheduler, err := gocron.NewScheduler(
+
+	schedulerOptions := make([]gocron.SchedulerOption, 0, 3)
+	schedulerOptions = append(schedulerOptions,
 		gocron.WithLogger(slogCronLogger{logger: logger.With("component", "gocron")}),
-		gocron.WithDistributedElector(elector),
 		gocron.WithGlobalJobOptions(
 			gocron.WithSingletonMode(gocron.LimitModeReschedule),
 			gocron.WithIntervalFromCompletion(),
 		),
 		gocron.WithStopTimeout(10*time.Second),
 	)
+
+	schedulerRuntime, err := gocron.NewScheduler(schedulerOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("create scheduler: %w", err)
 	}
+
 	return &Runtime{
-		scheduler: scheduler,
-		elector:   elector,
+		scheduler: schedulerRuntime,
 		logger:    logger,
 	}, nil
 }
@@ -93,23 +95,6 @@ func (runtime *Runtime) NewJob(definition gocron.JobDefinition, task gocron.Task
 }
 
 func (runtime *Runtime) RequireLeader(ctx context.Context) error {
-	if runtime == nil || runtime.elector == nil {
-		return raft.ErrLeaderUnavailable
-	}
-	return runtime.elector.IsLeader(ctx)
-}
-
-type raftElector struct {
-	runtime *raft.Runtime
-}
-
-func (elector *raftElector) IsLeader(ctx context.Context) error {
-	if elector == nil || elector.runtime == nil {
-		return raft.ErrLeaderUnavailable
-	}
-	if err := elector.runtime.AssertLeader(ctx); err != nil {
-		return fmt.Errorf("check raft scheduler leadership: %w", err)
-	}
 	return nil
 }
 

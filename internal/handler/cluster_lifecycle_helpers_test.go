@@ -114,7 +114,7 @@ func newLifecycleService(t *testing.T, raft raftRuntime, objects ...model.Object
 		objects: newLifecycleObjectService(t, objects...),
 		engine:  newLifecycleEngine(t),
 		raft:    raft,
-	}, slog.New(slog.DiscardHandler), config.Config{}, nil)
+	}, slog.New(slog.DiscardHandler), config.Config{EnableClusterManagement: true}, nil)
 }
 
 func newLifecycleObjectService(t *testing.T, objects ...model.ObjectMeta) *object.Service {

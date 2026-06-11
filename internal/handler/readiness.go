@@ -43,8 +43,13 @@ func (s *Service) checkReady(ctx context.Context, checks map[string]string) erro
 	err := s.checkObjectServiceReady(checks)
 	err = joinReadiness(err, s.checkEngineReady(checks))
 	err = joinReadiness(err, s.checkStorageWritableReady(checks))
-	err = joinReadiness(err, s.checkRaftReady(ctx, checks))
-	err = joinReadiness(err, s.checkRaftLeaderReady(ctx, checks))
+	if s.cfg.EnableClusterManagement {
+		err = joinReadiness(err, s.checkRaftReady(ctx, checks))
+		err = joinReadiness(err, s.checkRaftLeaderReady(ctx, checks))
+	} else {
+		checks["raft_membership"] = "disabled"
+		checks["raft_leader"] = "disabled"
+	}
 	s.checkRepairBacklogReady(checks)
 	return err
 }

@@ -5,6 +5,7 @@ func Default() Config {
 		HTTPAddress:                  ":8080",
 		HTTPBodyLimit:                1 << 30,
 		StorageAddress:               "127.0.0.1:8080",
+		EnableClusterManagement:      false,
 		EnableNativeObjectAPI:        true,
 		CacheBackend:                 "memory",
 		CacheTTL:                     "1m",

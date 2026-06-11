@@ -22,6 +22,7 @@ type Config struct {
 	AdminToken                   string  `json:"admin_token"              koanf:"admin_token"`
 	ClusterToken                 string  `json:"cluster_token"            koanf:"cluster_token"`
 	APIToken                     string  `json:"api_token"                koanf:"api_token"`
+	EnableClusterManagement      bool    `json:"enable_cluster_management" koanf:"enable_cluster_management"`
 	EnableNativeObjectAPI        bool    `json:"enable_native_object_api" koanf:"enable_native_object_api"`
 	CacheBackend                 string  `json:"cache_backend"            koanf:"cache_backend"            validate:"required,oneof=none memory redis"`
 	CacheTTL                     string  `json:"cache_ttl"                koanf:"cache_ttl"                validate:"required,min=1"`
@@ -173,6 +174,16 @@ func trim(cfg Config) Config {
 }
 
 func validateRequired(cfg Config) error {
+	if !cfg.EnableClusterManagement {
+		if cfg.HTTPAddress == "" {
+			return errors.New("invalid config: http_address is required")
+		}
+		if cfg.LogLevel == "" {
+			return errors.New("invalid config: log_level is required")
+		}
+		return nil
+	}
+
 	if cfg.HTTPAddress == "" {
 		return errors.New("invalid config: http_address is required")
 	}

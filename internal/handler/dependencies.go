@@ -33,18 +33,13 @@ type Dependencies struct {
 func NewDependencies(
 	objects *object.Service,
 	engineStore *engine.Engine,
-	raftRT *raftx.Runtime,
 	discoveryRuntime *discovery.Runtime,
 	repairRuntime *repair.Runtime,
 ) Dependencies {
-	var raftDep raftRuntime
-	if raftRT != nil {
-		raftDep = raftRT
-	}
 	return Dependencies{
 		objects:   objects,
 		engine:    engineStore,
-		raft:      raftDep,
+		raft:      nil,
 		discovery: discoveryRuntime,
 		repair:    repairRuntime,
 	}

@@ -86,7 +86,7 @@ func TestAPIAuthProtectsObjectRoutes(t *testing.T) {
 
 func TestNativeObjectAPIDisabledRejectsBucketRoute(t *testing.T) {
 	cfg := config.Config{EnableNativeObjectAPI: false}
-	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos", nil, nil)
+	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos", nil)
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
 	}
@@ -94,7 +94,7 @@ func TestNativeObjectAPIDisabledRejectsBucketRoute(t *testing.T) {
 
 func TestNativeObjectAPIDisabledRejectsObjectRoute(t *testing.T) {
 	cfg := config.Config{EnableNativeObjectAPI: false}
-	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos/cat.jpg", nil, nil)
+	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos/cat.jpg", nil)
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
 	}
@@ -124,7 +124,6 @@ func TestObjectAuthAcceptsAPIHeaderForBucketMutation(t *testing.T) {
 		http.MethodPut,
 		"/photos",
 		headers,
-		nil,
 	)
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), http.StatusCreated)
@@ -134,7 +133,7 @@ func TestObjectAuthAcceptsAPIHeaderForBucketMutation(t *testing.T) {
 func TestObjectAuthAcceptsAdminTokenForBucketMutation(t *testing.T) {
 	headers := map[string]string{"X-Maxio-Control": "admin-secret"}
 	cfg := config.Config{AdminToken: "admin-secret", APIToken: "api-secret"}
-	recorder := serveObjectRequest(t, cfg, http.MethodPut, "/admin-photos", headers, nil)
+	recorder := serveObjectRequest(t, cfg, http.MethodPut, "/admin-photos", headers)
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), http.StatusCreated)
 	}
@@ -207,11 +206,10 @@ func serveObjectRequest(
 	method string,
 	target string,
 	headers map[string]string,
-	body []byte,
 ) *httptest.ResponseRecorder {
 	t.Helper()
 
-	return serveRouterRequest(newObjectRouter(t, cfg, slog.New(slog.DiscardHandler)), method, target, headers, body)
+	return serveRouterRequest(newObjectRouter(t, cfg, slog.New(slog.DiscardHandler)), method, target, headers, nil)
 }
 
 func newObjectRouter(t *testing.T, cfg config.Config, logger *slog.Logger) http.Handler {
@@ -222,7 +220,7 @@ func newObjectRouter(t *testing.T, cfg config.Config, logger *slog.Logger) http.
 		t.Fatalf("create store: %v", err)
 	}
 	objects := object.NewService(storage, nil, nil, slog.New(slog.DiscardHandler), object.Config{})
-	deps := handler.NewDependencies(objects, nil, nil, nil, nil)
+	deps := handler.NewDependencies(objects, nil, nil, nil)
 	service := handler.NewService(deps, logger, cfg)
 	router := http.NewServeMux()
 	service.RegisterHTTP(router)
@@ -256,7 +254,7 @@ func serveStorageShardPut(
 	if err != nil {
 		t.Fatalf("create engine: %v", err)
 	}
-	deps := handler.NewDependencies(nil, eng, nil, nil, nil)
+	deps := handler.NewDependencies(nil, eng, nil, nil)
 	service := handler.NewService(deps, slog.New(slog.DiscardHandler), cfg)
 	router := http.NewServeMux()
 	service.RegisterHTTP(router)

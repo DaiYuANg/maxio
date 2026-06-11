@@ -58,6 +58,9 @@ func Module() dix.Module {
 }
 
 func newRuntime(cfg config.Config, logger *slog.Logger) (*Runtime, error) {
+	if !cfg.EnableClusterManagement {
+		return &Runtime{}, nil
+	}
 	configureDragonboatLogger(logger)
 
 	rtCfg, err := newRuntimeConfig(cfg)

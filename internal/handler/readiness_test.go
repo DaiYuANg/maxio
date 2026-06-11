@@ -31,14 +31,14 @@ func TestReadinessReportsStorageWritableAndRepairBacklog(t *testing.T) {
 	if response.Checks["repair_backlog"] != "ok" {
 		t.Fatalf("repair_backlog = %q, want ok", response.Checks["repair_backlog"])
 	}
-	if response.Checks["raft_membership"] != "unavailable" {
-		t.Fatalf("raft_membership = %q, want unavailable", response.Checks["raft_membership"])
+	if response.Checks["raft_membership"] != "disabled" {
+		t.Fatalf("raft_membership = %q, want disabled", response.Checks["raft_membership"])
 	}
-	if response.Checks["raft_leader"] != "unavailable" {
-		t.Fatalf("raft_leader = %q, want unavailable", response.Checks["raft_leader"])
+	if response.Checks["raft_leader"] != "disabled" {
+		t.Fatalf("raft_leader = %q, want disabled", response.Checks["raft_leader"])
 	}
-	if response.Status != "not_ready" {
-		t.Fatalf("status = %q, want not_ready", response.Status)
+	if response.Status != "ok" {
+		t.Fatalf("status = %q, want ok", response.Status)
 	}
 }
 

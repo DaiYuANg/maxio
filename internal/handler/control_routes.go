@@ -17,7 +17,15 @@ func (s *Service) handleControlRoute(w http.ResponseWriter, r *http.Request, rou
 		s.handleMetrics(w, r)
 		return true
 	}
+	if isClusterRoute(route) && !s.cfg.EnableClusterManagement {
+		http.NotFound(w, r)
+		return true
+	}
 	return s.handleNamedControlRoute(w, r, route, parts)
+}
+
+func isClusterRoute(route string) bool {
+	return strings.HasPrefix(strings.TrimSpace(route), "_cluster")
 }
 
 func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request, route string, parts []string) bool {

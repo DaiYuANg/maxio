@@ -21,7 +21,7 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider1(newLogger),
 			dix.Provider1(newEventBus),
-			dix.Provider5(NewDependencies),
+			dix.Provider4(NewDependencies),
 			dix.Provider4(newService),
 		),
 		dix.Hooks(
@@ -53,6 +53,12 @@ func startObjectEventSubscription(_ context.Context, bus eventx.BusRuntime, logg
 
 func syncStorageNodesOnStart(ctx context.Context, service *Service, _ eventx.BusRuntime, logger *slog.Logger) error {
 	if service == nil {
+		return nil
+	}
+	if !service.cfg.EnableClusterManagement {
+		if logger != nil {
+			logger.InfoContext(ctx, "skip raft storage node sync because cluster management is disabled")
+		}
 		return nil
 	}
 	if logger != nil {
