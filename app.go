@@ -19,7 +19,6 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/http"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
 	"github.com/lyonbrown4d/maxio/internal/store"
@@ -256,7 +255,6 @@ func applyOptions(opts ...Option) buildOptions {
 func defaultModules(configOptions ...configx.Option) []dix.Module {
 	return []dix.Module{
 		config.Module(configOptions...),
-		raft.Module(),
 		discovery.Module(),
 		metadata.Module(),
 		engine.Module(),

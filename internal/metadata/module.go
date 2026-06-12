@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/arcgolabs/dix"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 func Module() dix.Module {
 	return dix.NewModule("metadata",
 		dix.WithModuleProviders(
-			dix.ProviderErr3(newMetadataStore),
+			dix.ProviderErr2(newMetadataStore),
 		),
 		dix.Hooks(
 			dix.OnStop(func(_ context.Context, store MetadataStore) error {
@@ -26,19 +26,16 @@ func Module() dix.Module {
 	)
 }
 
-func newMetadataStore(cfg config.Config, runtime *raftx.Runtime, logger *slog.Logger) (MetadataStore, error) {
+func newMetadataStore(cfg config.Config, logger *slog.Logger) (MetadataStore, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	if cfg.EnableClusterManagement {
-		store, err := NewRaftMetadata(runtime)
-		if err != nil {
-			return nil, fmt.Errorf("metadata backend: %w", err)
-		}
-		logger.Info("metadata backend selected", "backend", "raft")
-		return store, nil
+
+	store, err := NewSQLiteMetadata(filepath.Join(cfg.DataDir, "metadata.db"), logger)
+	if err != nil {
+		return nil, fmt.Errorf("metadata backend: %w", err)
 	}
 
-	logger.Info("metadata backend selected", "backend", "memory")
-	return NewInMemoryMetadata(), nil
+	logger.Info("metadata backend selected", "backend", "sqlite")
+	return store, nil
 }
