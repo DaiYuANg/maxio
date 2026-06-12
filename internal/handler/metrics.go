@@ -50,7 +50,11 @@ func (collector *metricsCollector) addReadiness(ctx context.Context, s *Service)
 
 func (collector *metricsCollector) addStorageNodes(s *Service) {
 	if s == nil || s.engine == nil {
-		collector.collectionErrors++
+		collector.gauge("maxio_storage_nodes", "Configured storage nodes.", 0)
+		collector.gauge("maxio_storage_nodes_drained", "Storage nodes excluded from new placements.", 0)
+		collector.gauge("maxio_storage_node_objects", "Objects assigned to storage nodes.", 0)
+		collector.gauge("maxio_storage_node_shards", "Shards assigned to storage nodes.", 0)
+		collector.gaugeInt64("maxio_storage_node_used_bytes", "Bytes assigned to storage nodes.", 0)
 		return
 	}
 	nodes := s.engine.StorageNodeInfos()
@@ -75,7 +79,8 @@ func (collector *metricsCollector) addStorageNodes(s *Service) {
 
 func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Service) {
 	if s == nil || s.objects == nil {
-		collector.collectionErrors++
+		collector.gauge("maxio_buckets", "Buckets known to metadata.", 0)
+		collector.gauge("maxio_objects", "Committed objects known to metadata.", 0)
 		return
 	}
 	buckets, err := s.objects.ListBuckets(ctx)
@@ -98,7 +103,7 @@ func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Servi
 
 func (collector *metricsCollector) addRepairStatus(s *Service) {
 	if s == nil || s.repair == nil {
-		collector.collectionErrors++
+		collector.gauge("maxio_repair_running", "Whether the repair job is running.", 0)
 		return
 	}
 	status := s.repair.Status()
@@ -124,7 +129,7 @@ func (collector *metricsCollector) addRepairStatus(s *Service) {
 
 func (collector *metricsCollector) addDedupeStatus(s *Service) {
 	if s == nil || s.dedupe == nil {
-		collector.collectionErrors++
+		collector.gauge("maxio_dedupe_running", "Whether the dedupe job is running.", 0)
 		return
 	}
 	status := s.dedupe.Status()
@@ -145,7 +150,7 @@ func (collector *metricsCollector) addDedupeStatus(s *Service) {
 
 func (collector *metricsCollector) addIndexStatus(s *Service) {
 	if s == nil || s.objects == nil {
-		collector.collectionErrors++
+		collector.gauge("maxio_index_rebuilding", "Whether the content index rebuild is running.", 0)
 		return
 	}
 	status := s.objects.IndexStatus()
@@ -162,7 +167,7 @@ func (collector *metricsCollector) addIndexStatus(s *Service) {
 
 func (collector *metricsCollector) addRecoveryStatus(s *Service) {
 	if s == nil || s.objects == nil {
-		collector.collectionErrors++
+		collector.gauge("maxio_recovery_completed", "Whether storage recovery has completed at least once.", 0)
 		return
 	}
 	status := s.objects.RecoveryStatus()

@@ -22,7 +22,7 @@ func TestReadinessReportsStorageWritableAndRepairBacklog(t *testing.T) {
 		objects: &object.Service{},
 		engine:  eng,
 		repair:  &repair.Runtime{},
-	}, slog.New(slog.DiscardHandler), config.Config{}, nil)
+	}, slog.New(slog.DiscardHandler), config.Config{EnableNativeObjectAPI: true}, nil)
 
 	response := service.readiness(context.Background())
 	if response.Checks["storage_writable"] != "ok" {
@@ -56,7 +56,7 @@ func TestReadinessReportsNoWritableStorageNodes(t *testing.T) {
 		objects: &object.Service{},
 		engine:  eng,
 		repair:  &repair.Runtime{},
-	}, slog.New(slog.DiscardHandler), config.Config{}, nil)
+	}, slog.New(slog.DiscardHandler), config.Config{EnableNativeObjectAPI: true}, nil)
 
 	response := service.readiness(context.Background())
 	if response.Checks["storage_writable"] != "no_writable_storage_nodes" {

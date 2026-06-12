@@ -9,7 +9,10 @@ import (
 
 func (collector *metricsCollector) addRaftStatus(ctx context.Context, s *Service) {
 	if s == nil || s.raft == nil {
-		collector.collectionErrors++
+		collector.gaugeUint64("maxio_raft_local_replica_id", "Local raft replica ID.", 0)
+		collector.gauge("maxio_raft_leader_available", "Whether a raft leader is currently known.", 0)
+		collector.gauge("maxio_raft_local_is_leader", "Whether the local raft replica is the current leader.", 0)
+		collector.addRaftMembershipMetrics(raftx.Membership{})
 		return
 	}
 	collector.gaugeUint64("maxio_raft_local_replica_id", "Local raft replica ID.", s.raft.LocalReplicaID())

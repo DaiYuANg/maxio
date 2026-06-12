@@ -88,11 +88,11 @@ func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.handleControlRoute(w, r, route, parts) {
 		return
 	}
-	if !s.cfg.EnableNativeObjectAPI && !isNativeObjectRoute(parts) {
-		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "native object API is disabled"})
+	if !s.authorizeNativeObjectHTTPRequest(w, r, route, parts) {
 		return
 	}
-	if !s.authorizeNativeObjectHTTPRequest(w, r, route, parts) {
+	if !s.cfg.EnableNativeObjectAPI {
+		s.writeS3ProxyNotImplemented(w)
 		return
 	}
 
@@ -111,19 +111,13 @@ func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handleObject(w, r, bucket, key)
 }
 
-func isNativeObjectRoute(parts []string) bool {
-	if len(parts) == 0 {
-		return true
-	}
-	if len(parts) == 1 && parts[0] == "" {
-		return true
-	}
-	return !strings.HasPrefix(parts[0], "_")
-}
-
 func (s *Service) handleBuckets(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.objects == nil {
+		s.writeLegacyObjectUnavailable(w)
 		return
 	}
 	buckets, err := s.objects.ListBuckets(r.Context())
@@ -135,6 +129,10 @@ func (s *Service) handleBuckets(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleBucket(w http.ResponseWriter, r *http.Request, bucket string) {
+	if s.objects == nil {
+		s.writeLegacyObjectUnavailable(w)
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
 		prefix := r.URL.Query().Get("prefix")
@@ -168,6 +166,10 @@ func (s *Service) handleBucket(w http.ResponseWriter, r *http.Request, bucket st
 }
 
 func (s *Service) handleObject(w http.ResponseWriter, r *http.Request, bucket, key string) {
+	if s.objects == nil {
+		s.writeLegacyObjectUnavailable(w)
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
 		s.handleGetObject(w, r, bucket, key)
@@ -235,6 +237,10 @@ func (s *Service) handleDeleteObject(w http.ResponseWriter, r *http.Request, buc
 func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.objects == nil {
+		s.writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "search is not wired to the S3 proxy metadata repository yet"})
 		return
 	}
 

@@ -10,19 +10,13 @@ import (
 
 	"github.com/arcgolabs/configx"
 	"github.com/arcgolabs/dix"
-	"github.com/lyonbrown4d/maxio/cache"
-	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/index"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/dedupe"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/http"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
-	"github.com/lyonbrown4d/maxio/internal/store"
-	"github.com/lyonbrown4d/maxio/object"
 )
 
 const defaultStopTimeout = 10 * time.Second
@@ -193,30 +187,6 @@ func (app *App) Logger() *slog.Logger {
 	return app.logger
 }
 
-// Objects returns the core object service for library callers.
-func (app *App) Objects() (*object.Service, error) {
-	if app == nil || app.runtime == nil {
-		return nil, errors.New("object service unavailable: runtime is nil")
-	}
-	objects, err := dix.ResolveAs[*object.Service](app.runtime.Container())
-	if err != nil {
-		return nil, fmt.Errorf("resolve object service: %w", err)
-	}
-	return objects, nil
-}
-
-// Engine returns the erasure-coded storage engine for library callers.
-func (app *App) Engine() (*engine.Engine, error) {
-	if app == nil || app.runtime == nil {
-		return nil, errors.New("engine unavailable: runtime is nil")
-	}
-	storageEngine, err := dix.ResolveAs[*engine.Engine](app.runtime.Container())
-	if err != nil {
-		return nil, fmt.Errorf("resolve engine: %w", err)
-	}
-	return storageEngine, nil
-}
-
 func runtimeContext(ctx context.Context) context.Context {
 	if ctx != nil {
 		return ctx
@@ -257,14 +227,8 @@ func defaultModules(configOptions ...configx.Option) []dix.Module {
 		config.Module(configOptions...),
 		discovery.Module(),
 		metadata.Module(),
-		engine.Module(),
-		store.Module(),
-		cache.Module(),
 		index.Module(),
-		object.Module(),
 		scheduler.Module(),
-		repair.Module(),
-		dedupe.Module(),
 		handler.Module(),
 		http.Module(),
 	}

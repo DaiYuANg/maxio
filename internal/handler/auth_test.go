@@ -87,23 +87,23 @@ func TestAPIAuthProtectsObjectRoutes(t *testing.T) {
 func TestNativeObjectAPIDisabledRejectsBucketRoute(t *testing.T) {
 	cfg := config.Config{EnableNativeObjectAPI: false}
 	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos", nil)
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	if recorder.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotImplemented)
 	}
 }
 
 func TestNativeObjectAPIDisabledRejectsObjectRoute(t *testing.T) {
 	cfg := config.Config{EnableNativeObjectAPI: false}
 	recorder := serveObjectRequest(t, cfg, http.MethodGet, "/photos/cat.jpg", nil)
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	if recorder.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotImplemented)
 	}
 }
 
 func TestAPIAuthDoesNotProtectReadiness(t *testing.T) {
 	recorder := serveHandlerGet(t, config.Config{APIToken: "api-secret"}, "/readyz", nil)
-	if recorder.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 }
 
@@ -120,7 +120,7 @@ func TestObjectAuthAcceptsAPIHeaderForBucketMutation(t *testing.T) {
 	headers := map[string]string{"X-Maxio-API": "api-secret"}
 	recorder := serveObjectRequest(
 		t,
-		config.Config{APIToken: "api-secret"},
+		config.Config{APIToken: "api-secret", EnableNativeObjectAPI: true},
 		http.MethodPut,
 		"/photos",
 		headers,
@@ -132,7 +132,7 @@ func TestObjectAuthAcceptsAPIHeaderForBucketMutation(t *testing.T) {
 
 func TestObjectAuthAcceptsAdminTokenForBucketMutation(t *testing.T) {
 	headers := map[string]string{"X-Maxio-Control": "admin-secret"}
-	cfg := config.Config{AdminToken: "admin-secret", APIToken: "api-secret"}
+	cfg := config.Config{AdminToken: "admin-secret", APIToken: "api-secret", EnableNativeObjectAPI: true}
 	recorder := serveObjectRequest(t, cfg, http.MethodPut, "/admin-photos", headers)
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), http.StatusCreated)

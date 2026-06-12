@@ -40,9 +40,8 @@ func (s *Service) checkReady(ctx context.Context, checks map[string]string) erro
 		checks["service"] = "unavailable"
 		return errReadinessUnavailable
 	}
-	err := s.checkObjectServiceReady(checks)
-	err = joinReadiness(err, s.checkEngineReady(checks))
-	err = joinReadiness(err, s.checkStorageWritableReady(checks))
+	checks["service"] = "ok"
+	err := s.checkGatewayDataPlaneReady(checks)
 	if s.cfg.EnableClusterManagement {
 		err = joinReadiness(err, s.checkRaftReady(ctx, checks))
 		err = joinReadiness(err, s.checkRaftLeaderReady(ctx, checks))
@@ -61,6 +60,19 @@ func (s *Service) checkObjectServiceReady(checks map[string]string) error {
 	}
 	checks["object_service"] = "ok"
 	return nil
+}
+
+func (s *Service) checkGatewayDataPlaneReady(checks map[string]string) error {
+	if !s.cfg.EnableNativeObjectAPI {
+		checks["s3_proxy"] = "not_implemented"
+		checks["object_service"] = "disabled"
+		checks["engine"] = "removed"
+		checks["storage_writable"] = "external_upstream_pending"
+		return nil
+	}
+	err := s.checkObjectServiceReady(checks)
+	err = joinReadiness(err, s.checkEngineReady(checks))
+	return joinReadiness(err, s.checkStorageWritableReady(checks))
 }
 
 func (s *Service) checkEngineReady(checks map[string]string) error {
@@ -129,7 +141,7 @@ func (s *Service) checkRaftLeaderReady(ctx context.Context, checks map[string]st
 
 func (s *Service) checkRepairBacklogReady(checks map[string]string) {
 	if s.repair == nil {
-		checks["repair_backlog"] = "unavailable"
+		checks["repair_backlog"] = "disabled"
 		return
 	}
 	status := s.repair.Status()

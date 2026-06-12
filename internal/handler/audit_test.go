@@ -11,7 +11,7 @@ import (
 
 func TestObjectMutationAuditIncludesStructuredFields(t *testing.T) {
 	capture := &auditCaptureHandler{}
-	router := newObjectRouter(t, config.Config{APIToken: "api-secret"}, slog.New(capture))
+	router := newObjectRouter(t, config.Config{APIToken: "api-secret", EnableNativeObjectAPI: true}, slog.New(capture))
 	headers := map[string]string{"X-Maxio-API": "api-secret"}
 
 	recorder := serveRouterRequest(router, http.MethodPut, "/audit-bucket", headers, nil)

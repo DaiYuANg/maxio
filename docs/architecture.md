@@ -22,18 +22,18 @@ Native API（若保留）用于平台内控与治理。
 4. Cache, index, scheduler, repair, dedupe services
 5. HTTP control/management and S3 handlers (gateway)
 
-All modules are replaceable where package boundaries permit. `engine`, `model`,
-and object core can be imported as composable packages for library-first
-integrations. Index/repair runtime pieces can be embedded by other services as
-needed.
+All modules are replaceable where package boundaries permit. The old local
+`engine`/`store`/`object` path is no longer part of the default runtime; it is
+kept only as temporary legacy code while the S3 proxy data plane is rebuilt
+around upstream connectors and DB-backed metadata.
 
 ## API planes
 
-### Native HTTP object plane
+### Legacy native HTTP object plane
 
-- Controlled by `enable_native_object_api` (default: `true`).
-- Currently retained for management and internal workflows.
-- Keep route behavior deterministic; share request IDs and error semantics where possible.
+- Controlled by `enable_native_object_api` (default: `false`).
+- Not part of the default product path.
+- The default runtime returns `501` for data-plane routes until the S3 proxy is wired.
 
 ### Native S3 compatibility plane (first-class)
 

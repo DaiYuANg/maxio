@@ -16,7 +16,12 @@ covers MVP-safe backup, restore, upgrade, and rollback procedures.
 
 ## Single node
 
-Use `config.example.json` as the baseline config. For local single-node runs, keep:
+Use `config.example.json` as the baseline config. The default runtime is a
+stateless S3 proxy skeleton with DB-backed metadata; it does not start local
+Raft or local object storage modules.
+
+Legacy Raft config keys may still appear while the old code is being removed,
+but they are not part of the default startup path.
 
 ```json
 {
@@ -27,19 +32,20 @@ Use `config.example.json` as the baseline config. For local single-node runs, ke
 }
 ```
 
-## Object API mode
+## Data-plane mode
 
-MaxIO exposes native object APIs by default and control APIs in the same process.
+MaxIO is now proxy-first. Native local object APIs are disabled by default.
+Until the S3 proxy data plane is wired, bucket/object routes return `501`.
 
-To run MaxIO as a cluster-management-only service, set:
+To explicitly run the legacy native object API for compatibility tests, set:
 
 ```json
 {
-  "enable_native_object_api": false
+  "enable_native_object_api": true
 }
 ```
 
-In this mode, control paths remain available:
+In default proxy mode, control paths remain available:
 
 - `/healthz`, `/readyz`
 - `/metrics`
@@ -50,8 +56,8 @@ In this mode, control paths remain available:
 - `/_recovery/*`
 - `/_internal/*`
 
-Native bucket/object routes (`/`, `/<bucket>`, `/<bucket>/<key>`) return `404`
-when object API is disabled.
+Bucket/object routes (`/`, `/<bucket>`, `/<bucket>/<key>`) return `501` until
+the S3 proxy implementation is connected to upstream S3 backends.
 
 Start the server with the default config path:
 
