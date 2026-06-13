@@ -1,10 +1,23 @@
 package metadata
 
 var sqliteSchemaStatements = []string{
+	`CREATE TABLE IF NOT EXISTS metadata_upstreams (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		endpoint TEXT NOT NULL,
+		region TEXT NOT NULL,
+		weight INTEGER NOT NULL,
+		priority INTEGER NOT NULL,
+		buckets TEXT,
+		enabled INTEGER NOT NULL,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	)`,
 	`CREATE TABLE IF NOT EXISTS metadata_buckets (
 		name TEXT PRIMARY KEY,
 		created_at INTEGER NOT NULL
 	)`,
+	`CREATE INDEX IF NOT EXISTS idx_metadata_upstreams_enabled_priority ON metadata_upstreams (enabled, priority, name)`,
 	`CREATE TABLE IF NOT EXISTS metadata_objects (
 		bucket TEXT NOT NULL,
 		object_key TEXT NOT NULL,

@@ -31,6 +31,11 @@ type BlobRef struct {
 }
 
 type Repository interface {
+	ListUpstreams(ctx context.Context) ([]model.Upstream, error)
+	GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error)
+	UpsertUpstream(ctx context.Context, upstream model.Upstream) (model.Upstream, error)
+	DeleteUpstream(ctx context.Context, id string) (bool, error)
+
 	ListBuckets(ctx context.Context) ([]model.Bucket, error)
 	BucketExists(ctx context.Context, bucket string) (bool, error)
 	CreateBucket(ctx context.Context, bucket string) error
@@ -55,19 +60,21 @@ type Repository interface {
 type MetadataStore = Repository
 
 type InMemoryMetadata struct {
-	mu      sync.RWMutex
-	buckets map[string]map[string]struct{}
-	objects map[string]model.ObjectMeta
-	staged  map[string]model.ObjectMeta
-	blobs   map[string]BlobRef
+	mu        sync.RWMutex
+	buckets   map[string]map[string]struct{}
+	upstreams map[string]model.Upstream
+	objects   map[string]model.ObjectMeta
+	staged    map[string]model.ObjectMeta
+	blobs     map[string]BlobRef
 }
 
 func NewInMemoryMetadata() *InMemoryMetadata {
 	return &InMemoryMetadata{
-		buckets: make(map[string]map[string]struct{}),
-		objects: make(map[string]model.ObjectMeta),
-		staged:  make(map[string]model.ObjectMeta),
-		blobs:   make(map[string]BlobRef),
+		buckets:   make(map[string]map[string]struct{}),
+		upstreams: make(map[string]model.Upstream),
+		objects:   make(map[string]model.ObjectMeta),
+		staged:    make(map[string]model.ObjectMeta),
+		blobs:     make(map[string]BlobRef),
 	}
 }
 

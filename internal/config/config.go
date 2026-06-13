@@ -196,9 +196,6 @@ func validateRequired(cfg Config) error {
 	if cfg.LogLevel == "" {
 		return errors.New("invalid config: log_level is required")
 	}
-	if cfg.EnableS3Proxy && len(cfg.S3ProxyUpstreams) == 0 {
-		return errors.New("invalid config: enable_s3_proxy requires s3_proxy_upstreams")
-	}
 	if !cfg.EnableClusterManagement {
 		return nil
 	}

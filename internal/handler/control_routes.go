@@ -31,6 +31,7 @@ func isClusterRoute(route string) bool {
 func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request, route string, parts []string) bool {
 	routes := map[string]func(){
 		strings.Trim(defaultSearchPath, "/"):           func() { s.handleSearch(w, r) },
+		strings.Trim(defaultS3UpstreamsPath, "/"):      func() { s.handleS3Upstreams(w, r) },
 		strings.Trim(defaultClusterMembersPath, "/"):   func() { s.handleClusterMembers(w, r) },
 		strings.Trim(defaultClusterBootstrapPath, "/"): func() { s.handleClusterBootstrap(w, r) },
 		strings.Trim(defaultClusterJoinPath, "/"):      func() { s.handleClusterJoin(w, r) },
@@ -72,6 +73,10 @@ func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request
 	if s.handleStorageShardRoute(w, r, parts) {
 		return true
 	}
+	if isS3UpstreamRoute(parts) {
+		s.handleS3Upstream(w, r, parts[2])
+		return true
+	}
 	if isClusterMemberActionRoute(parts) {
 		s.handleClusterMemberAction(w, r, parts[2], parts[3])
 		return true
@@ -101,4 +106,8 @@ func isClusterMemberRoute(parts []string) bool {
 
 func isClusterMemberActionRoute(parts []string) bool {
 	return len(parts) == 4 && parts[0] == "_cluster" && parts[1] == "members"
+}
+
+func isS3UpstreamRoute(parts []string) bool {
+	return len(parts) == 3 && parts[0] == "_s3" && parts[1] == "upstreams"
 }

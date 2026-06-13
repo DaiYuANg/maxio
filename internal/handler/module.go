@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/logx"
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
+	"github.com/lyonbrown4d/maxio/internal/metadata"
 )
 
 func Module() dix.Module {
@@ -19,7 +20,7 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider1(newLogger),
 			dix.Provider1(newEventBus),
-			dix.Provider1(newGatewayDependencies),
+			dix.Provider2(newGatewayDependencies),
 			dix.Provider3(newGatewayService),
 		),
 		dix.Hooks(
@@ -32,8 +33,8 @@ func newEventBus(logger *slog.Logger) eventx.BusRuntime {
 	return eventx.New(eventx.WithMiddleware(busMiddleware(logger)))
 }
 
-func newGatewayDependencies(discoveryRuntime *discovery.Runtime) Dependencies {
-	return NewDependencies(nil, nil, discoveryRuntime, nil)
+func newGatewayDependencies(discoveryRuntime *discovery.Runtime, metadataStore metadata.MetadataStore) Dependencies {
+	return NewDependencies(nil, nil, discoveryRuntime, nil, metadataStore)
 }
 
 func newGatewayService(deps Dependencies, logger *slog.Logger, cfg config.Config) *Service {

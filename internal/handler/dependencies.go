@@ -5,6 +5,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
+	"github.com/lyonbrown4d/maxio/internal/metadata"
 	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/object"
@@ -26,6 +27,7 @@ type Dependencies struct {
 	engine    *engine.Engine
 	raft      raftRuntime
 	discovery *discovery.Runtime
+	metadata  metadata.MetadataStore
 	repair    *repair.Runtime
 }
 
@@ -35,12 +37,18 @@ func NewDependencies(
 	engineStore *engine.Engine,
 	discoveryRuntime *discovery.Runtime,
 	repairRuntime *repair.Runtime,
+	metadataStore ...metadata.MetadataStore,
 ) Dependencies {
+	var repo metadata.MetadataStore
+	if len(metadataStore) > 0 {
+		repo = metadataStore[0]
+	}
 	return Dependencies{
 		objects:   objects,
 		engine:    engineStore,
 		raft:      nil,
 		discovery: discoveryRuntime,
+		metadata:  repo,
 		repair:    repairRuntime,
 	}
 }
