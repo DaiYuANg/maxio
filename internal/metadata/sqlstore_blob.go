@@ -7,15 +7,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
-	rows, err := s.queryContext(
-		ctx,
-		`SELECT hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
-		   FROM metadata_blob_refs`,
-	)
+	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...)
+	rows, err := s.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query blob refs: %w", err)
 	}
@@ -45,13 +43,13 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 		return BlobRef{}, false, ErrBadRequest
 	}
 
-	row := s.queryRowContext(
-		ctx,
-		`SELECT hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
-		   FROM metadata_blob_refs
-		  WHERE hash = ?`,
-		hash,
-	)
+	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...).
+		Where(metadataBlobRefs.hash.Eq(hash)).
+		Limit(1)
+	row, err := s.queryRowBuilderContext(ctx, query)
+	if err != nil {
+		return BlobRef{}, false, fmt.Errorf("get blob ref: %w", err)
+	}
 	ref, err := scanBlobRef(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return BlobRef{}, false, nil
@@ -77,19 +75,19 @@ func (s *SQLMetadata) CreateBlobRef(
 		return ErrBadRequest
 	}
 
-	if _, err := s.execContext(
-		ctx,
-		`INSERT INTO metadata_blob_refs (
-			hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
-		) VALUES (?, ?, ?, 1, ?, ?, ?)
-		ON CONFLICT(hash) DO NOTHING`,
-		hash,
-		path,
-		size,
-		marshalShardPlacements(placements),
-		marshalStrings(checksums),
-		marshalInt64sVariadic(shardSizes...),
-	); err != nil {
+	query := querydsl.InsertInto(metadataBlobRefs.table).
+		Values(
+			metadataBlobRefs.hash.Set(hash),
+			metadataBlobRefs.path.Set(path),
+			metadataBlobRefs.size.Set(size),
+			metadataBlobRefs.refCount.Set(1),
+			metadataBlobRefs.shardPlacements.Set(marshalShardPlacements(placements)),
+			metadataBlobRefs.shardChecksums.Set(marshalStrings(checksums)),
+			metadataBlobRefs.shardSizes.Set(marshalInt64sVariadic(shardSizes...)),
+		).
+		OnConflict(metadataBlobRefs.hash).
+		DoNothing()
+	if _, err := s.execBuilderContext(ctx, query); err != nil {
 		return fmt.Errorf("create blob ref: %w", err)
 	}
 	return nil
@@ -100,12 +98,10 @@ func (s *SQLMetadata) UpdateBlobRefPlacements(ctx context.Context, hash string, 
 	if hash == "" {
 		return ErrBadRequest
 	}
-	result, err := s.execContext(
-		ctx,
-		"UPDATE metadata_blob_refs SET shard_placements = ? WHERE hash = ?",
-		marshalShardPlacements(placements),
-		hash,
-	)
+	query := querydsl.Update(metadataBlobRefs.table).
+		Set(metadataBlobRefs.shardPlacements.Set(marshalShardPlacements(placements))).
+		Where(metadataBlobRefs.hash.Eq(hash))
+	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("update blob ref placements: %w", err)
 	}
