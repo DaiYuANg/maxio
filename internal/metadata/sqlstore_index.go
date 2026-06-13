@@ -12,12 +12,6 @@ import (
 
 const sqlStoreIndexDocumentColumns = `document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at`
 
-const sqlStoreIndexJobColumns = `job_id, kind, bucket, object_key, version_id, status, attempts, error,
-available_at, started_at, finished_at, created_at, updated_at`
-
-const sqlStoreIndexOutboxColumns = `event_id, event_type, bucket, object_key, version_id, payload, status,
-attempts, error, available_at, created_at, updated_at`
-
 const sqlStoreIndexDocumentUpsertSQL = `INSERT INTO metadata_index_documents (
 	document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -29,39 +23,6 @@ ON CONFLICT(document_id) DO UPDATE SET
 	state = excluded.state,
 	error = excluded.error,
 	indexed_at = excluded.indexed_at,
-	updated_at = excluded.updated_at`
-
-const sqlStoreIndexJobUpsertSQL = `INSERT INTO metadata_index_jobs (
-	job_id, kind, bucket, object_key, version_id, status, attempts, error,
-	available_at, started_at, finished_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(job_id) DO UPDATE SET
-	kind = excluded.kind,
-	bucket = excluded.bucket,
-	object_key = excluded.object_key,
-	version_id = excluded.version_id,
-	status = excluded.status,
-	attempts = excluded.attempts,
-	error = excluded.error,
-	available_at = excluded.available_at,
-	started_at = excluded.started_at,
-	finished_at = excluded.finished_at,
-	updated_at = excluded.updated_at`
-
-const sqlStoreIndexOutboxUpsertSQL = `INSERT INTO metadata_index_outbox (
-	event_id, event_type, bucket, object_key, version_id, payload, status,
-	attempts, error, available_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(event_id) DO UPDATE SET
-	event_type = excluded.event_type,
-	bucket = excluded.bucket,
-	object_key = excluded.object_key,
-	version_id = excluded.version_id,
-	payload = excluded.payload,
-	status = excluded.status,
-	attempts = excluded.attempts,
-	error = excluded.error,
-	available_at = excluded.available_at,
 	updated_at = excluded.updated_at`
 
 func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error) {

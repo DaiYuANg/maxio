@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -182,26 +183,11 @@ func indexQueueTimes(availableAt, createdAt time.Time) (time.Time, time.Time, ti
 func listSQLIndexQueue[T any](
 	ctx context.Context,
 	store *SQLMetadata,
-	columns string,
-	table string,
-	status string,
-	limit int,
+	query querydsl.Builder,
 	label string,
 	scan func(sqlScanner) (T, error),
 ) ([]T, error) {
-	status = strings.TrimSpace(status)
-	limit = normalizeListLimit(limit)
-	rows, err := store.queryContext(
-		ctx,
-		`SELECT `+columns+`
-		   FROM `+table+`
-		  WHERE ? = '' OR status = ?
-		  ORDER BY available_at ASC, created_at ASC
-		  LIMIT ?`,
-		status,
-		status,
-		limit,
-	)
+	rows, err := store.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query %s: %w", label, err)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -15,22 +16,35 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 	if err != nil {
 		return model.IndexOutboxEvent{}, err
 	}
-	if _, execErr := s.execContext(
-		ctx,
-		sqlStoreIndexOutboxUpsertSQL,
-		event.ID,
-		event.EventType,
-		event.Bucket,
-		event.Key,
-		event.VersionID,
-		event.Payload,
-		event.Status,
-		event.Attempts,
-		event.Error,
-		event.AvailableAt.UnixNano(),
-		event.CreatedAt.UnixNano(),
-		event.UpdatedAt.UnixNano(),
-	); execErr != nil {
+	query := querydsl.InsertInto(metadataIndexOutbox.table).
+		Values(
+			metadataIndexOutbox.id.Set(event.ID),
+			metadataIndexOutbox.eventType.Set(event.EventType),
+			metadataIndexOutbox.bucket.Set(event.Bucket),
+			metadataIndexOutbox.key.Set(event.Key),
+			metadataIndexOutbox.versionID.Set(event.VersionID),
+			metadataIndexOutbox.payload.Set(event.Payload),
+			metadataIndexOutbox.status.Set(event.Status),
+			metadataIndexOutbox.attempts.Set(event.Attempts),
+			metadataIndexOutbox.errorText.Set(event.Error),
+			metadataIndexOutbox.availableAt.Set(event.AvailableAt.UnixNano()),
+			metadataIndexOutbox.createdAt.Set(event.CreatedAt.UnixNano()),
+			metadataIndexOutbox.updatedAt.Set(event.UpdatedAt.UnixNano()),
+		).
+		OnConflict(metadataIndexOutbox.id).
+		DoUpdateSet(
+			metadataIndexOutbox.eventType.SetExcluded(),
+			metadataIndexOutbox.bucket.SetExcluded(),
+			metadataIndexOutbox.key.SetExcluded(),
+			metadataIndexOutbox.versionID.SetExcluded(),
+			metadataIndexOutbox.payload.SetExcluded(),
+			metadataIndexOutbox.status.SetExcluded(),
+			metadataIndexOutbox.attempts.SetExcluded(),
+			metadataIndexOutbox.errorText.SetExcluded(),
+			metadataIndexOutbox.availableAt.SetExcluded(),
+			metadataIndexOutbox.updatedAt.SetExcluded(),
+		)
+	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
 		return model.IndexOutboxEvent{}, fmt.Errorf("upsert index outbox event: %w", execErr)
 	}
 	stored, found, err := s.GetIndexOutboxEvent(ctx, event.ID)
@@ -49,14 +63,13 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 		return model.IndexOutboxEvent{}, false, ErrBadRequest
 	}
 
-	row := s.queryRowContext(
-		ctx,
-		`SELECT `+sqlStoreIndexOutboxColumns+`
-		   FROM metadata_index_outbox
-		  WHERE event_id = ?
-		  LIMIT 1`,
-		id,
-	)
+	query := querydsl.SelectFrom(metadataIndexOutbox.table, metadataIndexOutbox.selectItems()...).
+		Where(metadataIndexOutbox.id.Eq(id)).
+		Limit(1)
+	row, err := s.queryRowBuilderContext(ctx, query)
+	if err != nil {
+		return model.IndexOutboxEvent{}, false, fmt.Errorf("get index outbox event: %w", err)
+	}
 	event, err := scanIndexOutboxEvent(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.IndexOutboxEvent{}, false, nil
@@ -68,13 +81,17 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 }
 
 func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) ([]model.IndexOutboxEvent, error) {
+	status = strings.TrimSpace(status)
+	query := querydsl.SelectFrom(metadataIndexOutbox.table, metadataIndexOutbox.selectItems()...).
+		OrderBy(metadataIndexOutbox.availableAt.Asc(), metadataIndexOutbox.createdAt.Asc()).
+		Limit(normalizeListLimit(limit))
+	if status != "" {
+		query.Where(metadataIndexOutbox.status.Eq(status))
+	}
 	return listSQLIndexQueue(
 		ctx,
 		s,
-		sqlStoreIndexOutboxColumns,
-		"metadata_index_outbox",
-		status,
-		limit,
+		query,
 		"index outbox",
 		scanIndexOutboxEvent,
 	)
@@ -85,5 +102,14 @@ func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bo
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	return deleteByID(ctx, s, `DELETE FROM metadata_index_outbox WHERE event_id = ?`, id, "index outbox event")
+	query := querydsl.DeleteFrom(metadataIndexOutbox.table).Where(metadataIndexOutbox.id.Eq(id))
+	result, err := s.execBuilderContext(ctx, query)
+	if err != nil {
+		return false, fmt.Errorf("delete index outbox event: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("delete index outbox event rows: %w", err)
+	}
+	return affected > 0, nil
 }

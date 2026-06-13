@@ -8,17 +8,37 @@ import (
 	"strings"
 	"time"
 
+	columnx "github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
+var metadataBuckets = newMetadataBucketsTable()
+
+type metadataBucketsTable struct {
+	table     querydsl.Table
+	name      columnx.Column[struct{}, string]
+	createdAt columnx.Column[struct{}, int64]
+}
+
+func newMetadataBucketsTable() metadataBucketsTable {
+	table := querydsl.NewTable("metadata_buckets")
+	return metadataBucketsTable{
+		table:     table,
+		name:      columnx.Named[string](table, "name"),
+		createdAt: columnx.Named[int64](table, "created_at"),
+	}
+}
+
+func (t metadataBucketsTable) selectItems() []querydsl.SelectItem {
+	return []querydsl.SelectItem{t.name, t.createdAt}
+}
+
 func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
 	ctx = ensureContext(ctx)
-	rows, err := s.queryContext(
-		ctx,
-		`SELECT name, created_at
-		   FROM metadata_buckets
-		  ORDER BY name ASC`,
-	)
+	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.selectItems()...).
+		OrderBy(metadataBuckets.name.Asc())
+	rows, err := s.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query buckets: %w", err)
 	}
@@ -48,7 +68,22 @@ func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, er
 		return false, ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	return bucketExistsInQuery(ctx, s.db, s.normalizeQuery(metadataBucketExistsQuery), bucket)
+	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.name).
+		Where(metadataBuckets.name.Eq(bucket)).
+		Limit(1)
+	row, err := s.queryRowBuilderContext(ctx, query)
+	if err != nil {
+		return false, fmt.Errorf("query bucket exists: %w", err)
+	}
+	var found string
+	err = row.Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("query bucket exists: %w", err)
+	}
+	return true, nil
 }
 
 func (s *SQLMetadata) CreateBucket(ctx context.Context, bucket string) error {
@@ -57,12 +92,12 @@ func (s *SQLMetadata) CreateBucket(ctx context.Context, bucket string) error {
 		return ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	if _, err := s.execContext(
-		ctx,
-		"INSERT INTO metadata_buckets (name, created_at) VALUES (?, ?)",
-		bucket,
-		time.Now().UTC().UnixNano(),
-	); err != nil {
+	query := querydsl.InsertInto(metadataBuckets.table).
+		Values(
+			metadataBuckets.name.Set(bucket),
+			metadataBuckets.createdAt.Set(time.Now().UTC().UnixNano()),
+		)
+	if _, err := s.execBuilderContext(ctx, query); err != nil {
 		if isSQLConstraintError(err) {
 			return ErrBucketExists
 		}
