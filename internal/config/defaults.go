@@ -7,6 +7,11 @@ func Default() Config {
 		StorageAddress:               "127.0.0.1:8080",
 		EnableClusterManagement:      false,
 		EnableNativeObjectAPI:        false,
+		EnableS3Proxy:                false,
+		S3ProxyEntrypoint:            "",
+		S3ProxyAdminAddress:          ":19090",
+		S3ProxyHealthInterval:        "5s",
+		S3ProxyHealthTimeout:         "2s",
 		CacheBackend:                 "memory",
 		CacheTTL:                     "1m",
 		CacheMaxCost:                 100000,
@@ -41,6 +46,7 @@ func Default() Config {
 
 func applyZeroDefaults(cfg Config) Config {
 	cfg = applyRuntimeZeroDefaults(cfg)
+	cfg = applyS3ProxyZeroDefaults(cfg)
 	cfg = applyCacheZeroDefaults(cfg)
 	cfg = applyRepairZeroDefaults(cfg)
 	cfg = applyDedupeZeroDefaults(cfg)
@@ -90,6 +96,22 @@ func applyCacheZeroDefaults(cfg Config) Config {
 	}
 	if cfg.CacheKeyPrefix == "" {
 		cfg.CacheKeyPrefix = Default().CacheKeyPrefix
+	}
+	return cfg
+}
+
+func applyS3ProxyZeroDefaults(cfg Config) Config {
+	if cfg.S3ProxyEntrypoint == "" {
+		cfg.S3ProxyEntrypoint = Default().S3ProxyEntrypoint
+	}
+	if cfg.S3ProxyAdminAddress == "" {
+		cfg.S3ProxyAdminAddress = Default().S3ProxyAdminAddress
+	}
+	if cfg.S3ProxyHealthInterval == "" {
+		cfg.S3ProxyHealthInterval = Default().S3ProxyHealthInterval
+	}
+	if cfg.S3ProxyHealthTimeout == "" {
+		cfg.S3ProxyHealthTimeout = Default().S3ProxyHealthTimeout
 	}
 	return cfg
 }

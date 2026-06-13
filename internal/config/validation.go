@@ -28,6 +28,12 @@ func validateDurations(cfg Config) error {
 		{name: "index_retry_backoff", value: cfg.IndexRetryBackoff},
 		{name: "cache_ttl", value: cfg.CacheTTL},
 	}
+	if cfg.EnableS3Proxy {
+		durationConfigs = append(durationConfigs,
+			durationConfig{name: "s3_proxy_health_interval", value: cfg.S3ProxyHealthInterval},
+			durationConfig{name: "s3_proxy_health_timeout", value: cfg.S3ProxyHealthTimeout},
+		)
+	}
 	for _, cfgValue := range durationConfigs {
 		if err := validateDuration(cfgValue.name, cfgValue.value); err != nil {
 			return err

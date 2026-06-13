@@ -10,12 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/arcgolabs/dbx"
+	sqlitedialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	// Register the pure-Go SQLite database/sql driver.
 	_ "modernc.org/sqlite"
 )
 
 type SQLiteMetadata struct {
 	db     *sql.DB
+	dbxDB  *dbx.DB
 	logger *slog.Logger
 }
 
@@ -38,10 +41,17 @@ func NewSQLiteMetadata(path string, logger *slog.Logger) (*SQLiteMetadata, error
 	}
 
 	db.SetMaxOpenConns(1)
+	session, err := dbx.NewWithOptions(db, sqlitedialect.New(), dbx.WithLogger(logger))
+	if err != nil {
+		return nil, fmt.Errorf("initialize dbx metadata session: %w", closeSQLiteOnInitError(db, logger, err))
+	}
+
 	metadata := &SQLiteMetadata{
 		db:     db,
+		dbxDB:  session,
 		logger: logger,
 	}
+
 	if err := metadata.applyPragmas(context.Background()); err != nil {
 		return nil, fmt.Errorf("configure sqlite: %w", closeSQLiteOnInitError(db, logger, err))
 	}
@@ -54,6 +64,12 @@ func NewSQLiteMetadata(path string, logger *slog.Logger) (*SQLiteMetadata, error
 
 func (s *SQLiteMetadata) Close() error {
 	if s == nil || s.db == nil {
+		return nil
+	}
+	if s.dbxDB != nil {
+		if err := s.dbxDB.Close(); err != nil {
+			return fmt.Errorf("close dbx metadata session: %w", err)
+		}
 		return nil
 	}
 	if err := s.db.Close(); err != nil {
@@ -71,7 +87,7 @@ func (s *SQLiteMetadata) applyPragmas(ctx context.Context) error {
 		"PRAGMA busy_timeout=5000",
 	}
 	for _, stmt := range stmts {
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+		if _, err := s.execContext(ctx, stmt); err != nil {
 			return fmt.Errorf("exec sqlite pragma: %w", err)
 		}
 	}
@@ -81,11 +97,22 @@ func (s *SQLiteMetadata) applyPragmas(ctx context.Context) error {
 func (s *SQLiteMetadata) createSchema(ctx context.Context) error {
 	ctx = ensureContext(ctx)
 	for _, stmt := range sqliteSchemaStatements {
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+		if _, err := s.execContext(ctx, stmt); err != nil {
 			return fmt.Errorf("exec schema statement: %w", err)
 		}
 	}
 	return nil
+}
+
+func (s *SQLiteMetadata) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if s == nil {
+		return nil, errors.New("metadata db session is nil")
+	}
+	session := s.db
+	if s.dbxDB != nil {
+		return s.dbxDB.ExecContext(ctx, query, args...)
+	}
+	return session.ExecContext(ctx, query, args...)
 }
 
 func (s *SQLiteMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx) error) error {

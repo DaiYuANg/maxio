@@ -16,6 +16,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/http"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
+	"github.com/lyonbrown4d/maxio/internal/proxy"
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
 )
 
@@ -231,5 +232,6 @@ func defaultModules(configOptions ...configx.Option) []dix.Module {
 		scheduler.Module(),
 		handler.Module(),
 		http.Module(),
+		proxy.Module(),
 	}
 }

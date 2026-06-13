@@ -11,57 +11,64 @@ import (
 	"time"
 
 	"github.com/arcgolabs/configx"
+	"github.com/lyonbrown4d/maxio/model"
 )
 
 const defaultConfigPath = "./config.json"
 
 type Config struct {
-	HTTPAddress                  string  `json:"http_address"              koanf:"http_address"              validate:"required,min=1"`
-	HTTPBodyLimit                int     `json:"http_body_limit"           koanf:"http_body_limit"`
-	StorageAddress               string  `json:"storage_address"           koanf:"storage_address"`
-	AdminToken                   string  `json:"admin_token"               koanf:"admin_token"`
-	ClusterToken                 string  `json:"cluster_token"             koanf:"cluster_token"`
-	APIToken                     string  `json:"api_token"                 koanf:"api_token"`
-	EnableClusterManagement      bool    `json:"enable_cluster_management" koanf:"enable_cluster_management"`
-	EnableNativeObjectAPI        bool    `json:"enable_native_object_api"  koanf:"enable_native_object_api"`
-	CacheBackend                 string  `json:"cache_backend"             koanf:"cache_backend"             validate:"required,oneof=none memory redis"`
-	CacheTTL                     string  `json:"cache_ttl"                 koanf:"cache_ttl"                 validate:"required,min=1"`
-	CacheMaxCost                 int     `json:"cache_max_cost"            koanf:"cache_max_cost"`
-	CacheRedisAddress            string  `json:"cache_redis_address"       koanf:"cache_redis_address"`
-	CacheRedisUsername           string  `json:"cache_redis_username"      koanf:"cache_redis_username"`
-	CacheRedisPassword           string  `json:"cache_redis_password"      koanf:"cache_redis_password"`
-	CacheRedisDB                 int     `json:"cache_redis_db"            koanf:"cache_redis_db"`
-	CacheKeyPrefix               string  `json:"cache_key_prefix"          koanf:"cache_key_prefix"`
-	DataDir                      string  `json:"data_dir"                  koanf:"data_dir"                  validate:"required,min=1"`
-	LogLevel                     string  `json:"log_level"                 koanf:"log_level"                 validate:"required,oneof=debug info warn error"`
-	RaftNodeID                   uint64  `json:"raft_node_id"              koanf:"raft_node_id"`
-	RaftShardID                  uint64  `json:"raft_shard_id"             koanf:"raft_shard_id"`
-	RaftAddress                  string  `json:"raft_address"              koanf:"raft_address"`
-	RaftDataDir                  string  `json:"raft_data_dir"             koanf:"raft_data_dir"`
-	RaftBootstrap                bool    `json:"raft_bootstrap"            koanf:"raft_bootstrap"`
-	RaftJoin                     bool    `json:"raft_join"                 koanf:"raft_join"`
-	RaftInitialMembers           string  `json:"raft_initial_members"      koanf:"raft_initial_members"`
-	RaftOperationTimeout         string  `json:"raft_operation_timeout"    koanf:"raft_operation_timeout"    validate:"required,min=1"`
-	GossipBindAddress            string  `json:"gossip_bind_address"       koanf:"gossip_bind_address"       validate:"required,min=1"`
-	GossipAdvertiseAddress       string  `json:"gossip_advertise_address"  koanf:"gossip_advertise_address"`
-	GossipSeeds                  string  `json:"gossip_seeds"              koanf:"gossip_seeds"`
-	PendingObjectTTL             string  `json:"pending_object_ttl"        koanf:"pending_object_ttl"        validate:"required,min=1"`
-	RepairInterval               string  `json:"repair_interval"           koanf:"repair_interval"           validate:"required,min=1"`
-	RepairOnStart                bool    `json:"repair_on_start"           koanf:"repair_on_start"`
-	RepairMaxBatch               int     `json:"repair_max_batch"          koanf:"repair_max_batch"`
-	RepairMaxRetries             int     `json:"repair_max_retries"        koanf:"repair_max_retries"`
-	RepairRateLimit              int     `json:"repair_rate_limit"         koanf:"repair_rate_limit"`
-	RepairRetryBackoff           string  `json:"repair_retry_backoff"      koanf:"repair_retry_backoff"      validate:"required,min=1"`
-	RepairRetryMaxBackoff        string  `json:"repair_retry_max_backoff"  koanf:"repair_retry_max_backoff"`
-	RepairRetryBackoffMultiplier float64 `json:"repair_retry_multiplier"   koanf:"repair_retry_multiplier"`
-	DedupeInterval               string  `json:"dedupe_interval"           koanf:"dedupe_interval"           validate:"required,min=1"`
-	DedupeOnStart                bool    `json:"dedupe_on_start"           koanf:"dedupe_on_start"`
-	DedupeMaxFixes               int     `json:"dedupe_max_fixes"          koanf:"dedupe_max_fixes"`
-	IndexTimeout                 string  `json:"index_timeout"             koanf:"index_timeout"             validate:"required,min=1"`
-	IndexRetryBackoff            string  `json:"index_retry_backoff"       koanf:"index_retry_backoff"       validate:"required,min=1"`
-	IndexMaxRetries              int     `json:"index_max_retries"         koanf:"index_max_retries"`
-	IndexQueueSize               int     `json:"index_queue_size"          koanf:"index_queue_size"`
-	IndexRateLimit               int     `json:"index_rate_limit"          koanf:"index_rate_limit"`
+	HTTPAddress                  string           `json:"http_address"              koanf:"http_address"              validate:"required,min=1"`
+	HTTPBodyLimit                int              `json:"http_body_limit"           koanf:"http_body_limit"`
+	StorageAddress               string           `json:"storage_address"           koanf:"storage_address"`
+	AdminToken                   string           `json:"admin_token"               koanf:"admin_token"`
+	ClusterToken                 string           `json:"cluster_token"             koanf:"cluster_token"`
+	APIToken                     string           `json:"api_token"                 koanf:"api_token"`
+	EnableClusterManagement      bool             `json:"enable_cluster_management" koanf:"enable_cluster_management"`
+	EnableNativeObjectAPI        bool             `json:"enable_native_object_api"  koanf:"enable_native_object_api"`
+	EnableS3Proxy                bool             `json:"enable_s3_proxy"           koanf:"enable_s3_proxy"`
+	S3ProxyUpstreams             []model.Upstream `json:"s3_proxy_upstreams"        koanf:"s3_proxy_upstreams"`
+	S3ProxyEntrypoint            string           `json:"s3_proxy_entrypoint"       koanf:"s3_proxy_entrypoint"`
+	S3ProxyAdminAddress          string           `json:"s3_proxy_admin_address"    koanf:"s3_proxy_admin_address"`
+	S3ProxyHealthInterval        string           `json:"s3_proxy_health_interval"  koanf:"s3_proxy_health_interval"`
+	S3ProxyHealthTimeout         string           `json:"s3_proxy_health_timeout"   koanf:"s3_proxy_health_timeout"`
+	CacheBackend                 string           `json:"cache_backend"             koanf:"cache_backend"             validate:"required,oneof=none memory redis"`
+	CacheTTL                     string           `json:"cache_ttl"                 koanf:"cache_ttl"                 validate:"required,min=1"`
+	CacheMaxCost                 int              `json:"cache_max_cost"            koanf:"cache_max_cost"`
+	CacheRedisAddress            string           `json:"cache_redis_address"       koanf:"cache_redis_address"`
+	CacheRedisUsername           string           `json:"cache_redis_username"      koanf:"cache_redis_username"`
+	CacheRedisPassword           string           `json:"cache_redis_password"      koanf:"cache_redis_password"`
+	CacheRedisDB                 int              `json:"cache_redis_db"            koanf:"cache_redis_db"`
+	CacheKeyPrefix               string           `json:"cache_key_prefix"          koanf:"cache_key_prefix"`
+	DataDir                      string           `json:"data_dir"                  koanf:"data_dir"                  validate:"required,min=1"`
+	LogLevel                     string           `json:"log_level"                 koanf:"log_level"                 validate:"required,oneof=debug info warn error"`
+	RaftNodeID                   uint64           `json:"raft_node_id"              koanf:"raft_node_id"`
+	RaftShardID                  uint64           `json:"raft_shard_id"             koanf:"raft_shard_id"`
+	RaftAddress                  string           `json:"raft_address"              koanf:"raft_address"`
+	RaftDataDir                  string           `json:"raft_data_dir"             koanf:"raft_data_dir"`
+	RaftBootstrap                bool             `json:"raft_bootstrap"            koanf:"raft_bootstrap"`
+	RaftJoin                     bool             `json:"raft_join"                 koanf:"raft_join"`
+	RaftInitialMembers           string           `json:"raft_initial_members"      koanf:"raft_initial_members"`
+	RaftOperationTimeout         string           `json:"raft_operation_timeout"    koanf:"raft_operation_timeout"    validate:"required,min=1"`
+	GossipBindAddress            string           `json:"gossip_bind_address"       koanf:"gossip_bind_address"       validate:"required,min=1"`
+	GossipAdvertiseAddress       string           `json:"gossip_advertise_address"  koanf:"gossip_advertise_address"`
+	GossipSeeds                  string           `json:"gossip_seeds"              koanf:"gossip_seeds"`
+	PendingObjectTTL             string           `json:"pending_object_ttl"        koanf:"pending_object_ttl"        validate:"required,min=1"`
+	RepairInterval               string           `json:"repair_interval"           koanf:"repair_interval"           validate:"required,min=1"`
+	RepairOnStart                bool             `json:"repair_on_start"           koanf:"repair_on_start"`
+	RepairMaxBatch               int              `json:"repair_max_batch"          koanf:"repair_max_batch"`
+	RepairMaxRetries             int              `json:"repair_max_retries"        koanf:"repair_max_retries"`
+	RepairRateLimit              int              `json:"repair_rate_limit"         koanf:"repair_rate_limit"`
+	RepairRetryBackoff           string           `json:"repair_retry_backoff"      koanf:"repair_retry_backoff"      validate:"required,min=1"`
+	RepairRetryMaxBackoff        string           `json:"repair_retry_max_backoff"  koanf:"repair_retry_max_backoff"`
+	RepairRetryBackoffMultiplier float64          `json:"repair_retry_multiplier"   koanf:"repair_retry_multiplier"`
+	DedupeInterval               string           `json:"dedupe_interval"           koanf:"dedupe_interval"           validate:"required,min=1"`
+	DedupeOnStart                bool             `json:"dedupe_on_start"           koanf:"dedupe_on_start"`
+	DedupeMaxFixes               int              `json:"dedupe_max_fixes"          koanf:"dedupe_max_fixes"`
+	IndexTimeout                 string           `json:"index_timeout"             koanf:"index_timeout"             validate:"required,min=1"`
+	IndexRetryBackoff            string           `json:"index_retry_backoff"       koanf:"index_retry_backoff"       validate:"required,min=1"`
+	IndexMaxRetries              int              `json:"index_max_retries"         koanf:"index_max_retries"`
+	IndexQueueSize               int              `json:"index_queue_size"          koanf:"index_queue_size"`
+	IndexRateLimit               int              `json:"index_rate_limit"          koanf:"index_rate_limit"`
 }
 
 func Load(opts ...configx.Option) (Config, error) {
@@ -156,6 +163,10 @@ func trim(cfg Config) Config {
 	cfg.CacheRedisPassword = strings.TrimSpace(cfg.CacheRedisPassword)
 	cfg.CacheKeyPrefix = strings.TrimSpace(cfg.CacheKeyPrefix)
 	cfg.LogLevel = strings.TrimSpace(cfg.LogLevel)
+	cfg.S3ProxyEntrypoint = strings.TrimSpace(cfg.S3ProxyEntrypoint)
+	cfg.S3ProxyAdminAddress = strings.TrimSpace(cfg.S3ProxyAdminAddress)
+	cfg.S3ProxyHealthInterval = strings.TrimSpace(cfg.S3ProxyHealthInterval)
+	cfg.S3ProxyHealthTimeout = strings.TrimSpace(cfg.S3ProxyHealthTimeout)
 	cfg.RaftAddress = strings.TrimSpace(cfg.RaftAddress)
 	cfg.RaftDataDir = strings.TrimSpace(cfg.RaftDataDir)
 	cfg.RaftInitialMembers = strings.TrimSpace(cfg.RaftInitialMembers)
@@ -181,6 +192,9 @@ func validateRequired(cfg Config) error {
 		if cfg.LogLevel == "" {
 			return errors.New("invalid config: log_level is required")
 		}
+		if cfg.EnableS3Proxy && len(cfg.S3ProxyUpstreams) == 0 {
+			return errors.New("invalid config: enable_s3_proxy requires s3_proxy_upstreams")
+		}
 		return nil
 	}
 
@@ -189,6 +203,9 @@ func validateRequired(cfg Config) error {
 	}
 	if cfg.LogLevel == "" {
 		return errors.New("invalid config: log_level is required")
+	}
+	if cfg.EnableS3Proxy && len(cfg.S3ProxyUpstreams) == 0 {
+		return errors.New("invalid config: enable_s3_proxy requires s3_proxy_upstreams")
 	}
 	if cfg.RaftAddress == "" {
 		return errors.New("invalid config: raft_address is required")

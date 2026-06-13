@@ -64,6 +64,13 @@ func (s *Service) checkObjectServiceReady(checks map[string]string) error {
 
 func (s *Service) checkGatewayDataPlaneReady(checks map[string]string) error {
 	if !s.cfg.EnableNativeObjectAPI {
+		if s.cfg.EnableS3Proxy {
+			checks["s3_proxy"] = "configured"
+			checks["object_service"] = "disabled"
+			checks["engine"] = "removed"
+			checks["storage_writable"] = "external_upstream"
+			return nil
+		}
 		checks["s3_proxy"] = "not_implemented"
 		checks["object_service"] = "disabled"
 		checks["engine"] = "removed"

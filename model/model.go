@@ -13,6 +13,19 @@ type Bucket struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type Upstream struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Endpoint  string    `json:"endpoint"`
+	Region    string    `json:"region,omitempty"`
+	Weight    int       `json:"weight"`
+	Priority  int       `json:"priority"`
+	Buckets   []string  `json:"buckets,omitempty"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type ShardPlacement struct {
 	Index       int    `json:"index"`
 	NodeID      string `json:"node_id"`
