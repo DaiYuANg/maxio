@@ -2,9 +2,9 @@
   "http_address": ":8080",
   "http_body_limit": 1073741824,
   "storage_address": "127.0.0.1:8080",
-  "admin_token": "",
-  "cluster_token": "",
-  "api_token": "",
+  "admin_token": "dev-admin-token",
+  "cluster_token": "dev-cluster-token",
+  "api_token": "dev-api-token",
   "metadata_backend": "sqlite",
   "metadata_dsn": "./data/maxio.db",
   "metadata_auto_migrate": true,
@@ -14,7 +14,19 @@
   "s3_proxy_admin_address": ":19090",
   "s3_proxy_health_interval": "5s",
   "s3_proxy_health_timeout": "2s",
-  "s3_proxy_upstreams": [],
+  "s3_proxy_upstreams": [
+    {
+      "name": "local-minio",
+      "endpoint": "http://127.0.0.1:9000",
+      "region": "us-east-1",
+      "bucket": "maxio",
+      "prefix": "",
+      "access_key_env": "MAXIO_UPSTREAM_ACCESS_KEY",
+      "secret_key_env": "MAXIO_UPSTREAM_SECRET_KEY",
+      "dedupe_mode": "observe",
+      "index_mode": "content"
+    }
+  ],
   "data_dir": "./data",
   "log_level": "info",
   "raft_node_id": 1,

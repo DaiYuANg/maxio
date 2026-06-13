@@ -53,6 +53,47 @@ type ObjectMeta struct {
 	ShardSizes         []int64           `json:"shard_sizes,omitempty"`
 }
 
+type ObjectRecord struct {
+	Bucket           string    `json:"bucket"`
+	Key              string    `json:"key"`
+	CurrentVersionID string    `json:"current_version_id,omitempty"`
+	Deleted          bool      `json:"deleted,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type ObjectVersion struct {
+	Bucket             string            `json:"bucket"`
+	Key                string            `json:"key"`
+	VersionID          string            `json:"version_id"`
+	Digest             string            `json:"digest,omitempty"`
+	ETag               string            `json:"etag,omitempty"`
+	Size               int64             `json:"size"`
+	ContentType        string            `json:"content_type,omitempty"`
+	CacheControl       string            `json:"cache_control,omitempty"`
+	ContentDisposition string            `json:"content_disposition,omitempty"`
+	ContentEncoding    string            `json:"content_encoding,omitempty"`
+	ContentLanguage    string            `json:"content_language,omitempty"`
+	UserMetadata       map[string]string `json:"user_metadata,omitempty"`
+	UpstreamID         string            `json:"upstream_id,omitempty"`
+	UpstreamBucket     string            `json:"upstream_bucket,omitempty"`
+	UpstreamKey        string            `json:"upstream_key,omitempty"`
+	DeleteMarker       bool              `json:"delete_marker,omitempty"`
+	CreatedAt          time.Time         `json:"created_at"`
+	UpdatedAt          time.Time         `json:"updated_at"`
+}
+
+type DigestRef struct {
+	Digest         string    `json:"digest"`
+	Size           int64     `json:"size"`
+	RefCount       int       `json:"ref_count"`
+	UpstreamID     string    `json:"upstream_id,omitempty"`
+	UpstreamBucket string    `json:"upstream_bucket,omitempty"`
+	UpstreamKey    string    `json:"upstream_key,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type WriteIntent struct {
 	ID        string    `json:"id"`
 	Stage     string    `json:"stage"`
@@ -82,4 +123,68 @@ type SearchQuery struct {
 
 type SearchResult struct {
 	Items []ObjectMeta `json:"items"`
+}
+
+const (
+	IndexDocumentStatePending = "pending"
+	IndexDocumentStateIndexed = "indexed"
+	IndexDocumentStateDeleted = "deleted"
+	IndexDocumentStateFailed  = "failed"
+
+	IndexJobKindUpsert  = "upsert"
+	IndexJobKindDelete  = "delete"
+	IndexJobKindRebuild = "rebuild"
+
+	IndexJobStatusQueued    = "queued"
+	IndexJobStatusRunning   = "running"
+	IndexJobStatusSucceeded = "succeeded"
+	IndexJobStatusFailed    = "failed"
+
+	IndexOutboxStatusPending    = "pending"
+	IndexOutboxStatusDispatched = "dispatched"
+	IndexOutboxStatusFailed     = "failed"
+)
+
+type IndexDocument struct {
+	ID        string    `json:"id"`
+	Bucket    string    `json:"bucket"`
+	Key       string    `json:"key"`
+	VersionID string    `json:"version_id"`
+	Digest    string    `json:"digest,omitempty"`
+	State     string    `json:"state"`
+	Error     string    `json:"error,omitempty"`
+	IndexedAt time.Time `json:"indexed_at,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type IndexJob struct {
+	ID          string    `json:"id"`
+	Kind        string    `json:"kind"`
+	Bucket      string    `json:"bucket,omitempty"`
+	Key         string    `json:"key,omitempty"`
+	VersionID   string    `json:"version_id,omitempty"`
+	Status      string    `json:"status"`
+	Attempts    int       `json:"attempts"`
+	Error       string    `json:"error,omitempty"`
+	AvailableAt time.Time `json:"available_at"`
+	StartedAt   time.Time `json:"started_at,omitempty"`
+	FinishedAt  time.Time `json:"finished_at,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type IndexOutboxEvent struct {
+	ID          string    `json:"id"`
+	EventType   string    `json:"event_type"`
+	Bucket      string    `json:"bucket,omitempty"`
+	Key         string    `json:"key,omitempty"`
+	VersionID   string    `json:"version_id,omitempty"`
+	Payload     string    `json:"payload,omitempty"`
+	Status      string    `json:"status"`
+	Attempts    int       `json:"attempts"`
+	Error       string    `json:"error,omitempty"`
+	AvailableAt time.Time `json:"available_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

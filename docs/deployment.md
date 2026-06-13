@@ -1,69 +1,95 @@
 # MaxIO deployment notes
 
-## Operational runbooks
+MaxIO's target runtime is a stateless S3 proxy backed by an external metadata
+database and upstream S3-compatible storage. Local disk is not authoritative for
+object bytes.
 
-Before running MaxIO with persistent data, read:
+## Required services
+
+Production:
 
 ```text
-docs/data-layout.md
-docs/backup-restore-upgrade.md
-docs/smoke-tests.md
+MaxIO gateway instances
+PostgreSQL metadata database
+Upstream S3-compatible storage
+Persistent volume for derived Bleve index, optional but recommended
+Metrics/logging stack
 ```
 
-`docs/data-layout.md` explains what lives under `data_dir`, which data is
-authoritative, and which derived state can be rebuilt. `docs/backup-restore-upgrade.md`
-covers MVP-safe backup, restore, upgrade, and rollback procedures.
+Development:
 
-## Single node
+```text
+Single MaxIO process
+SQLite metadata database
+Local or remote S3-compatible upstream
+Local ./data directory for Bleve
+```
 
-Use `config.example.json` as the baseline config. The default runtime is a
-stateless S3 proxy skeleton with DB-backed metadata; it does not start local
-Raft or local object storage modules.
+## Configuration baseline
 
-Legacy Raft config keys may still appear while the old code is being removed,
-but they are not part of the default startup path.
+`config.example.json` is the minimal local baseline. `config.proxy.example.json`
+shows a proxy-oriented shape with one upstream.
+
+Important settings:
 
 ```json
 {
-  "raft_node_id": 1,
-  "raft_bootstrap": true,
-  "raft_join": false,
-  "raft_initial_members": ""
+  "metadata_backend": "sqlite",
+  "metadata_dsn": "./data/maxio.db",
+  "metadata_auto_migrate": true,
+  "enable_native_object_api": false,
+  "enable_s3_proxy": true,
+  "s3_proxy_entrypoint": ":8080",
+  "s3_proxy_upstreams": []
 }
 ```
 
-## Data-plane mode
-
-MaxIO is now proxy-first. Native local object APIs are disabled by default.
-Until the S3 proxy data plane is wired, bucket/object routes return `501`.
-
-To explicitly run the legacy native object API for compatibility tests, set:
+For production, prefer:
 
 ```json
 {
-  "enable_native_object_api": true
+  "metadata_backend": "postgres",
+  "metadata_dsn": "postgres://maxio:***@postgres:5432/maxio?sslmode=require",
+  "metadata_auto_migrate": false
 }
 ```
 
-In default proxy mode, control paths remain available:
+Run migrations through the release procedure before starting new gateway
+versions in production.
 
-- `/healthz`, `/readyz`
-- `/metrics`
-- `/_cluster/*`
-- `/_repair/*`
-- `/_dedupe/*`
-- `/_index/*`
-- `/_recovery/*`
-- `/_internal/*`
+## Stateless gateway scaling
 
-Bucket/object routes (`/`, `/<bucket>`, `/<bucket>/<key>`) return `501` until
-the S3 proxy implementation is connected to upstream S3 backends.
+Multiple MaxIO instances can serve the same logical service when they share:
+
+- the same metadata DB;
+- compatible configuration and migration version;
+- access to the same upstream S3 routes;
+- the same admin/API credential policy;
+- independent or shared Bleve rebuild strategy.
+
+The gateway must not depend on local Raft state or local object shard files in
+the target architecture. Legacy Raft settings may remain in config while the old
+runtime is removed, but new deployments should not rely on them.
+
+## Local startup
 
 Start the server with the default config path:
 
 ```sh
 ./maxio
 ```
+
+Useful local checks:
+
+```sh
+curl http://127.0.0.1:8080/healthz
+curl http://127.0.0.1:8080/readyz
+curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/metrics
+```
+
+If the S3 proxy implementation is not wired in the current binary, object routes
+may still return `501`. That is a runtime implementation gap, not a change to
+the product architecture.
 
 ## Container image
 
@@ -73,196 +99,102 @@ Build the local image:
 docker build -t maxio:dev .
 ```
 
-The Dockerfile builds a static Linux binary and compresses it with UPX before
-copying it into the runtime image. Release images are built by GoReleaser from
-the same UPX-compressed Linux artifacts and published to GHCR when a SemVer tag
-such as `v0.1.0` is pushed.
-
-Run a single-node development container with a persistent data volume:
+Run a development container:
 
 ```sh
 docker run --rm \
   --name maxio \
   -p 8080:8080 \
-  -p 63000:63000 \
-  -p 7946:7946 \
   -v maxio-data:/app/data \
   -e MAXIO_ADMIN_TOKEN="$MAXIO_ADMIN_TOKEN" \
+  -e MAXIO_API_TOKEN="$MAXIO_API_TOKEN" \
   maxio:dev
 ```
 
-The image copies `config.example.json` to `/app/config.json`. Override config
-values with environment variables such as `MAXIO_ADMIN_TOKEN`,
-`MAXIO_API_TOKEN`, `MAXIO_RAFT_ADDRESS`, and `MAXIO_STORAGE_ADDRESS`.
+Mount a production config or inject environment variables according to the
+runtime config loader.
 
-## Docker Compose
+## Metadata DB operations
 
-Start a single-node local stack:
+Back up the metadata DB before upgrades and before destructive upstream
+maintenance.
 
-```sh
-docker compose -f deploy/compose.single.yaml up --build
-```
+Operational expectations:
 
-Check readiness and metrics:
+- migration state is explicit and versioned;
+- gateways fail readiness when DB connectivity or migration compatibility fails;
+- write paths use DB transactions for visible object state;
+- background workers use DB leases for index and dedupe jobs;
+- recovery scans DB state, not local disk, after crashes.
 
-```sh
-curl http://127.0.0.1:8080/readyz
-curl -H "Authorization: Bearer ${MAXIO_ADMIN_TOKEN:-dev-admin-token}" http://127.0.0.1:8080/metrics
-```
+## Upstream S3 operations
 
-Stop the single-node stack and keep its volume:
+Configure upstream S3 services with durability, lifecycle, and versioning
+appropriate for the selected dedupe mode.
 
-```sh
-docker compose -f deploy/compose.single.yaml down
-```
+Observe mode:
 
-Start a three-node local stack:
+- safest default;
+- logical objects keep their own upstream byte locations;
+- delete behavior can mirror normal S3 object deletion.
 
-```sh
-docker compose -f deploy/compose.three-node.yaml up --build
-```
+Alias mode:
 
-The three nodes expose HTTP on host ports `8081`, `8082`, and `8083`. Raft and
-gossip traffic stays on the Compose network through service names such as
-`maxio-1`, `maxio-2`, and `maxio-3`.
+- requires canonical object retention while references exist;
+- should use upstream versioning or protected prefixes;
+- needs explicit repair and lifecycle checks before deleting canonical bytes.
 
-Check cluster members from node 1:
+## Bleve index operations
 
-```sh
-curl -H "Authorization: Bearer ${MAXIO_ADMIN_TOKEN:-dev-admin-token}" http://127.0.0.1:8081/_cluster/members
-```
-
-Stop the three-node stack and keep volumes:
+Inspect index worker status:
 
 ```sh
-docker compose -f deploy/compose.three-node.yaml down
+curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_index/status
 ```
 
-Remove local Compose data volumes only when you intentionally want a clean
-cluster:
+Rebuild the derived Bleve index:
 
 ```sh
-docker compose -f deploy/compose.three-node.yaml down -v
+curl -X POST \
+  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
+  http://127.0.0.1:8080/_index/rebuild
 ```
 
-## Systemd
-
-The systemd assets are intended for a single host or for manually managed
-cluster nodes outside containers.
-
-Install the binary and config:
-
-```sh
-sudo install -D -m 0755 ./maxio /usr/local/bin/maxio
-sudo install -D -m 0644 deploy/systemd/maxio.env.example /etc/maxio/maxio.env
-sudo install -D -m 0644 deploy/systemd/maxio.service /etc/systemd/system/maxio.service
-```
-
-Create the service user and data directory:
-
-```sh
-sudo useradd --system --home-dir /var/lib/maxio --shell /usr/sbin/nologin maxio
-sudo mkdir -p /var/lib/maxio /var/log/maxio
-sudo chown -R maxio:maxio /var/lib/maxio /var/log/maxio
-```
-
-Edit `/etc/maxio/maxio.env` before starting. At minimum, set:
-
-```text
-MAXIO_ADMIN_TOKEN
-MAXIO_STORAGE_ADDRESS
-MAXIO_RAFT_ADDRESS
-```
-
-For multi-node systemd deployments, also set stable `MAXIO_RAFT_NODE_ID`,
-`MAXIO_RAFT_INITIAL_MEMBERS`, `MAXIO_GOSSIP_ADVERTISE_ADDRESS`, and
-`MAXIO_GOSSIP_SEEDS` on every node.
-
-Start the service:
-
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now maxio
-sudo systemctl status maxio
-```
-
-Check logs and readiness:
-
-```sh
-journalctl -u maxio -f
-curl http://127.0.0.1:8080/readyz
-```
+Bleve can be stored on a persistent volume to avoid rebuild time, but it remains
+derived. If index state is suspected to be corrupt, rebuild from DB rather than
+treating the local index as authoritative.
 
 ## Admin protection
 
-Set `admin_token` or `MAXIO_ADMIN_TOKEN` to protect management APIs.
-Set `cluster_token` or `MAXIO_CLUSTER_TOKEN` to protect internal shard APIs used between MaxIO nodes.
-Set `api_token` or `MAXIO_API_TOKEN` to protect bucket and object APIs.
-Set `http_body_limit` to control the maximum request body accepted by the Fiber HTTP adapter. The default is `1073741824` bytes.
+Set these credentials for non-local deployments:
 
-Native HTTP authorization is split by route class. Control-plane routes require the admin token when `admin_token` is set. Internal shard routes require the cluster token when `cluster_token` is set. Native bucket and object routes require object authorization when `api_token` is set; the API token grants object read/write access, and the admin token is accepted as an object superuser. The API token does not authorize control-plane routes.
+```text
+MAXIO_ADMIN_TOKEN
+MAXIO_API_TOKEN
+MAXIO_CLUSTER_TOKEN, if internal routes remain enabled
+```
 
-To disable native bucket/object routes in control-only deployments, set
-`enable_native_object_api` or `MAXIO_ENABLE_NATIVE_OBJECT_API=false`.
+Admin requests can use:
 
-Admin requests can use either header:
-
-```sh
+```text
 Authorization: Bearer <token>
 X-Maxio-Control: <token>
 ```
 
-Internal shard requests use the cluster header:
+S3/object API requests should use the configured S3 auth path or the API token
+compatibility path while the auth model is being completed.
 
-```sh
-X-Maxio-Cluster: <cluster-token>
-```
-
-Protected paths include:
-
-```text
-/_cluster/*
-/_repair/*
-/_internal/*
-/_search
-/metrics
-```
-
-When `api_token` is configured, bucket and object routes also require either:
-
-```sh
-Authorization: Bearer <api-token>
-X-Maxio-API: <api-token>
-```
-
-The admin token is also accepted for native bucket and object routes.
-
-Object APIs use `api_token` for standard object access control. The admin token is
-also accepted for object APIs.
-
-`/healthz` and `/readyz` remain unauthenticated for load balancers.
+`/healthz` and `/readyz` should remain unauthenticated for load balancers.
 
 ## TLS termination
 
-Terminate TLS at a reverse proxy, ingress, or load balancer in front of MaxIO.
-
-The current httpx runtime used by MaxIO exposes plain HTTP serving. Keep MaxIO on a private network and expose only the TLS terminator publicly.
-
-Example topology:
-
-```text
-client -> TLS proxy or ingress -> MaxIO HTTP address
-```
-
-Production deployments should treat the MaxIO HTTP listener as a private upstream, not as the public TLS endpoint. The supported production pattern is:
+Terminate TLS at a reverse proxy, ingress, or load balancer in front of MaxIO:
 
 ```text
 client HTTPS -> reverse proxy / ingress / load balancer -> private MaxIO HTTP
 ```
 
-The TLS terminator is responsible for certificate provisioning, renewal, cipher policy, HTTP to HTTPS redirects, HSTS, and any public mTLS policy. MaxIO currently does not terminate TLS itself and does not reload TLS certificates.
-
-Forward these headers unchanged when admin, API, or cluster credentials are used:
+Forward credential headers unchanged:
 
 ```text
 Authorization
@@ -271,116 +203,34 @@ X-Maxio-Cluster
 X-Maxio-API
 ```
 
-The internal shard API `/_internal/storage/shards/*` must only be reachable by trusted MaxIO nodes or by a private service network. If `cluster_token` is configured, MaxIO remote shard transport automatically sends `X-Maxio-Cluster`. If `cluster_token` is empty, the transport falls back to `admin_token` for development.
+Keep internal management and repair endpoints private.
 
-## Multi-node bootstrap
+## Readiness model
 
-Each node needs a stable raft address and an HTTP storage address.
+Gateway readiness should require:
 
-Example initial members:
+- metadata DB reachable;
+- migration version compatible;
+- required upstream routes loaded;
+- background workers able to lease work or intentionally disabled;
+- local Bleve path writable when indexing is enabled.
+
+Health may remain process-local. Readiness should reflect whether the instance
+can serve proxy traffic safely.
+
+## Upgrade model
+
+Recommended sequence:
 
 ```text
-1=10.0.0.1:63000,2=10.0.0.2:63000,3=10.0.0.3:63000
+1. Back up metadata DB.
+2. Confirm upstream S3 lifecycle/versioning assumptions.
+3. Run DB migrations.
+4. Roll gateways gradually.
+5. Watch DB transaction errors, index queue depth, and repair_fault count.
+6. Trigger index rebuild only when schema version changes require it.
 ```
 
-Node 1:
-
-```json
-{
-  "raft_node_id": 1,
-  "raft_address": "10.0.0.1:63000",
-  "storage_address": "10.0.0.1:8080",
-  "raft_bootstrap": true,
-  "raft_initial_members": "1=10.0.0.1:63000,2=10.0.0.2:63000,3=10.0.0.3:63000"
-}
-```
-
-Node 2 and node 3 use their own `raft_node_id`, `raft_address`, and `storage_address`, with the same `raft_initial_members`.
-
-## Runtime cluster operations
-
-List raft members:
-
-```sh
-curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_cluster/members
-```
-
-Synchronize storage node HTTP addresses from raft and gossip discovery:
-
-```sh
-curl -X POST -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_cluster/storage-nodes/sync
-```
-
-Drain a replica from new shard placements:
-
-```sh
-curl -X POST -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_cluster/members/2/drain
-```
-
-Preview remaining shard references:
-
-```sh
-curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" "http://127.0.0.1:8080/_cluster/rebalance/plan?replica_id=2"
-```
-
-Rebalance shards away from a drained replica:
-
-```sh
-curl -X POST -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" "http://127.0.0.1:8080/_cluster/rebalance?replica_id=2"
-```
-
-Remove the replica after rebalance:
-
-```sh
-curl -X DELETE -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_cluster/members/2
-```
-
-The remove operation is guarded. It returns conflict if object metadata still references the target replica.
-
-## Node replacement
-
-The replacement endpoint adds the new replica, syncs storage nodes, drains and rebalances the old replica, then removes the old replica if safe:
-
-```sh
-curl -X POST \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"replica_id":4,"target":"10.0.0.4:63000"}' \
-  http://127.0.0.1:8080/_cluster/members/2/replace
-```
-
-## Observability
-
-Health:
-
-```sh
-curl http://127.0.0.1:8080/healthz
-```
-
-Readiness:
-
-```sh
-curl http://127.0.0.1:8080/readyz
-```
-
-Metrics:
-
-```sh
-curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/metrics
-```
-
-For a full post-start smoke-test sequence, use `docs/smoke-tests.md`.
-
-## Index operations
-
-Inspect index worker status:
-
-```sh
-curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_index/status
-```
-
-Rebuild the derived Bleve index from committed object metadata and object content:
-
-```sh
-curl -X POST -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_index/rebuild
-```
+Because gateways are stateless, rollback normally means running the previous
+binary against a compatible DB schema. Incompatible schema changes need an
+explicit migration rollback plan.

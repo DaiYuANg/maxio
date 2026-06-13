@@ -18,6 +18,7 @@ var (
 	ErrBucketExists   = errors.New("bucket already exists")
 	ErrBucketNotFound = errors.New("bucket not found")
 	ErrObjectNotFound = errors.New("object not found")
+	ErrUnsupported    = errors.New("unsupported metadata operation")
 )
 
 type BlobRef struct {
@@ -49,6 +50,31 @@ type Repository interface {
 	DeleteStagedObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error)
 	DeleteObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error)
 
+	UpsertObjectRecord(ctx context.Context, record model.ObjectRecord) (model.ObjectRecord, error)
+	GetObjectRecord(ctx context.Context, bucket, key string) (model.ObjectRecord, bool, error)
+	DeleteObjectRecord(ctx context.Context, bucket, key string) (bool, error)
+	UpsertObjectVersion(ctx context.Context, version model.ObjectVersion) (model.ObjectVersion, error)
+	GetObjectVersion(ctx context.Context, bucket, key, versionID string) (model.ObjectVersion, bool, error)
+	ListObjectVersions(ctx context.Context, bucket, key string) ([]model.ObjectVersion, error)
+	DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error)
+	UpsertDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error)
+	GetDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error)
+	RetainDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error)
+	ReleaseDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error)
+	DeleteDigestRef(ctx context.Context, digest string) (bool, error)
+	UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error)
+	GetIndexDocument(ctx context.Context, id string) (model.IndexDocument, bool, error)
+	ListIndexDocuments(ctx context.Context, bucket, prefix string) ([]model.IndexDocument, error)
+	DeleteIndexDocument(ctx context.Context, id string) (bool, error)
+	UpsertIndexJob(ctx context.Context, job model.IndexJob) (model.IndexJob, error)
+	GetIndexJob(ctx context.Context, id string) (model.IndexJob, bool, error)
+	ListIndexJobs(ctx context.Context, status string, limit int) ([]model.IndexJob, error)
+	DeleteIndexJob(ctx context.Context, id string) (bool, error)
+	UpsertIndexOutboxEvent(ctx context.Context, event model.IndexOutboxEvent) (model.IndexOutboxEvent, error)
+	GetIndexOutboxEvent(ctx context.Context, id string) (model.IndexOutboxEvent, bool, error)
+	ListIndexOutboxEvents(ctx context.Context, status string, limit int) ([]model.IndexOutboxEvent, error)
+	DeleteIndexOutboxEvent(ctx context.Context, id string) (bool, error)
+
 	ListBlobRefs(ctx context.Context) ([]BlobRef, error)
 	GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error)
 	CreateBlobRef(ctx context.Context, hash, path string, size int64, placements []model.ShardPlacement, checksums []string, shardSizes ...[]int64) error
@@ -66,6 +92,13 @@ type InMemoryMetadata struct {
 	objects   map[string]model.ObjectMeta
 	staged    map[string]model.ObjectMeta
 	blobs     map[string]BlobRef
+
+	objectRecords  map[string]model.ObjectRecord
+	objectVersions map[string]model.ObjectVersion
+	digestRefs     map[string]model.DigestRef
+	indexDocuments map[string]model.IndexDocument
+	indexJobs      map[string]model.IndexJob
+	indexOutbox    map[string]model.IndexOutboxEvent
 }
 
 func NewInMemoryMetadata() *InMemoryMetadata {
@@ -75,6 +108,13 @@ func NewInMemoryMetadata() *InMemoryMetadata {
 		objects:   make(map[string]model.ObjectMeta),
 		staged:    make(map[string]model.ObjectMeta),
 		blobs:     make(map[string]BlobRef),
+
+		objectRecords:  make(map[string]model.ObjectRecord),
+		objectVersions: make(map[string]model.ObjectVersion),
+		digestRefs:     make(map[string]model.DigestRef),
+		indexDocuments: make(map[string]model.IndexDocument),
+		indexJobs:      make(map[string]model.IndexJob),
+		indexOutbox:    make(map[string]model.IndexOutboxEvent),
 	}
 }
 

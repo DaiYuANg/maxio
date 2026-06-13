@@ -1,139 +1,117 @@
 # MaxIO data layout
 
-This document describes the runtime data written by MaxIO and how to treat each
-area during operations. The examples use the default local layout. Container and
-systemd deployments normally override the root with `MAXIO_DATA_DIR`.
+MaxIO's proxy-only layout separates authoritative state from derived state.
+Object bytes live in upstream S3. MaxIO persists metadata in a database and can
+rebuild its local Bleve file index from that metadata plus upstream object
+content.
 
-## Root directories
+## Authoritative state
 
-`data_dir` is the primary persistent data root.
+Authoritative state is stored in the metadata database:
+
+```text
+tenants
+buckets
+upstreams
+bucket_routes
+object_keys
+object_versions
+blob_fingerprints
+dedupe_groups
+dedupe_links
+index_jobs
+index_documents
+outbox_events
+audit_events
+schema_migrations
+```
+
+The exact table names can evolve with migrations, but the ownership rule should
+not change: if MaxIO needs a durable product decision, it belongs in the DB.
+
+The DB stores:
+
+- upstream S3 endpoint and route metadata;
+- logical bucket/key/version identity;
+- upstream object location, etag, size, checksum, and upstream version ID;
+- object write/delete visibility state;
+- object-level fingerprints and dedupe relationships;
+- index queue, lease, retry, and schema-version state;
+- reconciliation and audit events.
+
+## Upstream S3 bytes
+
+Upstream S3 stores all authoritative object bytes:
+
+```text
+s3://<upstream-bucket>/<upstream-prefix>/<object>
+```
+
+MaxIO metadata maps logical objects to upstream locations. The upstream location
+may be one-to-one with the requested bucket/key in observe mode, or may point to
+a canonical object in alias mode.
+
+Operational rules:
+
+```text
+Do not treat MaxIO local disk as an object backup.
+Back up upstream S3 according to the upstream provider's durability model.
+Preserve upstream versioning where alias mode or rollback requirements need it.
+Keep DB backups transactionally aligned with upstream operational recovery.
+```
+
+## Local runtime directories
+
+`data_dir` is still useful, but it is not an object storage root in proxy mode.
 
 Default values:
 
 ```text
 config.example.json: ./data
-Docker Compose:      /app/data
+Docker/container:    /app/data
 systemd example:     /var/lib/maxio/data
 ```
 
-`raft_data_dir` controls Dragonboat/Raft persistence. The default value is the
-relative path `raft`. Relative values are resolved under `data_dir`, so the
-default effective path is:
-
-```text
-<data_dir>/raft
-```
-
-If `raft_data_dir` is absolute, it is outside `data_dir` and must be backed up
-and restored separately.
-
-## Current layout summary
-
-Typical runtime data:
+Expected proxy-mode layout:
 
 ```text
 <data_dir>/
-  raft/                       # Raft nodehost, WAL, snapshots, replicated metadata
-  index/bleve/                # Derived Bleve search index
-  <shard-dir>/<hash>/         # Object content shard set
-    chunk-0000
-    chunk-0001
-    ...
-  <shard-dir>/<layout-id>/    # Object layout metadata
-    meta.json
+  index/bleve/        # derived search index, rebuildable
+  tmp/                # transient local scratch, safe to clear when MaxIO is stopped
+  logs/               # optional local logs if file logging is enabled
 ```
 
-`<shard-dir>` is derived from the first two characters of the object key,
-lowercased. Short keys use the whole key. Do not rely on a fixed top-level
-`objects/` directory; back up the whole `data_dir`.
+Legacy directories such as `raft/` or local shard directories may exist during
+the migration away from the previous storage-engine design. They are not part of
+the target proxy-only architecture and should not be introduced into new
+deployments.
 
-## Raft metadata and membership
+## Metadata DB
 
-Path:
+Recommended production DB: PostgreSQL.
+
+Development DB: SQLite.
+
+The DB is the source of truth for:
+
+- object visibility;
+- object version lineage;
+- delete markers;
+- upstream routing;
+- dedupe policy and links;
+- index state;
+- repair and rebuild cursors.
+
+Backup priority:
 
 ```text
-<raft_data_dir>
+1. Metadata DB backup and migration version.
+2. MaxIO configuration and secret material references.
+3. Upstream S3 bucket/versioning configuration.
+4. Local Bleve index only if avoiding rebuild time matters.
 ```
 
-Contains:
-
-```text
-Dragonboat nodehost identity
-Raft WAL and snapshots
-Replicated bucket metadata
-Replicated object metadata
-Blob reference metadata
-Cluster membership state
-```
-
-Operational classification: authoritative and not safely rebuildable from shard
-files alone.
-
-Rules:
-
-```text
-Do not delete raft_data_dir on an existing replica.
-Do not copy one replica's raft_data_dir to another replica ID.
-Do not start two nodes with the same restored raft_data_dir at the same time.
-Restore it with the same raft_node_id and compatible cluster membership.
-```
-
-If this directory is lost for one node in a healthy multi-node cluster, replace
-the node through the cluster replacement flow instead of reusing the old replica
-identity with empty Raft state. If the whole cluster loses Raft metadata, object
-shards are not enough for an MVP-supported full metadata reconstruction.
-
-## Object shard data
-
-Path shape:
-
-```text
-<data_dir>/<shard-dir>/<object-content-sha256>/chunk-0000
-<data_dir>/<shard-dir>/<object-content-sha256>/chunk-0001
-...
-```
-
-MaxIO currently uses a `9+3` erasure layout by default: 9 data chunks and 3
-parity chunks. The default shard size is 1 MiB.
-
-In a single-node deployment, every shard for an object is local. In a multi-node
-deployment, shard placement metadata can point each chunk at a local or remote
-storage node. Each node stores only the chunks assigned to that node, using the
-same path shape in that node's own `data_dir`.
-
-Operational classification: primary object data.
-
-Rules:
-
-```text
-Do not delete shard sets referenced by object metadata.
-Back up every node's data_dir, not only one node's data_dir.
-The erasure layout can tolerate some missing shards for an object, but not an
-unbounded loss of shard files.
-Run repair after node loss, restore, or suspicious storage events.
-```
-
-## Object layout metadata
-
-Path shape:
-
-```text
-<data_dir>/<shard-dir>/<layout-id>/meta.json
-```
-
-The layout file maps a bucket/key to the content shard set, size, ETag, checksum
-list, and shard placements. Reads use this layout to find and validate object
-shards.
-
-Operational classification: operationally critical local metadata.
-
-The committed Raft metadata also stores object and blob reference information,
-and the MVP does not expose a general-purpose "rebuild every missing layout file"
-restore command. Treat layout `meta.json` files as part of the object data
-backup. If they are missing or inconsistent, use the recovery, dedupe, repair,
-and smoke-test flows to detect damage; do not hand-edit them in production.
-
-## Bleve search index
+## Bleve index
 
 Path:
 
@@ -141,64 +119,82 @@ Path:
 <data_dir>/index/bleve
 ```
 
-Contains the local persistent Bleve index used by search APIs.
+Classification: derived, rebuildable.
 
-Operational classification: derived and rebuildable.
-
-The index is derived from committed object metadata and object content. It can be
-excluded from backups when rebuild time is acceptable. Rebuild it with:
-
-```sh
-curl -X POST \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_index/rebuild"
-```
-
-If an index backup is restored across MaxIO or Bleve version changes and search
-behaves unexpectedly, stop MaxIO, remove only `index/bleve`, restart, and rebuild
-the index.
-
-## Temporary put staging
-
-Normal object writes use OS temporary files named like:
+Bleve documents should be keyed by stable DB identity, for example:
 
 ```text
-maxio-put-*
+object_version:<object_version_id>:schema:<index_schema_version>
 ```
 
-These files are created in the operating system temp directory, not under
-`data_dir`. They are active-write scratch files and are not part of a backup.
-Quiesce writes or stop the process before taking a file-level backup.
+The indexed document should include enough fields for search and filtering, but
+must not become authoritative for object existence. Search results must always
+resolve back to visible DB object versions before being returned.
+
+Safe rebuild:
+
+```text
+1. Pause index workers or put the node in maintenance.
+2. Remove or move <data_dir>/index/bleve.
+3. Start MaxIO and trigger an index rebuild.
+4. Rebuild scans DB object_versions and enqueues index_jobs.
+5. Workers fetch bytes from upstream S3 and repopulate Bleve.
+```
+
+## Temporary upload and extraction files
+
+Large uploads, checksum calculation, file sniffing, and text extraction may use
+temporary files. These files are process-local scratch space.
+
+Rules:
+
+```text
+They are not part of backup.
+They may be deleted when MaxIO is stopped.
+They must not be used to decide committed object visibility.
+```
 
 ## What can be rebuilt
 
 Rebuildable:
 
 ```text
-<data_dir>/index/bleve
-Some missing object shards, if enough shards remain for the erasure layout
-Some stale pending write state, through recovery
-Some orphan shard sets, through recovery/dedupe cleanup
+Bleve index directory
+Index job queue from committed object_versions
+Dedupe grouping from blob_fingerprints
+Readiness/cache state
+Failed or stale outbox work, if represented in DB
 ```
 
-Not safely rebuildable in the MVP:
+Not rebuildable from MaxIO local disk:
 
 ```text
-raft_data_dir, from shard files alone
-Object shard sets after unrecoverable erasure loss
-Arbitrary missing object layout files, without supported repair coverage
-In-progress upload state, if upload staging is lost
+Metadata DB
+Upstream S3 object bytes
+Secrets or credential references not stored in config/secret manager
+Object versions that never committed to DB
 ```
 
-## Backup priority
+## Consistency checks
 
-For a production backup, preserve these in order:
+The repair loop should reconcile these sources:
 
 ```text
-1. Config, environment, tokens, and exact MaxIO version.
-2. raft_data_dir for each replica.
-3. data_dir for each storage node, including shard and layout directories.
-4. index/bleve only when avoiding rebuild time matters.
+DB object_versions
+DB blob_fingerprints
+upstream S3 HEAD/GET metadata
+Bleve document presence and schema version
+index_jobs and index_documents status
 ```
 
-See `docs/backup-restore-upgrade.md` for operational procedures.
+Expected actions:
+
+- DB row exists and upstream HEAD succeeds: object can remain visible.
+- DB row exists and upstream HEAD fails: mark a repair fault; do not silently
+  delete the object.
+- Upstream object exists without committed DB row: classify as orphan and apply
+  retention policy.
+- Bleve document missing or stale: enqueue re-index.
+- Dedupe group missing for known fingerprint: rebuild dedupe grouping from DB.
+
+See `docs/metadata-indexing.md` for the entity model and rebuild strategy.

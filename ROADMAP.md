@@ -1,110 +1,143 @@
-# MaxIO Roadmap (v2, no-Raft + DB-first metadata)
+# MaxIO roadmap
 
-## 产品定位（重新规划）
+MaxIO is moving from a full S3/storage-engine service to a stateless S3 proxy
+with DB metadata and a rebuildable Bleve file index.
 
-- **核心产品：S3 聚合网关（可接入多实例）**  
-  统一接入多个上游 S3 实例/集群，提供网关侧的对象索引、对象级去重、可观测和治理能力。
-- **一等公民：S3 API**  
-  S3 路由与签名兼容能力为公共入口；Native API 保持为内部管理增强能力（非主要流量入口）。
-- **基础设施策略**  
-  网关进程保持无状态（stateless），支持水平扩展；元数据与索引状态统一落库（默认外部 DB，单机可用 SQLite，本地开发可替换为 PostgreSQL/MySQL）。
-- **交付目标**  
-  首版先达到“生产可用的最小体量”：数据平面可用、恢复可控、可观测、可部署、可运维。
+## Product target
 
-## 架构决策（与旧版 Raft 架构差异）
+- S3 upstream stores object bytes.
+- MaxIO stores metadata, dedupe relationships, index state, and operational
+  events.
+- Metadata DB is the source of truth.
+- Bleve is a derived index and can be rebuilt.
+- Gateway instances are stateless and horizontally scalable.
+- Object-level dedupe supports two evolution paths: observe first, alias later.
 
-- 去除 Raft 作为默认控制平面基础；所有网关元数据与对象索引状态改由 DB 事务层负责。
-- 调整为 Gateway + Upstream 集群模型：  
-  - Gateway：无状态 API 入口（S3、鉴权、路由、鉴权透传、事件与索引触发）。  
-  - Upstream：多个 S3 实例只保留在网关的连接元数据中，由网关转发实际对象数据。
-- S3 与内部治理 API（如有）共用统一元数据索引模型，不存在“可选接入层”语义。
-- 保留 `dedupe + content index` 为第一优先级能力；这些能力依赖元数据库中的对象指纹与引用关系。
+## Architecture decisions
 
-## 当前实现状态（v2 目标视角）
+- Remove Raft as the default control-plane foundation.
+- Do not store authoritative object bytes in MaxIO local shard files.
+- Persist object visibility, routing, fingerprints, and index status in DB.
+- Use DB transactions and leases for write state, worker queues, rebuilds, and
+  recovery.
+- Keep S3 API as the first-class public data plane.
+- Keep management APIs for health, readiness, metrics, indexing, repair, and
+  dedupe operations.
 
-- S3 网关转发、对象事件、metrics、管理 API 基础框架已形成基础骨架。
-- 部分 cluster 与多副本逻辑仍基于旧实现概念，正在向 DB 控制路径迁移。
-- 对象级去重与内容检索已具备雏形，仍需与无状态元数据库一体化，并在网关层聚合路径下保证一致性。
-- 代码尚未完成“完全不再依赖 Raft 的最终收敛”；当前文档仅作为后续落地约束与实现目标。
+## P0: Metadata foundation
 
-## 第一阶段：重构底座（P0，优先）
+Goal: make DB-backed metadata the durable runtime center.
 
-目标：把运行时重心稳定为 stateless + DB。
+- Define metadata repository boundaries for tenants, buckets, upstreams,
+  routes, object keys, object versions, fingerprints, dedupe links, index jobs,
+  and audit/outbox events.
+- Implement SQLite for local development and PostgreSQL for production.
+- Add migrations and startup compatibility checks.
+- Define DB transaction boundaries for PUT, DELETE, COPY, and index enqueue.
+- Make object visibility depend on DB state, not local process state.
 
-- 1.1 元数据接口抽象
-  - 定义 `metadata.Repository` 接口（对象、版本、布局、索引任务、节点拓扑、事件游标）。
-  - 引入默认 DB 实现：`postgres`（推荐生产）、`sqlite`（开发默认内嵌）。
-  - 实现幂等写、事务边界和乐观并发控制。
-- 1.2 网关无状态化
-  - Gateway 生命周期不持久化本地元数据状态。
-  - 清理节点本地状态依赖，转为“从 metadata repo 读取 + 写入 + 任务入列”。
-- 1.3 S3 API 与上游抽象统一
-  - 将多上游 S3 的路由策略、签名透传、桶/路径映射统一为同一元数据模型。
-  - 建立统一错误模型与请求生命周期（超时、重试、幂等、范围读、审计与事件行为）。
-- 1.4 配置与启动重构
-  - 数据库连接、迁移、连接池、事务隔离、重试/超时统一到 configx。
-  - 在 `dix` 模块中保留“组装 + 启动 + 生命周期”边界，减少业务内聚。
+Acceptance criteria:
 
-验收标准（P0）：
-- 服务启动无需本地 raft 文件目录；节点可无状态横向扩容。
-- 单机 DB 下可完成对象创建/读取/删除的完整闭环。
-- 同时覆盖对象 API 与管理 API 的基础健康检查（`/healthz`, `/readyz`, `/metrics`）。
-- 重复启动幂等，无悬挂状态导致服务不可读写。
+- A gateway can restart without losing committed object metadata.
+- A second gateway can read the same metadata DB and serve the same logical
+  bucket/key namespace.
+- Startup readiness fails when DB is unavailable or schema is incompatible.
 
-## 第二阶段：核心生产能力（P1）
+## P1: S3 proxy write/read path
 
-- 2.1 去重 + 索引与重建
-  - 对象级 dedupe/内容索引主流程改为 metadata repo 驱动，使用对象指纹+桶策略做全网汇总。
-  - 索引状态 API、重建 API、失败重试与速率控制。
-- 2.2 数据一致性与修复
-  - 存储校验（对象/分片）统一纳入读写路径。
-  - 自动修复任务与后台修复状态可观测。
-  - 缺片重建、损坏检测、失败告警与重试退避。
-- 2.3 可靠性与幂等
-  - write/read/delete 的状态机定义（pending/committed/deleted）。
-  - 支持部分失败恢复、挂起任务重扫与回收。
+Goal: route S3 traffic through stateless gateways while preserving metadata.
 
-验收标准（P1）：
-- 3 节点模拟环境下完成对象写入、读取、损坏恢复演练。
-- 后台任务可重试且可追踪（last run / failures / queue depth）。
-- 已有对象可通过索引重建恢复。
+- Register upstream S3 endpoints and bucket route mappings in metadata.
+- Proxy PUT/GET/HEAD/DELETE/COPY through upstream S3.
+- Record upstream location, etag, size, checksum, version ID, and commit state.
+- Add idempotency handling for write retries.
+- Reconcile pending writes and orphan upstream objects.
 
-## 第三阶段：集群治理与安全（P2）
+Acceptance criteria:
 
-- 2.4 集群拓扑治理
-  - 节点注册、失效、替换、替代分配、drain/decommission/rebalance 全部通过数据库事务执行。
-  - 重平衡策略基于容量与健康状态，不依赖 Raft membership。
-- 2.5 安全最小集
-  - 网关鉴权（admin/token）与内部调用鉴权分离。
-- 2.6 运维交付
-  - Docker、systemd、升级、备份/恢复、故障演练文档落地。
+- PUT writes bytes to upstream S3 and commits visible metadata.
+- GET/HEAD resolve through DB metadata and stream from upstream S3.
+- DELETE updates DB visibility and creates upstream delete or repair work
+  according to policy.
+- Crash recovery can identify pending, orphaned, and repair-fault states.
 
-验收标准（P2）：
-- 集群成员变更流程可回放、可重试、失败可回滚。
-- 管理 API 可清晰拒绝非法转移与脏状态。
-- 部署文档包含单机与小规模集群示例。
+## P2: File indexing and rebuild
 
-## 第四阶段：可观测与兼容扩展（P3）
+Goal: make content search an asynchronous, rebuildable capability.
 
-- 统一 trace + metrics 指标：
-  - 对象请求延迟/成功率/重试率
-  - 元数据 DB 连接、事务失败、任务队列深度
-  - 修复/去重/索引扫描状态
-- 完善对象 API 契约（错误码、分页、超时/范围读）。
-- 发布 v1.0 API 兼容性说明（S3 + 管理 API）。
+- Store index jobs, leases, attempts, schema version, and document state in DB.
+- Build Bleve documents from object metadata and upstream bytes.
+- Make workers idempotent and lease-based.
+- Add index status and rebuild APIs.
+- Implement schema-version-aware rebuild.
+- Ensure search results resolve back through DB visibility checks.
 
-## 明确非目标
+Acceptance criteria:
 
-- 不以“完整 AWS 边缘特性全集”作为 v1.0 目标，但应确保生产可用核心 S3 交互能力与多上游接入能力。
-- 不引入 chunk-level dedupe 与跨区域主动复制作为 v1.0 首要目标。
-- 不把网关打造成持久状态控制面（例如内嵌 raft/日志复制服务）。
+- Deleting the Bleve directory and triggering rebuild restores searchable
+  documents from DB and upstream bytes.
+- Failed jobs retry with backoff and expose last error.
+- Search never returns objects that DB marks deleted or invisible.
 
-## 当前下一步
+## P3: Object-level dedupe
 
-按 P0 的顺序先做：
+Goal: support safe dedupe rollout with observe mode before alias mode.
 
-1. 元数据仓库抽象与 DB 实现（sqlite / postgres）；
-2. 多上游 S3 注册与路由模型（endpoint、桶映射、优先级、健康）；
-3. 去除 raft 引导参数对网关启动路径的硬依赖；
-4. 对 `/healthz`、`/readyz`、`/metrics` 做 stateless 语义校验；
-5. 生成无状态部署示例（docker-compose + systemd）。
+- Compute object fingerprints on write or via background jobs.
+- Group object versions by fingerprint and size.
+- Expose duplicate groups and duplicate byte estimates.
+- Implement observe mode without changing upstream object locations.
+- Define alias mode policy, canonical object selection, reference tracking, and
+  safe delete semantics.
+- Add alias-mode repair checks before enabling it as a production option.
+
+Acceptance criteria:
+
+- Observe mode reports duplicates without changing read behavior.
+- Dedupe grouping can be rebuilt from DB fingerprints.
+- Alias mode is gated by explicit bucket or tenant policy.
+
+## P4: Consistency, repair, and operations
+
+Goal: make recovery and day-2 operations explicit.
+
+- Compare DB object versions with upstream HEAD/GET results.
+- Mark unreadable upstream bytes as repair faults.
+- Detect stale/missing Bleve documents and enqueue re-index.
+- Detect orphan upstream objects without DB rows.
+- Add metrics for DB transactions, index queue depth, rebuild progress, dedupe
+  savings, upstream errors, and repair faults.
+- Update backup, restore, and upgrade procedures for DB-first operation.
+
+Acceptance criteria:
+
+- Operators can distinguish DB faults, upstream byte faults, and index drift.
+- Repair actions are queued and auditable.
+- Backup/restore docs clearly identify authoritative and derived state.
+
+## P5: Hardening and compatibility
+
+Goal: prepare the proxy runtime for production use.
+
+- Complete S3 compatibility contracts for pagination, error mapping, range
+  reads, metadata, multipart upload, and versioning behavior.
+- Harden auth boundaries for S3 traffic and management APIs.
+- Add rate limits and worker concurrency controls.
+- Add deployment templates for multi-gateway plus external DB.
+- Document supported upstream S3 providers and required capabilities.
+
+## Explicit non-goals for v1
+
+- Chunk-level dedupe.
+- Cross-region active-active replication.
+- Local object shard storage as a default product path.
+- Gateway-local Raft as the control plane.
+- Treating Bleve as authoritative object state.
+
+## Immediate next steps
+
+1. Finalize metadata schema and migration plan.
+2. Wire S3 proxy PUT/GET/HEAD/DELETE to DB object-version transitions.
+3. Implement DB-backed index queue and Bleve rebuild.
+4. Ship observe-mode dedupe reporting.
+5. Add consistency scanner for DB, upstream S3, and Bleve drift.

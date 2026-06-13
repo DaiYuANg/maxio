@@ -1,79 +1,201 @@
-# MaxIO architecture and component design
+# MaxIO architecture
 
-## Positioning
+MaxIO is a stateless S3 proxy with DB-backed metadata and a rebuildable Bleve
+file index. The upstream S3 service stores object bytes. MaxIO stores routing
+metadata, object metadata, dedupe relationships, index state, and operational
+events.
 
-MaxIO is now positioned as an **S3 gateway platform** built on an external
-metadata data-store:
+## Product boundary
 
-- 多个上游 S3 实例/集群可通过网关接入与统一路由。
-- S3 API 作为一等公民，负责请求转换、权限透传、对象索引与去重协调。
+MaxIO is not a full object storage engine in the current product direction.
 
-Native API（若保留）用于平台内控与治理。
+It does:
 
-- 网关应保持无状态与水平扩展；所有持久协议状态与对象索引状态委托给元数据数据库。
+- expose an S3-compatible proxy entrypoint;
+- route requests to one or more upstream S3-compatible services;
+- persist object, version, fingerprint, dedupe, and index state in a database;
+- build a file/content index in Bleve from committed metadata and upstream
+  object bytes;
+- provide management APIs for health, readiness, indexing, rebuild, and
+  operational inspection.
 
-## Runtime composition
+It does not:
 
-`app.go` builds a single `maxio` runtime from `dix` modules:
+- store authoritative object bytes locally;
+- use local shard files or Raft state as the default control plane;
+- treat Bleve as authoritative state;
+- require gateway-local state for horizontal scaling.
 
-1. Configuration and logger
-2. Metadata repository + metadata transaction boundary
-3. Upstream backends registry and connector pool (S3 upstreams)
-4. Cache, index, scheduler, repair, dedupe services
-5. HTTP control/management and S3 handlers (gateway)
+## Runtime shape
 
-All modules are replaceable where package boundaries permit. The old local
-`engine`/`store`/`object` path is no longer part of the default runtime; it is
-kept only as temporary legacy code while the S3 proxy data plane is rebuilt
-around upstream connectors and DB-backed metadata.
+```text
+client
+  |
+  v
+MaxIO gateway instances  <----> metadata DB
+  |                         \--> Bleve index directory
+  |
+  v
+upstream S3-compatible storage
+```
+
+Gateway instances are interchangeable. They can be placed behind a load
+balancer because every durable decision is recorded in the metadata database.
+Local disk is only used for derived or temporary state such as Bleve index files,
+logs, and transient upload buffers.
+
+## Components
+
+- **S3 proxy entrypoint:** accepts S3-compatible requests, validates policy,
+  selects an upstream route, forwards bytes, and records metadata transitions.
+- **Metadata repository:** ACID database layer for tenants, buckets, upstreams,
+  object versions, blob fingerprints, dedupe links, index jobs, cursors, and
+  audit events.
+- **Upstream registry:** DB-backed list of S3 endpoints, bucket mappings,
+  credentials references, health state, and routing policy.
+- **Indexer:** asynchronous worker that reads committed object metadata, fetches
+  bytes from upstream S3 when needed, extracts text/file metadata, and writes a
+  Bleve document.
+- **Dedupe coordinator:** records object-level fingerprints and either observes
+  duplicate candidates or aliases object metadata to a canonical blob identity,
+  depending on bucket policy.
+- **Management plane:** exposes health, readiness, metrics, index rebuild,
+  dedupe inspection, and repair/reconciliation endpoints.
 
 ## API planes
 
-### Legacy native HTTP object plane
+### S3 compatibility plane
 
-- Controlled by `enable_native_object_api` (default: `false`).
-- Not part of the default product path.
-- The default runtime returns `501` for data-plane routes until the S3 proxy is wired.
+This is the primary public data plane. S3 requests are proxied to upstream S3
+while MaxIO records metadata and indexing work.
 
-### Native S3 compatibility plane (first-class)
+Write-like requests use DB state transitions to make retries and partial
+failures explicit. Read-like requests prefer metadata for routing and policy,
+then stream object bytes from upstream S3.
 
-- Supported as the public ingress API.
-- S3 requests are translated into a unified object metadata model used by indexing and
-  dedupe.
-- Route behavior is defined by explicit S3 compatibility contracts (object operations,
-  metadata semantics, errors, and pagination behavior).
+### Management plane
 
-### Control and management plane
+The management plane is for operators and automation:
 
-- Health/readiness: `/healthz`, `/readyz`
-- Metrics: `/metrics`
-- Cluster and node operations for deployment topology: `/_cluster/*`
-- Repair/dedupe/index/recovery: `/_repair/*`, `/_dedupe/*`, `/_index/*`,
-  `/_recovery/*`
-- Internal shard transport: `/_internal/*` (cluster-authenticated and internal only)
+```text
+/healthz
+/readyz
+/metrics
+/_index/*
+/_dedupe/*
+/_repair/*
+/_recovery/*
+/_cluster/*       legacy or topology-oriented endpoints while migration continues
+```
 
-## Data-plane architecture
+Management endpoints must not be used as the primary object data plane.
 
-- **Metadata service (required):** ACID-backed metadata repository (PostgreSQL/MySQL/
-  SQLite for dev, with a migration path to managed DB).
-  - Upstream S3 endpoint 信息、桶级映射、对象指纹、对象元信息、去重关系、索引任务与审计记录。
-- **Upstream connectors (stateful endpoints external):** 各接入 S3 实例的连接配置与运行状态。
-- **Gateway（无状态）：** 按租户/路由策略转发 S3 请求，持久化元数据与索引，触发去重扫描与索引任务。
+### Legacy native object API
 
-No raft is required in this model.
+The native object API is no longer the product default. If legacy routes remain
+available for compatibility tests, they should be treated as internal or
+temporary until removed from the proxy-only runtime.
 
-## Non-functional requirements
+## Metadata-first write path
 
-- Data safety and recoverability are implemented through database transactions,
-  storage integrity checks, and repair jobs.
-- Multi-tenant/security boundaries are enforced at gateway and transport layer;
-  gateway tokens and cluster tokens are required by runtime config.
-- Observability is provided by request logging/metrics, audit logs, and
-  health/readiness endpoints.
+For a normal object PUT:
+
+1. Gateway authenticates the request and resolves tenant, bucket, key, and
+   upstream route.
+2. Gateway creates or updates a DB object-version row with `write_pending`
+   status and an idempotency key derived from request identity.
+3. Gateway streams bytes to upstream S3.
+4. Gateway records upstream object location, size, etag, checksums, version ID,
+   and commit timestamp in the DB.
+5. Gateway computes or schedules content fingerprinting.
+6. Gateway commits the visible object-version state.
+7. Gateway enqueues index and dedupe work in the DB in the same transaction or
+   by a transactionally recoverable outbox.
+
+The DB commit is the source of truth for whether MaxIO considers an object
+version visible. Upstream bytes without committed metadata are reconciled as
+orphans. Metadata without readable upstream bytes is reconciled as a consistency
+fault.
+
+## Metadata-first read path
+
+For GET/HEAD:
+
+1. Gateway resolves the latest visible object version from the DB.
+2. Gateway validates bucket policy, delete markers, version constraints, and
+   dedupe alias state.
+3. Gateway maps the version to its canonical upstream location.
+4. Gateway streams bytes from upstream S3.
+5. Gateway records read audit and optional consistency observations.
+
+Reads do not require Bleve. Search results must resolve back through DB object
+versions before returning object references to callers.
+
+## Dedupe modes
+
+Object-level dedupe is intentionally modeled as policy, not an always-on storage
+mutation.
+
+- **observe:** MaxIO records fingerprints and duplicate groups, but every object
+  version continues to point at the upstream object written by the client. This
+  is safe for early rollout, reporting, billing analysis, and later migration.
+- **alias:** MaxIO may point duplicate object versions at a canonical blob
+  identity in metadata. Alias mode requires stricter commit ordering, delete
+  semantics, and repair tooling because metadata can make multiple logical
+  objects depend on one upstream byte object.
+
+The initial production recommendation is observe mode. Alias mode should be
+enabled per bucket or tenant only after reconciliation and delete semantics are
+fully exercised.
+
+## Indexing model
+
+Bleve is a derived local index. It stores searchable documents built from:
+
+- DB object metadata;
+- file metadata extracted from object content;
+- optional text extraction from upstream object bytes;
+- index schema version and source object-version identity.
+
+The DB owns queueing and status:
+
+```text
+pending -> leased -> indexed
+pending -> leased -> failed -> pending
+pending -> skipped
+indexed -> stale -> pending
+```
+
+Workers must be idempotent. Re-indexing the same object-version with the same
+schema version should replace the same Bleve document ID.
+
+See `docs/metadata-indexing.md` for the detailed table and consistency design.
+
+## Rebuild and consistency
+
+Because DB is authoritative and Bleve is derived, MaxIO supports destructive
+Bleve rebuilds:
+
+1. stop or pause index workers;
+2. delete or replace the local Bleve index directory;
+3. scan committed DB object versions;
+4. enqueue rebuild jobs;
+5. let workers repopulate Bleve;
+6. compare DB index status and Bleve document counts.
+
+Consistency checks compare DB object-version rows, upstream HEAD results, blob
+fingerprints, and Bleve documents. The repair loop should favor DB state and
+produce explicit jobs rather than silently mutating object visibility.
 
 ## Deployment intent
 
-- Default deployment is stateless gateway scaling behind L7 load balancing.
-- S3 API is first-class public route; Native API as optional internal management interface.
-- Use `docs/deployment.md` for operational templates and `docs/ROADMAP.md` for the
-  production backlog.
+Production deployments should run multiple stateless gateways against the same
+external DB and upstream S3 fleet. SQLite is acceptable only for local
+development and single-process demos.
+
+Operational docs:
+
+- `docs/metadata-indexing.md`
+- `docs/data-layout.md`
+- `docs/deployment.md`
+- `docs/backup-restore-upgrade.md`
