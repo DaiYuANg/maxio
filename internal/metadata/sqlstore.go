@@ -33,7 +33,7 @@ type SQLMetadata struct {
 
 type SQLiteMetadata = SQLMetadata
 
-func NewSQLiteMetadata(path string, logger *slog.Logger) (*SQLMetadata, error) {
+func NewSQLiteMetadata(path string, logger *slog.Logger, migrateSchema ...bool) (*SQLMetadata, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -67,10 +67,40 @@ func NewSQLiteMetadata(path string, logger *slog.Logger) (*SQLMetadata, error) {
 	if err := metadata.applyPragmas(context.Background()); err != nil {
 		return nil, fmt.Errorf("configure sqlite: %w", closeSQLMetadataOnInitError(db, logger, err))
 	}
-	if err := metadata.createSchema(context.Background()); err != nil {
-		return nil, fmt.Errorf("initialize sqlite schema: %w", closeSQLMetadataOnInitError(db, logger, err))
+	if shouldMigrateSchema(migrateSchema...) {
+		if err := metadata.createSchema(context.Background()); err != nil {
+			return nil, fmt.Errorf("initialize sqlite schema: %w", closeSQLMetadataOnInitError(db, logger, err))
+		}
 	}
 
+	return metadata, nil
+}
+
+func shouldMigrateSchema(values ...bool) bool {
+	if len(values) == 0 {
+		return true
+	}
+	return values[0]
+}
+
+func newSQLMetadata(
+	db *sql.DB,
+	session *dbx.DB,
+	logger *slog.Logger,
+	queryDialect metadataSQLDialect,
+	migrateSchema bool,
+) (*SQLMetadata, error) {
+	metadata := &SQLMetadata{
+		db:           db,
+		dbxDB:        session,
+		logger:       logger,
+		queryDialect: queryDialect,
+	}
+	if migrateSchema {
+		if err := metadata.createSchema(context.Background()); err != nil {
+			return nil, fmt.Errorf("initialize metadata schema: %w", err)
+		}
+	}
 	return metadata, nil
 }
 
@@ -110,22 +140,11 @@ func (s *SQLMetadata) applyPragmas(ctx context.Context) error {
 	return nil
 }
 
-func (s *SQLMetadata) createSchema(ctx context.Context) error {
-	ctx = ensureContext(ctx)
-	for _, stmt := range sqlStoreSchemaStatements {
-		if _, err := s.execContext(ctx, stmt); err != nil {
-			return fmt.Errorf("exec schema statement: %w", err)
-		}
-	}
-	return nil
-}
-
 func (s *SQLMetadata) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	if s == nil {
 		return nil, errors.New("metadata db session is nil")
 	}
 	query = s.normalizeQuery(query)
-	session := s.db
 	if s.dbxDB != nil {
 		result, err := s.dbxDB.ExecContext(ctx, query, args...)
 		if err != nil {
@@ -133,7 +152,7 @@ func (s *SQLMetadata) execContext(ctx context.Context, query string, args ...any
 		}
 		return result, nil
 	}
-	result, err := session.ExecContext(ctx, query, args...)
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("exec metadata query: %w", err)
 	}
@@ -142,6 +161,13 @@ func (s *SQLMetadata) execContext(ctx context.Context, query string, args ...any
 
 func (s *SQLMetadata) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	query = s.normalizeQuery(query)
+	if s != nil && s.dbxDB != nil {
+		rows, err := s.dbxDB.QueryContext(ensureContext(ctx), query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("query metadata rows: %w", err)
+		}
+		return rows, nil
+	}
 	rows, err := s.db.QueryContext(ensureContext(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query metadata rows: %w", err)

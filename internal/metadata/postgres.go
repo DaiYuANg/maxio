@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/arcgolabs/dbx"
+	postgresdialect "github.com/arcgolabs/dbx/dialect/postgres"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -24,16 +26,18 @@ func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLMet
 		return nil, fmt.Errorf("open postgres metadata database: %w", err)
 	}
 
-	store := &SQLMetadata{
-		db:           db,
-		logger:       logger,
-		queryDialect: metadataSQLDialectPostgres,
+	session, err := dbx.NewWithOptions(db, postgresdialect.New(), dbx.WithLogger(logger))
+	if err != nil {
+		return nil, fmt.Errorf("initialize dbx postgres metadata session: %w", closePostgresOnInitError(db, logger, err))
 	}
-	if err := store.ping(context.Background()); err != nil {
-		return nil, fmt.Errorf("connect postgres metadata database: %w", closePostgresOnInitError(db, logger, err))
+
+	store := &SQLMetadata{db: db, dbxDB: session, logger: logger, queryDialect: metadataSQLDialectPostgres}
+	if pingErr := store.ping(context.Background()); pingErr != nil {
+		return nil, fmt.Errorf("connect postgres metadata database: %w", closePostgresOnInitError(db, logger, pingErr))
 	}
 	if migrate {
-		if err := store.createSchema(context.Background()); err != nil {
+		store, err = newSQLMetadata(db, session, logger, metadataSQLDialectPostgres, true)
+		if err != nil {
 			return nil, fmt.Errorf("initialize postgres schema: %w", closePostgresOnInitError(db, logger, err))
 		}
 	}

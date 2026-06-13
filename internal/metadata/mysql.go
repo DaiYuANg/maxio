@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/arcgolabs/dbx"
+	mysqldialect "github.com/arcgolabs/dbx/dialect/mysql"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -26,16 +28,18 @@ func NewMySQLMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLMetada
 		return nil, fmt.Errorf("open mysql metadata database: %w", err)
 	}
 
-	store := &SQLMetadata{
-		db:           db,
-		logger:       logger,
-		queryDialect: metadataSQLDialectMySQL,
+	session, err := dbx.NewWithOptions(db, mysqldialect.New(), dbx.WithLogger(logger))
+	if err != nil {
+		return nil, fmt.Errorf("initialize dbx mysql metadata session: %w", closeMySQLOnInitError(db, logger, err))
 	}
-	if err := store.ping(context.Background()); err != nil {
-		return nil, fmt.Errorf("connect mysql metadata database: %w", closeMySQLOnInitError(db, logger, err))
+
+	store := &SQLMetadata{db: db, dbxDB: session, logger: logger, queryDialect: metadataSQLDialectMySQL}
+	if pingErr := store.ping(context.Background()); pingErr != nil {
+		return nil, fmt.Errorf("connect mysql metadata database: %w", closeMySQLOnInitError(db, logger, pingErr))
 	}
 	if migrate {
-		if err := store.createSchema(context.Background()); err != nil {
+		store, err = newSQLMetadata(db, session, logger, metadataSQLDialectMySQL, true)
+		if err != nil {
 			return nil, fmt.Errorf("initialize mysql schema: %w", closeMySQLOnInitError(db, logger, err))
 		}
 	}
