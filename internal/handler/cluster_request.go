@@ -67,3 +67,7 @@ func parseReplicaIDSegment(raw string) (uint64, error) {
 	}
 	return replicaID, nil
 }
+
+func parseRequiredReplicaID(r *http.Request) (uint64, error) {
+	return parseReplicaIDSegment(r.URL.Query().Get("replica_id"))
+}

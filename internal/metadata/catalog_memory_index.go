@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (m *InMemoryMetadata) UpsertIndexDocument(_ context.Context, document model.IndexDocument) (model.IndexDocument, error) {

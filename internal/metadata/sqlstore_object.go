@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const sqlStoreObjectColumns = `bucket, object_key, hash, etag, size, content_type, cache_control, content_disposition,

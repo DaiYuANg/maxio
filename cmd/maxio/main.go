@@ -8,14 +8,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/lyonbrown4d/maxio"
+	"github.com/lyonbrown4d/maxio/internal/app"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	if err := maxio.Run(ctx); err != nil {
+	if err := app.Run(ctx); err != nil {
 		slog.Error("maxio failed", "error", err)
 	}
 }

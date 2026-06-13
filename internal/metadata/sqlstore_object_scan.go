@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func scanObjectMeta(scanner interface{ Scan(dest ...any) error }) (model.ObjectMeta, error) {

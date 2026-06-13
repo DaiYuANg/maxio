@@ -30,38 +30,22 @@ func (s *Service) handleClusterMemberAction(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Service) handleDrainClusterMember(w http.ResponseWriter, r *http.Request, replicaID uint64) {
-	if s.engine == nil {
-		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "storage engine unavailable"})
-		return
-	}
-	nodeID := clusterStorageNodeID(replicaID)
-	if err := s.engine.DrainStorageNode(nodeID); err != nil {
-		s.writeError(w, err)
-		return
-	}
-	s.auditHTTP(r, "cluster.member.drain", "replica_id", replicaID, "node_id", nodeID)
-	s.writeJSON(w, http.StatusAccepted, map[string]any{
+	s.auditHTTP(r, "cluster.member.drain", "replica_id", replicaID, "node_id", clusterStorageNodeID(replicaID))
+	s.writeJSON(w, http.StatusNotImplemented, map[string]any{
 		"replica_id": replicaID,
-		"node_id":    nodeID,
-		"status":     "draining",
+		"node_id":    clusterStorageNodeID(replicaID),
+		"status":     "not_applicable",
+		"error":      "storage drain is not available in stateless proxy mode",
 	})
 }
 
 func (s *Service) handleResumeClusterMember(w http.ResponseWriter, r *http.Request, replicaID uint64) {
-	if s.engine == nil {
-		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "storage engine unavailable"})
-		return
-	}
-	nodeID := clusterStorageNodeID(replicaID)
-	if err := s.engine.ResumeStorageNode(nodeID); err != nil {
-		s.writeError(w, err)
-		return
-	}
-	s.auditHTTP(r, "cluster.member.resume", "replica_id", replicaID, "node_id", nodeID)
-	s.writeJSON(w, http.StatusOK, map[string]any{
+	s.auditHTTP(r, "cluster.member.resume", "replica_id", replicaID, "node_id", clusterStorageNodeID(replicaID))
+	s.writeJSON(w, http.StatusNotImplemented, map[string]any{
 		"replica_id": replicaID,
-		"node_id":    nodeID,
-		"status":     "active",
+		"node_id":    clusterStorageNodeID(replicaID),
+		"status":     "not_applicable",
+		"error":      "storage resume is not available in stateless proxy mode",
 	})
 }
 

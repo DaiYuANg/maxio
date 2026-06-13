@@ -12,19 +12,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 )
 
 type clusterStatusResponse struct {
-	LocalReplicaID     uint64                   `json:"local_replica_id"`
-	LocalControlTarget string                   `json:"local_control_target"`
-	Membership         control.Membership       `json:"membership"`
-	Nodes              []ClusterNodeInfo        `json:"nodes"`
-	StorageNodes       []engine.StorageNodeInfo `json:"storage_nodes"`
-	DiscoveryNodes     []discovery.Node         `json:"discovery_nodes"`
-	Reconcile          clusterReconcilePlan     `json:"reconcile"`
+	LocalReplicaID     uint64               `json:"local_replica_id"`
+	LocalControlTarget string               `json:"local_control_target"`
+	Membership         control.Membership   `json:"membership"`
+	Nodes              []ClusterNodeInfo    `json:"nodes"`
+	StorageNodes       []StorageNodeInfo    `json:"storage_nodes"`
+	DiscoveryNodes     []discovery.Node     `json:"discovery_nodes"`
+	Reconcile          clusterReconcilePlan `json:"reconcile"`
 }
 
 type clusterReconcileRequest struct {
@@ -128,11 +127,7 @@ func (s *Service) handleClusterReconcileApply(w http.ResponseWriter, r *http.Req
 		return
 	}
 	s.auditHTTP(r, "cluster.reconcile", "mode", plan.Mode, "added", len(plan.Added), "removed", len(plan.Removed))
-	s.writeJSON(w, http.StatusAccepted, clusterReconcileResponse{
-		Plan:   plan,
-		Result: result,
-		Status: "applied",
-	})
+	s.writeJSON(w, http.StatusAccepted, clusterReconcileResponse{Plan: plan, Result: result, Status: "applied"})
 }
 
 func (s *Service) clusterReconcilePlan(ctx context.Context, removeMissing bool) (clusterReconcilePlan, error) {
@@ -161,19 +156,11 @@ func (s *Service) localControlTarget() string {
 	return s.control.LocalControlAddress()
 }
 
-func (s *Service) clusterStorageNodeInfos() []engine.StorageNodeInfo {
-	if s == nil || s.engine == nil {
-		return nil
-	}
-	return s.engine.StorageNodeInfos()
+func (s *Service) clusterStorageNodeInfos() []StorageNodeInfo {
+	return nil
 }
 
-// BuildClusterReconcilePlan builds a safe control membership reconcile plan from gossip discovery.
-func BuildClusterReconcilePlan(
-	membership control.Membership,
-	discovered []discovery.Node,
-	removeMissing bool,
-) clusterReconcilePlan {
+func BuildClusterReconcilePlan(membership control.Membership, discovered []discovery.Node, removeMissing bool) clusterReconcilePlan {
 	desired := desiredMembersBase(membership, removeMissing)
 	conflicts := mergeDiscoveredMembers(desired, membership.Nodes, removedReplicaSet(membership.Removed), discovered)
 	if removeMissing {

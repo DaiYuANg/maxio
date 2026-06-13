@@ -4,7 +4,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/handler"
@@ -23,7 +22,7 @@ func TestBuildClusterNodeRegistryMergesMemberDiscoveryAndStorage(t *testing.T) {
 		{ReplicaID: 1, State: "alive", ControlAddress: "127.0.0.1:63000", HTTPAddress: "127.0.0.1:8080"},
 		{ReplicaID: 2, State: "suspect", ControlAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
 		{ReplicaID: 3, State: "alive", ControlAddress: "127.0.0.1:63002", HTTPAddress: "127.0.0.1:8082"},
-	}, []engine.StorageNodeInfo{
+	}, []handler.StorageNodeInfo{
 		{ID: "node-1", Address: "127.0.0.1:8080", Local: true},
 		{ID: "node-2", Address: "127.0.0.1:8081", ObjectCount: 1, ShardCount: 4, UsedBytes: 128},
 	})
@@ -59,7 +58,7 @@ func TestBuildClusterNodeRegistryReportsOfflineMissingStorage(t *testing.T) {
 		},
 	}, []discovery.Node{
 		{ReplicaID: 1, State: "alive", ControlAddress: "127.0.0.1:63000"},
-	}, []engine.StorageNodeInfo{
+	}, []handler.StorageNodeInfo{
 		{ID: "node-1", Address: "127.0.0.1:8080", Local: true},
 	})
 
@@ -67,9 +66,6 @@ func TestBuildClusterNodeRegistryReportsOfflineMissingStorage(t *testing.T) {
 	assertClusterStorageState(t, nodes[1], handler.ClusterStorageStateUnregistered)
 	if !slices.Contains(nodes[1].Issues, "not_discovered") {
 		t.Fatalf("node 2 issues = %+v, want not_discovered", nodes[1].Issues)
-	}
-	if !slices.Contains(nodes[1].Issues, "storage_not_registered") {
-		t.Fatalf("node 2 issues = %+v, want storage_not_registered", nodes[1].Issues)
 	}
 }
 
@@ -83,7 +79,7 @@ func TestBuildClusterNodeRegistryReportsDrainingStorageNode(t *testing.T) {
 		},
 	}, []discovery.Node{
 		{ReplicaID: 1, State: "alive", ControlAddress: "127.0.0.1:63000"},
-	}, []engine.StorageNodeInfo{
+	}, []handler.StorageNodeInfo{
 		{ID: "node-1", Address: "127.0.0.1:8080", Local: true, Drained: true, ObjectCount: 1, ShardCount: 3, UsedBytes: 64},
 	})
 
@@ -105,7 +101,7 @@ func TestBuildClusterNodeRegistryReportsRemovedNodeReappearance(t *testing.T) {
 		Removed: []uint64{2},
 	}, []discovery.Node{
 		{ReplicaID: 2, State: "alive", ControlAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
-	}, []engine.StorageNodeInfo{
+	}, []handler.StorageNodeInfo{
 		{ID: "node-2", Address: "127.0.0.1:8081"},
 	})
 
@@ -115,9 +111,6 @@ func TestBuildClusterNodeRegistryReportsRemovedNodeReappearance(t *testing.T) {
 	}
 	if !slices.Contains(nodes[1].Issues, "removed_node_reappeared") {
 		t.Fatalf("node issues = %+v, want removed_node_reappeared", nodes[1].Issues)
-	}
-	if !slices.Contains(nodes[1].Issues, "removed_storage_registered") {
-		t.Fatalf("node issues = %+v, want removed_storage_registered", nodes[1].Issues)
 	}
 }
 

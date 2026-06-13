@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func TestInMemoryMetadataBlobRefStoresShardPlacements(t *testing.T) {

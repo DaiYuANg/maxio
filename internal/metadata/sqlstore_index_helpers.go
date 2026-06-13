@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 type sqlScanner interface {

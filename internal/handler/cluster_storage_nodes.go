@@ -7,11 +7,7 @@ func (s *Service) handleClusterStorageNodes(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.engine == nil {
-		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "storage engine unavailable"})
-		return
-	}
-	s.writeJSON(w, http.StatusOK, s.engine.StorageNodeInfos())
+	s.writeJSON(w, http.StatusOK, []StorageNodeInfo{})
 }
 
 func (s *Service) handleClusterStorageNodesSync(w http.ResponseWriter, r *http.Request) {
@@ -24,9 +20,5 @@ func (s *Service) handleClusterStorageNodesSync(w http.ResponseWriter, r *http.R
 		return
 	}
 	s.auditHTTP(r, "cluster.storage_nodes.sync")
-	if s.engine == nil {
-		s.writeJSON(w, http.StatusOK, []any{})
-		return
-	}
-	s.writeJSON(w, http.StatusOK, s.engine.StorageNodeInfos())
+	s.writeJSON(w, http.StatusOK, []StorageNodeInfo{})
 }

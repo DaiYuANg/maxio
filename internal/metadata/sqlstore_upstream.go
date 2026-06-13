@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const sqlStoreUpstreamColumns = `id, name, endpoint, region, weight, priority, buckets, enabled, created_at, updated_at`

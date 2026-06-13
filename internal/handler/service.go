@@ -12,7 +12,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/dedupe"
-	"github.com/lyonbrown4d/maxio/object"
+	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
 const defaultSearchPath = "/_search"

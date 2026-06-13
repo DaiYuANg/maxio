@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const sqlStoreObjectRecordColumns = `bucket, object_key, current_version_id, deleted, created_at, updated_at`

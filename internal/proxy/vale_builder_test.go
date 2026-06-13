@@ -3,8 +3,8 @@ package proxy_test
 import (
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/proxy"
-	"github.com/lyonbrown4d/maxio/model"
 )
 
 func TestBuildValeConfigFromUpstreamsWithBucketRoutes(t *testing.T) {

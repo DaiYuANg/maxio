@@ -39,14 +39,7 @@ func (s *Service) handleDecommissionClusterMember(w http.ResponseWriter, r *http
 		s.writeDecommissionError(w, err)
 		return
 	}
-	s.auditHTTP(r, "cluster.member.decommission",
-		"replica_id", replicaID,
-		"node_id", result.NodeID,
-		"objects", result.Objects,
-		"shards", result.Shards,
-		"used_bytes", result.UsedBytes,
-		"status", result.Status,
-	)
+	s.auditHTTP(r, "cluster.member.decommission", "replica_id", replicaID, "node_id", result.NodeID, "status", result.Status)
 	s.writeJSON(w, http.StatusAccepted, result)
 }
 
@@ -78,11 +71,8 @@ func decommissionBlockedResponse(err error) (clusterMemberDecommissionBlockedRes
 	}, true
 }
 
-func (s *Service) decommissionClusterMember(
-	ctx context.Context,
-	replicaID uint64,
-) (clusterMemberDecommissionResponse, error) {
-	if s == nil || s.control == nil || s.engine == nil || s.objects == nil {
+func (s *Service) decommissionClusterMember(ctx context.Context, replicaID uint64) (clusterMemberDecommissionResponse, error) {
+	if s == nil || s.control == nil {
 		return clusterMemberDecommissionResponse{}, errors.New("cluster decommission dependencies unavailable")
 	}
 	membership, err := s.control.GetMembership(ctx)
@@ -95,39 +85,7 @@ func (s *Service) decommissionClusterMember(
 	}
 	nodeID := clusterStorageNodeID(replicaID)
 	if !present {
-		if err := s.syncStorageNodes(ctx); err != nil {
-			return clusterMemberDecommissionResponse{}, fmt.Errorf("sync storage nodes after already decommissioned check: %w", err)
-		}
-		return clusterMemberDecommissionResponse{
-			ReplicaID: replicaID,
-			NodeID:    nodeID,
-			Status:    "already_decommissioned",
-		}, nil
-	}
-	return s.runClusterMemberDecommission(ctx, replicaID, nodeID)
-}
-
-func (s *Service) runClusterMemberDecommission(
-	ctx context.Context,
-	replicaID uint64,
-	nodeID string,
-) (clusterMemberDecommissionResponse, error) {
-	if err := s.syncStorageNodes(ctx); err != nil {
-		return clusterMemberDecommissionResponse{}, fmt.Errorf("sync storage nodes before decommission: %w", err)
-	}
-	if err := s.engine.DrainStorageNode(nodeID); err != nil {
-		return clusterMemberDecommissionResponse{}, fmt.Errorf("drain storage node: %w", err)
-	}
-	stats, err := s.countObjectPlacements(ctx, nodeID)
-	if err != nil {
-		return clusterMemberDecommissionResponse{}, err
-	}
-	rebalance, err := s.objects.RebalanceNode(ctx, nodeID)
-	if err != nil {
-		return clusterMemberDecommissionResponse{}, fmt.Errorf("rebalance decommissioned node: %w", err)
-	}
-	if err := s.ensureClusterMemberDecommissionable(ctx, replicaID); err != nil {
-		return clusterMemberDecommissionResponse{}, fmt.Errorf("%w: %w", errClusterDecommissionBlocked, err)
+		return clusterMemberDecommissionResponse{ReplicaID: replicaID, NodeID: nodeID, Status: "already_decommissioned"}, nil
 	}
 	if err := s.control.RemoveReplica(ctx, replicaID); err != nil {
 		return clusterMemberDecommissionResponse{}, fmt.Errorf("remove decommissioned cluster replica: %w", err)
@@ -135,17 +93,9 @@ func (s *Service) runClusterMemberDecommission(
 	if err := s.syncStorageNodes(ctx); err != nil {
 		return clusterMemberDecommissionResponse{}, fmt.Errorf("sync storage nodes after decommission: %w", err)
 	}
-	return clusterMemberDecommissionResponse{
-		ReplicaID: replicaID,
-		NodeID:    nodeID,
-		Objects:   rebalance.Objects,
-		Shards:    rebalance.Shards,
-		UsedBytes: stats.usedBytes,
-		Status:    "decommissioned",
-	}, nil
+	return clusterMemberDecommissionResponse{ReplicaID: replicaID, NodeID: nodeID, Status: "decommissioned"}, nil
 }
 
-// ValidateClusterMemberDecommission validates whether a non-local replica can be decommissioned.
 func ValidateClusterMemberDecommission(replicaID uint64, membership control.Membership) (bool, error) {
 	if replicaID == 0 {
 		return false, errors.New("replica_id must be greater than zero")

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/arcgolabs/configx"
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const defaultConfigPath = "./config.json"

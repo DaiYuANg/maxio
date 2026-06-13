@@ -44,6 +44,15 @@ balancer because every durable decision is recorded in the metadata database.
 Local disk is only used for derived or temporary state such as Bleve index files,
 logs, and transient upload buffers.
 
+## Code organization
+
+- `cmd/maxio` starts the executable process.
+- `internal/app` assembles runtime modules and owns application startup.
+- `internal/cache` and `internal/object` are internal runtime implementation
+  packages, not public extension points.
+- Root-level public packages should not define the product boundary; the S3
+  proxy and DB-backed metadata model define the runtime shape.
+
 ## Components
 
 - **S3 proxy entrypoint:** accepts S3-compatible requests, validates policy,

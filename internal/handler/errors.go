@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/lyonbrown4d/maxio/internal/control"
-	"github.com/lyonbrown4d/maxio/object"
+	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
 func (s *Service) writeJSON(w http.ResponseWriter, code int, value any) {

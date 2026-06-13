@@ -70,7 +70,7 @@ func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request
 		routeHandler()
 		return true
 	}
-	if s.handleStorageShardRoute(w, r, parts) {
+	if s.handleStorageShardRoute(w, parts) {
 		return true
 	}
 	if isS3UpstreamRoute(parts) {

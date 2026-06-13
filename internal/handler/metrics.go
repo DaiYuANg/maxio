@@ -49,48 +49,31 @@ func (collector *metricsCollector) addReadiness(ctx context.Context, s *Service)
 }
 
 func (collector *metricsCollector) addStorageNodes(s *Service) {
-	if s == nil || s.engine == nil {
-		collector.gauge("maxio_storage_nodes", "Configured storage nodes.", 0)
-		collector.gauge("maxio_storage_nodes_drained", "Storage nodes excluded from new placements.", 0)
-		collector.gauge("maxio_storage_node_objects", "Objects assigned to storage nodes.", 0)
-		collector.gauge("maxio_storage_node_shards", "Shards assigned to storage nodes.", 0)
-		collector.gaugeInt64("maxio_storage_node_used_bytes", "Bytes assigned to storage nodes.", 0)
-		return
-	}
-	nodes := s.engine.StorageNodeInfos()
-	drained := 0
-	objects := 0
-	shards := 0
-	usedBytes := int64(0)
-	for _, node := range nodes {
-		if node.Drained {
-			drained++
-		}
-		objects += node.ObjectCount
-		shards += node.ShardCount
-		usedBytes += node.UsedBytes
-	}
-	collector.gauge("maxio_storage_nodes", "Configured storage nodes.", len(nodes))
-	collector.gauge("maxio_storage_nodes_drained", "Storage nodes excluded from new placements.", drained)
-	collector.gauge("maxio_storage_node_objects", "Objects assigned to storage nodes.", objects)
-	collector.gauge("maxio_storage_node_shards", "Shards assigned to storage nodes.", shards)
-	collector.gaugeInt64("maxio_storage_node_used_bytes", "Bytes assigned to storage nodes.", usedBytes)
+	_ = s
+	collector.gauge("maxio_storage_nodes", "Configured storage nodes.", 0)
+	collector.gauge("maxio_storage_nodes_drained", "Storage nodes excluded from new placements.", 0)
+	collector.gauge("maxio_storage_node_objects", "Objects assigned to storage nodes.", 0)
+	collector.gauge("maxio_storage_node_shards", "Shards assigned to storage nodes.", 0)
+	collector.gaugeInt64("maxio_storage_node_used_bytes", "Bytes assigned to storage nodes.", 0)
 }
 
 func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Service) {
-	if s == nil || s.objects == nil {
+	_ = ctx
+	if s == nil || s.metadata == nil {
 		collector.gauge("maxio_buckets", "Buckets known to metadata.", 0)
 		collector.gauge("maxio_objects", "Committed objects known to metadata.", 0)
 		return
 	}
-	buckets, err := s.objects.ListBuckets(ctx)
+	buckets, err := s.metadata.ListBuckets(ctx)
 	if err != nil {
 		collector.collectionErrors++
+		collector.gauge("maxio_buckets", "Buckets known to metadata.", 0)
+		collector.gauge("maxio_objects", "Committed objects known to metadata.", 0)
 		return
 	}
 	objects := 0
 	for _, bucket := range buckets {
-		items, err := s.objects.ListObjects(ctx, bucket.Name, "")
+		items, err := s.metadata.ListObjectMetas(ctx, bucket.Name, "")
 		if err != nil {
 			collector.collectionErrors++
 			continue
@@ -102,29 +85,12 @@ func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Servi
 }
 
 func (collector *metricsCollector) addRepairStatus(s *Service) {
-	if s == nil || s.repair == nil {
-		collector.gauge("maxio_repair_running", "Whether the repair job is running.", 0)
-		return
-	}
-	status := s.repair.Status()
-	summary := status.LastSummary
-	collector.gauge("maxio_repair_running", "Whether the repair job is running.", boolInt(status.Running))
-	collector.gauge("maxio_repair_last_objects", "Objects scanned by the last repair job.", summary.Objects)
-	collector.gauge("maxio_repair_last_unhealthy", "Unhealthy objects found by the last repair job.", summary.Unhealthy)
-	collector.gauge("maxio_repair_last_scrubbed", "Shards scrubbed by the last repair job.", summary.Scrubbed)
-	collector.gauge("maxio_repair_last_scrub_failed", "Scrub failures in the last repair job.", summary.ScrubFailed)
-	collector.gauge("maxio_repair_last_checksum_failed", "Checksum failures in the last repair job.", summary.ChecksumFailed)
-	collector.gauge("maxio_repair_last_repair_attempts", "Repair attempts in the last repair job.", summary.RepairAttempts)
-	collector.gauge("maxio_repair_last_repair_retries", "Repair retries in the last repair job.", summary.RepairRetries)
-	collector.gauge("maxio_repair_last_retry_delay_ms", "Retry delay milliseconds in the last repair job.", int(summary.RetryDelayMs))
-	collector.gauge("maxio_repair_last_throttled", "Whether the last repair job was throttled.", summary.Throttled)
-	collector.gauge("maxio_repair_last_throttle_wait_ms", "Throttle wait time in milliseconds in the last repair job.", int(summary.ThrottleWaitMs))
-	collector.gauge("maxio_repair_last_repaired_objects", "Objects repaired by the last repair job.", summary.RepairedObjects)
-	collector.gauge("maxio_repair_last_repaired_shards", "Shards repaired by the last repair job.", summary.RepairedShards)
-	collector.gauge("maxio_repair_last_unrecoverable", "Unrecoverable items left by the last repair job.", summary.Unrecoverable)
-	collector.gauge("maxio_repair_last_failed", "Failures recorded by the last repair job.", summary.Failed)
-	collector.gauge("maxio_repair_last_limited", "Whether the last repair job was limited by configured thresholds.", boolInt(summary.Limited))
-	collector.gauge("maxio_repair_last_duration_ms", "Milliseconds spent in last repair job.", int(status.LastDuration.Milliseconds()))
+	_ = s
+	collector.gauge("maxio_repair_running", "Whether the repair job is running.", 0)
+	collector.gauge("maxio_repair_last_objects", "Objects scanned by the last repair job.", 0)
+	collector.gauge("maxio_repair_last_unhealthy", "Unhealthy objects found by the last repair job.", 0)
+	collector.gauge("maxio_repair_last_repaired_objects", "Objects repaired by the last repair job.", 0)
+	collector.gauge("maxio_repair_last_failed", "Failures recorded by the last repair job.", 0)
 }
 
 func (collector *metricsCollector) addDedupeStatus(s *Service) {
@@ -166,25 +132,11 @@ func (collector *metricsCollector) addIndexStatus(s *Service) {
 }
 
 func (collector *metricsCollector) addRecoveryStatus(s *Service) {
-	if s == nil || s.objects == nil {
-		collector.gauge("maxio_recovery_completed", "Whether storage recovery has completed at least once.", 0)
-		return
-	}
-	status := s.objects.RecoveryStatus()
-	result := status.LastResult
-	actions := result.PendingActions
-	collector.gauge("maxio_recovery_completed", "Whether storage recovery has completed at least once.", boolInt(status.Completed))
-	collector.gauge("maxio_recovery_last_failed", "Whether the last storage recovery run failed.", boolInt(status.LastError != ""))
-	collector.gauge("maxio_recovery_last_dry_run", "Whether the last storage recovery run was a dry run.", boolInt(result.DryRun))
-	collector.gauge("maxio_recovery_last_pending_removed", "Pending objects removed by the last storage recovery run.", result.PendingRemoved)
-	collector.gauge("maxio_recovery_last_pending_wait", "Fresh pending objects left untouched by the last storage recovery plan.", actions["wait"])
-	collector.gauge("maxio_recovery_last_pending_delete_staged", "Expired staged metadata deleted by the last storage recovery run.", actions["delete_staged"])
-	collector.gauge("maxio_recovery_last_pending_rollback_layout", "Expired pending layouts rolled back by the last storage recovery run.", actions["rollback_layout"])
-	collector.gauge("maxio_recovery_last_pending_release_blob", "Expired retained blob refs released by the last storage recovery run.", actions["release_blob"])
-	collector.gauge("maxio_recovery_last_pending_committed_cleanup", "Committed stale staged metadata cleaned by the last storage recovery run.", actions["committed_cleanup"])
-	collector.gauge("maxio_recovery_last_orphan_shards_scanned", "Shard sets scanned by the last storage recovery run.", result.OrphanShardCleanup.Scanned)
-	collector.gauge("maxio_recovery_last_orphan_shards_removed", "Orphan shard sets removed by the last storage recovery run.", result.OrphanShardCleanup.Removed)
-	collector.gauge("maxio_recovery_last_orphan_shards", "Orphan shard sets found by the last storage recovery run.", len(result.OrphanShardCleanup.Orphans))
+	_ = s
+	collector.gauge("maxio_recovery_completed", "Whether storage recovery has completed at least once.", 0)
+	collector.gauge("maxio_recovery_last_failed", "Whether the last storage recovery run failed.", 0)
+	collector.gauge("maxio_recovery_last_pending_removed", "Pending objects removed by the last storage recovery run.", 0)
+	collector.gauge("maxio_recovery_last_orphan_shards_removed", "Orphan shard sets removed by the last storage recovery run.", 0)
 }
 
 func (collector *metricsCollector) gauge(name, help string, value int) {

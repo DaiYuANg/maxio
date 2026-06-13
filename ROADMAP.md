@@ -42,7 +42,11 @@ Status as of 2026-06-13:
   DB and wired into the runtime worker loop.
 - Dedupe is still metadata-first: digest reference structures exist, but
   observe-mode reporting is not yet connected to the proxy write path.
-- Local object-shard storage remains legacy code and is not part of the target default product path.
+- Application assembly now lives under `internal/app`; cache and object service
+  code have been moved under `internal/cache` and `internal/object` instead of
+  root-level public packages.
+- Local object-shard storage remains legacy code and is not part of the target
+  default product path.
 
 ## P0: Metadata foundation
 

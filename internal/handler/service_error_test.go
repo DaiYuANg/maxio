@@ -10,7 +10,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/control"
-	"github.com/lyonbrown4d/maxio/object"
+	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
 func TestWriteErrorReturnsConflictForControlNotLeader(t *testing.T) {

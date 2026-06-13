@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const defaultS3UpstreamsPath = "/_s3/upstreams"

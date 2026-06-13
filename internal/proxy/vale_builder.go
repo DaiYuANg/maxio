@@ -12,7 +12,7 @@ import (
 	"github.com/arcgolabs/vale"
 	valeconfig "github.com/arcgolabs/vale/config"
 	"github.com/arcgolabs/vale/provider"
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const defaultValeEntrypoint = "web"

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func TestNewMetadataStoreSupportsSQLite(t *testing.T) {

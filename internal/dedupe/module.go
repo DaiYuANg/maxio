@@ -12,8 +12,8 @@ import (
 	"github.com/arcgolabs/dix"
 	gocron "github.com/go-co-op/gocron/v2"
 	"github.com/lyonbrown4d/maxio/internal/config"
+	"github.com/lyonbrown4d/maxio/internal/object"
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
-	"github.com/lyonbrown4d/maxio/object"
 )
 
 const dedupeJobName = "maxio.object.dedupe"

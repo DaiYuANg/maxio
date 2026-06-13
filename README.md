@@ -25,6 +25,15 @@ dedupe relationships, index state, and operational events.
 - `docs/deployment.md` - deployment and configuration guidance.
 - `ROADMAP.md` - staged implementation roadmap.
 
+## Code layout during migration
+
+- `cmd/maxio` is the executable entrypoint.
+- `internal/app` owns process assembly and startup wiring.
+- `internal/cache` and `internal/object` are internal implementation packages;
+  they are no longer public root-level libraries.
+- Legacy local object-store code may still exist behind internal packages while
+  the S3 proxy path is completed, but it is not the target product boundary.
+
 ## Minimal local configuration
 
 Start from `config.example.json` for local development. For a more explicit

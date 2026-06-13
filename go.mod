@@ -20,9 +20,7 @@ require (
 	github.com/gofiber/template/html/v3 v3.0.4
 	github.com/hashicorp/memberlist v0.5.4
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/klauspost/reedsolomon v1.14.0
 	github.com/redis/go-redis/v9 v9.20.0
-	github.com/spf13/afero v1.15.0
 	modernc.org/sqlite v1.52.0
 )
 

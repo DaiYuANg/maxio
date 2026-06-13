@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 )
@@ -25,6 +24,16 @@ const (
 	ClusterStorageStateDrained      = "drained"
 	ClusterStorageStateUnregistered = "unregistered"
 )
+
+type StorageNodeInfo struct {
+	ID          string `json:"id"`
+	Address     string `json:"address,omitempty"`
+	Local       bool   `json:"local,omitempty"`
+	Drained     bool   `json:"drained,omitempty"`
+	ObjectCount int    `json:"object_count"`
+	ShardCount  int    `json:"shard_count"`
+	UsedBytes   int64  `json:"used_bytes"`
+}
 
 type ClusterNodeInfo struct {
 	ReplicaID         uint64   `json:"replica_id,omitempty"`
@@ -58,17 +67,13 @@ func (s *Service) handleClusterNodes(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, err)
 		return
 	}
-	s.writeJSON(w, http.StatusOK, BuildClusterNodeRegistry(
-		membership,
-		s.discoveryNodes(),
-		s.clusterStorageNodeInfos(),
-	))
+	s.writeJSON(w, http.StatusOK, BuildClusterNodeRegistry(membership, s.discoveryNodes(), s.clusterStorageNodeInfos()))
 }
 
 func BuildClusterNodeRegistry(
 	membership control.Membership,
 	discovered []discovery.Node,
-	storageNodes []engine.StorageNodeInfo,
+	storageNodes []StorageNodeInfo,
 ) []ClusterNodeInfo {
 	nodes := make(map[string]ClusterNodeInfo, len(membership.Nodes)+len(membership.Removed)+len(discovered)+len(storageNodes))
 	mergeMembershipNodes(nodes, membership)
@@ -135,7 +140,7 @@ func mergeDiscoveryNodes(nodes map[string]ClusterNodeInfo, discovered []discover
 	}
 }
 
-func mergeStorageNodes(nodes map[string]ClusterNodeInfo, storageNodes []engine.StorageNodeInfo) {
+func mergeStorageNodes(nodes map[string]ClusterNodeInfo, storageNodes []StorageNodeInfo) {
 	for index := range storageNodes {
 		storageNode := storageNodes[index]
 		replicaID, ok := storageReplicaID(storageNode.ID)
@@ -210,14 +215,10 @@ func clusterUnknownDiscoveryStatus(node ClusterNodeInfo) string {
 func clusterNodeIssues(node ClusterNodeInfo) []string {
 	issues := make([]string, 0, 4)
 	issues = appendIssueIf(issues, node.Member && !node.Discovered && !node.Local, "not_discovered")
-	issues = appendIssueIf(issues, node.Member && !node.StorageRegistered, "storage_not_registered")
 	issues = appendIssueIf(issues, node.Discovered && !node.Member, "not_in_control_membership")
-	issues = appendIssueIf(issues, node.StorageRegistered && !node.Member, "storage_without_control_member")
 	issues = appendIssueIf(issues, node.Removed && node.Discovered, "removed_node_reappeared")
-	issues = appendIssueIf(issues, node.Removed && node.StorageRegistered, "removed_storage_registered")
 	issues = appendIssueIf(issues, drainedStorageHasOwnership(node), "drained_storage_has_ownership")
 	issues = appendIssueIf(issues, addressMismatch(node.ControlTarget, node.ControlAddress), "control_address_mismatch")
-	issues = appendIssueIf(issues, addressMismatch(node.StorageAddress, node.HTTPAddress), "storage_address_mismatch")
 	return issues
 }
 

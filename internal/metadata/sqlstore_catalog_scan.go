@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func scanObjectRecord(scanner interface{ Scan(dest ...any) error }) (model.ObjectRecord, error) {

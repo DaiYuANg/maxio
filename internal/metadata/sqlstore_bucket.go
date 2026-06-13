@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {

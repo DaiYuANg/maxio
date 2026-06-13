@@ -34,7 +34,7 @@ func newEventBus(logger *slog.Logger) eventx.BusRuntime {
 }
 
 func newGatewayDependencies(discoveryRuntime *discovery.Runtime, metadataStore metadata.MetadataStore) Dependencies {
-	return NewDependencies(nil, nil, discoveryRuntime, nil, metadataStore)
+	return NewDependencies(discoveryRuntime, metadataStore)
 }
 
 func newGatewayService(deps Dependencies, logger *slog.Logger, cfg config.Config) *Service {

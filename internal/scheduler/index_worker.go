@@ -7,7 +7,7 @@ import (
 	"time"
 
 	gocron "github.com/go-co-op/gocron/v2"
-	searchindex "github.com/lyonbrown4d/maxio/index"
+	searchindex "github.com/lyonbrown4d/maxio/internal/index"
 )
 
 const IndexWorkerJobName = "maxio.index.worker"

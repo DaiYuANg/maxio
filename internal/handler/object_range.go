@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/lyonbrown4d/maxio/internal/bytesrange"
-	"github.com/lyonbrown4d/maxio/object"
+	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
 func (s *Service) writeGetObjectResponse(

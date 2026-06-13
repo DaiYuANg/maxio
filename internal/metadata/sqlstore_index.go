@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const sqlStoreIndexDocumentColumns = `document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at`

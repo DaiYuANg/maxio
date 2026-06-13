@@ -247,10 +247,3 @@ func (s *Service) writeAPIUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-api"`)
 	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "api authorization required"})
 }
-
-func (s *Service) storageNodeToken() string {
-	if token := strings.TrimSpace(s.cfg.ClusterToken); token != "" {
-		return token
-	}
-	return strings.TrimSpace(s.cfg.AdminToken)
-}

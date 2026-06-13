@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/arcgolabs/collectionx/list"
-	"github.com/lyonbrown4d/maxio/model"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
