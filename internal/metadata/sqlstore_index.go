@@ -7,43 +7,40 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
-
-const sqlStoreIndexDocumentColumns = `document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at`
-
-const sqlStoreIndexDocumentUpsertSQL = `INSERT INTO metadata_index_documents (
-	document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(document_id) DO UPDATE SET
-	bucket = excluded.bucket,
-	object_key = excluded.object_key,
-	version_id = excluded.version_id,
-	digest = excluded.digest,
-	state = excluded.state,
-	error = excluded.error,
-	indexed_at = excluded.indexed_at,
-	updated_at = excluded.updated_at`
 
 func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error) {
 	document, err := prepareIndexDocument(document)
 	if err != nil {
 		return model.IndexDocument{}, err
 	}
-	if _, execErr := s.execContext(
-		ctx,
-		sqlStoreIndexDocumentUpsertSQL,
-		document.ID,
-		document.Bucket,
-		document.Key,
-		document.VersionID,
-		document.Digest,
-		document.State,
-		document.Error,
-		unixNanoOrNil(document.IndexedAt),
-		document.CreatedAt.UnixNano(),
-		document.UpdatedAt.UnixNano(),
-	); execErr != nil {
+	query := querydsl.InsertInto(metadataIndexDocuments.table).
+		Values(
+			metadataIndexDocuments.id.Set(document.ID),
+			metadataIndexDocuments.bucket.Set(document.Bucket),
+			metadataIndexDocuments.key.Set(document.Key),
+			metadataIndexDocuments.versionID.Set(document.VersionID),
+			metadataIndexDocuments.digest.Set(document.Digest),
+			metadataIndexDocuments.state.Set(document.State),
+			metadataIndexDocuments.errorText.Set(document.Error),
+			metadataIndexDocuments.indexedAt.Set(unixNanoOrNil(document.IndexedAt)),
+			metadataIndexDocuments.createdAt.Set(document.CreatedAt.UnixNano()),
+			metadataIndexDocuments.updatedAt.Set(document.UpdatedAt.UnixNano()),
+		).
+		OnConflict(metadataIndexDocuments.id).
+		DoUpdateSet(
+			metadataIndexDocuments.bucket.SetExcluded(),
+			metadataIndexDocuments.key.SetExcluded(),
+			metadataIndexDocuments.versionID.SetExcluded(),
+			metadataIndexDocuments.digest.SetExcluded(),
+			metadataIndexDocuments.state.SetExcluded(),
+			metadataIndexDocuments.errorText.SetExcluded(),
+			metadataIndexDocuments.indexedAt.SetExcluded(),
+			metadataIndexDocuments.updatedAt.SetExcluded(),
+		)
+	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
 		return model.IndexDocument{}, fmt.Errorf("upsert index document: %w", execErr)
 	}
 	stored, found, err := s.GetIndexDocument(ctx, document.ID)
@@ -62,14 +59,13 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 		return model.IndexDocument{}, false, ErrBadRequest
 	}
 
-	row := s.queryRowContext(
-		ctx,
-		`SELECT `+sqlStoreIndexDocumentColumns+`
-		   FROM metadata_index_documents
-		  WHERE document_id = ?
-		  LIMIT 1`,
-		id,
-	)
+	query := querydsl.SelectFrom(metadataIndexDocuments.table, metadataIndexDocuments.selectItems()...).
+		Where(metadataIndexDocuments.id.Eq(id)).
+		Limit(1)
+	row, err := s.queryRowBuilderContext(ctx, query)
+	if err != nil {
+		return model.IndexDocument{}, false, fmt.Errorf("get index document: %w", err)
+	}
 	document, err := scanIndexDocument(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.IndexDocument{}, false, nil
@@ -83,17 +79,12 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) ([]model.IndexDocument, error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
-	rows, err := s.queryContext(
-		ctx,
-		`SELECT `+sqlStoreIndexDocumentColumns+`
-		   FROM metadata_index_documents
-		  WHERE (? = '' OR bucket = ?) AND (? = '' OR object_key LIKE ?)
-		  ORDER BY bucket ASC, object_key ASC, version_id ASC`,
-		bucket,
-		bucket,
-		prefix,
-		prefixPattern(prefix),
-	)
+	query := querydsl.SelectFrom(metadataIndexDocuments.table, metadataIndexDocuments.selectItems()...).
+		OrderBy(metadataIndexDocuments.bucket.Asc(), metadataIndexDocuments.key.Asc(), metadataIndexDocuments.versionID.Asc())
+	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
+		query.Where(predicate)
+	}
+	rows, err := s.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query index documents: %w", err)
 	}
@@ -117,10 +108,34 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 	return documents, nil
 }
 
+func indexDocumentFilter(bucket, prefix string) querydsl.Predicate {
+	bucketFilter := metadataIndexDocuments.bucket.Eq(bucket)
+	prefixFilter := querydsl.Like(metadataIndexDocuments.key, prefixPattern(prefix))
+	switch {
+	case bucket != "" && prefix != "":
+		return querydsl.And(bucketFilter, prefixFilter)
+	case bucket != "":
+		return bucketFilter
+	case prefix != "":
+		return prefixFilter
+	default:
+		return nil
+	}
+}
+
 func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	return deleteByID(ctx, s, `DELETE FROM metadata_index_documents WHERE document_id = ?`, id, "index document")
+	query := querydsl.DeleteFrom(metadataIndexDocuments.table).Where(metadataIndexDocuments.id.Eq(id))
+	result, err := s.execBuilderContext(ctx, query)
+	if err != nil {
+		return false, fmt.Errorf("delete index document: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("delete index document rows: %w", err)
+	}
+	return affected > 0, nil
 }

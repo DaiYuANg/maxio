@@ -210,15 +210,3 @@ func listSQLIndexQueue[T any](
 	}
 	return items, nil
 }
-
-func deleteByID(ctx context.Context, store *SQLMetadata, query, id, label string) (bool, error) {
-	result, err := store.execContext(ctx, query, id)
-	if err != nil {
-		return false, fmt.Errorf("delete %s: %w", label, err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete %s rows: %w", label, err)
-	}
-	return affected > 0, nil
-}

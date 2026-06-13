@@ -6,9 +6,24 @@ import (
 )
 
 var (
-	metadataIndexJobs   = newMetadataIndexJobsTable()
-	metadataIndexOutbox = newMetadataIndexOutboxTable()
+	metadataIndexDocuments = newMetadataIndexDocumentsTable()
+	metadataIndexJobs      = newMetadataIndexJobsTable()
+	metadataIndexOutbox    = newMetadataIndexOutboxTable()
 )
+
+type metadataIndexDocumentsTable struct {
+	table     querydsl.Table
+	id        columnx.Column[struct{}, string]
+	bucket    columnx.Column[struct{}, string]
+	key       columnx.Column[struct{}, string]
+	versionID columnx.Column[struct{}, string]
+	digest    columnx.Column[struct{}, string]
+	state     columnx.Column[struct{}, string]
+	errorText columnx.Column[struct{}, string]
+	indexedAt columnx.Column[struct{}, any]
+	createdAt columnx.Column[struct{}, int64]
+	updatedAt columnx.Column[struct{}, int64]
+}
 
 type metadataIndexJobsTable struct {
 	table       querydsl.Table
@@ -41,6 +56,23 @@ type metadataIndexOutboxTable struct {
 	availableAt columnx.Column[struct{}, int64]
 	createdAt   columnx.Column[struct{}, int64]
 	updatedAt   columnx.Column[struct{}, int64]
+}
+
+func newMetadataIndexDocumentsTable() metadataIndexDocumentsTable {
+	table := querydsl.NewTable("metadata_index_documents")
+	return metadataIndexDocumentsTable{
+		table:     table,
+		id:        columnx.Named[string](table, "document_id"),
+		bucket:    columnx.Named[string](table, "bucket"),
+		key:       columnx.Named[string](table, "object_key"),
+		versionID: columnx.Named[string](table, "version_id"),
+		digest:    columnx.Named[string](table, "digest"),
+		state:     columnx.Named[string](table, "state"),
+		errorText: columnx.Named[string](table, "error"),
+		indexedAt: columnx.Named[any](table, "indexed_at"),
+		createdAt: columnx.Named[int64](table, "created_at"),
+		updatedAt: columnx.Named[int64](table, "updated_at"),
+	}
 }
 
 func newMetadataIndexJobsTable() metadataIndexJobsTable {
@@ -79,6 +111,21 @@ func newMetadataIndexOutboxTable() metadataIndexOutboxTable {
 		availableAt: columnx.Named[int64](table, "available_at"),
 		createdAt:   columnx.Named[int64](table, "created_at"),
 		updatedAt:   columnx.Named[int64](table, "updated_at"),
+	}
+}
+
+func (t metadataIndexDocumentsTable) selectItems() []querydsl.SelectItem {
+	return []querydsl.SelectItem{
+		t.id,
+		t.bucket,
+		t.key,
+		t.versionID,
+		t.digest,
+		t.state,
+		t.errorText,
+		t.indexedAt,
+		t.createdAt,
+		t.updatedAt,
 	}
 }
 
