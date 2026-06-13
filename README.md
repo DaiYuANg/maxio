@@ -70,6 +70,39 @@ Derived or rebuildable state:
 - `alias`: allow multiple logical object versions to resolve to canonical bytes.
   This requires stricter delete, repair, and lifecycle controls.
 
+## Implementation status
+
+Status as of 2026-06-13:
+
+Implemented:
+
+- Proxy-only product direction is documented.
+- Metadata backend selection supports SQLite for local development and a
+  PostgreSQL-oriented backend path.
+- Metadata repository now has first-pass canonical models for upstreams, object
+  records, object versions, digest references, index documents, index jobs, and
+  index outbox events.
+- SQLite schema and repository methods cover the first metadata catalog
+  lifecycle.
+- S3 upstream registration is stored in metadata and exposed through management
+  APIs.
+- Bleve search engine exists, and a first index job state machine plus worker
+  abstraction exists.
+- Raft-backed metadata remains legacy; new DB-only catalog operations return
+  unsupported on the Raft implementation.
+
+Not yet implemented:
+
+- S3 proxy PUT/GET/HEAD/DELETE are not yet fully wired to canonical DB object
+  record/version transitions.
+- Index jobs are not yet leased from the metadata DB by the runtime worker.
+- Bleve rebuild, index status APIs, and stale-document repair are not complete.
+- Dedupe observe reports are not yet connected to the proxy write path.
+- DB migrations, schema compatibility checks, and production PostgreSQL
+  validation still need hardening.
+- Full S3 compatibility, auth hardening, metrics, tracing, and operational
+  repair workflows remain roadmap items.
+
 ## Development status
 
 Some code and older docs may still contain migration-era concepts from the

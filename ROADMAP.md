@@ -24,6 +24,27 @@ with DB metadata and a rebuildable Bleve file index.
 - Keep management APIs for health, readiness, metrics, indexing, repair, and
   dedupe operations.
 
+## Current implementation status
+
+Status as of 2026-06-13:
+
+- P0 metadata foundation is partially implemented: repository interfaces,
+  canonical object/version/digest/index/outbox models, SQLite schema, in-memory
+  implementation, and SQLite lifecycle tests exist.
+- PostgreSQL is present as a backend direction, but production validation,
+  migrations, and schema compatibility checks still need hardening.
+- S3 upstream metadata registration and management APIs exist.
+- S3 data-path metadata capture is not complete: proxy PUT/GET/HEAD/DELETE are
+  not yet fully committed through DB object-version transitions.
+- File indexing is partially implemented: Bleve search exists, and the first
+  index job state machine plus worker abstraction exists.
+- Index queue execution is not complete: jobs are not yet leased from metadata
+  DB and wired into the runtime worker loop.
+- Dedupe is still metadata-first: digest reference structures exist, but
+  observe-mode reporting is not yet connected to the proxy write path.
+- Raft/local object-shard storage remains legacy code and is not part of the
+  target default product path.
+
 ## P0: Metadata foundation
 
 Goal: make DB-backed metadata the durable runtime center.
