@@ -8,38 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
-
-const sqlStoreObjectColumns = `bucket, object_key, hash, etag, size, content_type, cache_control, content_disposition,
-content_encoding, content_language, user_metadata, updated_at, state, write_intent_id, write_intent_stage,
-write_intent_started_at, write_intent_updated_at, shard_placements, shard_checksums, shard_sizes`
-
-const sqlStoreObjectUpsertSQL = `INSERT INTO metadata_objects (
-	bucket, object_key, hash, etag, size, content_type, cache_control, content_disposition,
-	content_encoding, content_language, user_metadata, updated_at, state, write_intent_id,
-	write_intent_stage, write_intent_started_at, write_intent_updated_at, shard_placements,
-	shard_checksums, shard_sizes
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(bucket, object_key) DO UPDATE SET
-	hash = excluded.hash,
-	etag = excluded.etag,
-	size = excluded.size,
-	content_type = excluded.content_type,
-	cache_control = excluded.cache_control,
-	content_disposition = excluded.content_disposition,
-	content_encoding = excluded.content_encoding,
-	content_language = excluded.content_language,
-	user_metadata = excluded.user_metadata,
-	updated_at = excluded.updated_at,
-	state = excluded.state,
-	write_intent_id = excluded.write_intent_id,
-	write_intent_stage = excluded.write_intent_stage,
-	write_intent_started_at = excluded.write_intent_started_at,
-	write_intent_updated_at = excluded.write_intent_updated_at,
-	shard_placements = excluded.shard_placements,
-	shard_checksums = excluded.shard_checksums,
-	shard_sizes = excluded.shard_sizes`
 
 func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
 	bucket = strings.TrimSpace(bucket)
@@ -51,17 +22,10 @@ func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string
 		return nil, err
 	}
 
-	return s.queryObjectMetas(
-		ctx,
-		`SELECT `+sqlStoreObjectColumns+`
-		   FROM metadata_objects
-		  WHERE bucket = ? AND state = ? AND (? = '' OR object_key LIKE ?)
-		  ORDER BY object_key ASC`,
-		bucket,
-		model.ObjectStateCommitted,
-		prefix,
-		prefixPattern(prefix),
-	)
+	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
+		Where(objectMetaFilter(bucket, prefix, model.ObjectStateCommitted)).
+		OrderBy(metadataObjects.key.Asc())
+	return s.queryObjectMetas(ctx, query)
 }
 
 func (s *SQLMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
@@ -73,18 +37,10 @@ func (s *SQLMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix 
 		}
 	}
 
-	return s.queryObjectMetas(
-		ctx,
-		`SELECT `+sqlStoreObjectColumns+`
-		   FROM metadata_objects
-		  WHERE state = ? AND (? = '' OR bucket = ?) AND (? = '' OR object_key LIKE ?)
-		  ORDER BY bucket ASC, object_key ASC`,
-		model.ObjectStatePending,
-		bucket,
-		bucket,
-		prefix,
-		prefixPattern(prefix),
-	)
+	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
+		Where(objectMetaFilter(bucket, prefix, model.ObjectStatePending)).
+		OrderBy(metadataObjects.bucket.Asc(), metadataObjects.key.Asc())
+	return s.queryObjectMetas(ctx, query)
 }
 
 func (s *SQLMetadata) GetObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
@@ -117,8 +73,8 @@ func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) 
 	return s.deleteObjectMeta(ctx, bucket, key, model.ObjectStateCommitted, "committed")
 }
 
-func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query string, args ...any) ([]model.ObjectMeta, error) {
-	rows, err := s.queryContext(ctx, query, args...)
+func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) ([]model.ObjectMeta, error) {
+	rows, err := s.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query object metas: %w", err)
 	}
@@ -143,15 +99,13 @@ func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query string, args .
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
-	row := s.queryRowContext(ctx,
-		`SELECT `+sqlStoreObjectColumns+`
-		   FROM metadata_objects
-		  WHERE bucket = ? AND object_key = ? AND state = ?
-		  LIMIT 1`,
-		bucket,
-		key,
-		state,
-	)
+	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
+		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state))).
+		Limit(1)
+	row, err := s.queryRowBuilderContext(ctx, query)
+	if err != nil {
+		return model.ObjectMeta{}, false, fmt.Errorf("query object meta: %w", err)
+	}
 	meta, err := scanObjectMeta(row)
 	if err != nil {
 		if errorsIsNoRows(err) {
@@ -172,30 +126,51 @@ func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta
 	}
 
 	intentID, intentStage, intentStartedAt, intentUpdatedAt := extractWriteIntentValues(meta.WriteIntent)
-	if _, err := s.execContext(
-		ensureContext(ctx),
-		sqlStoreObjectUpsertSQL,
-		meta.Bucket,
-		meta.Key,
-		meta.Hash,
-		meta.ETag,
-		meta.Size,
-		meta.ContentType,
-		meta.CacheControl,
-		meta.ContentDisposition,
-		meta.ContentEncoding,
-		meta.ContentLanguage,
-		marshalUserMetadata(meta.UserMetadata),
-		meta.UpdatedAt.UnixNano(),
-		meta.State,
-		intentID,
-		intentStage,
-		intentStartedAt,
-		intentUpdatedAt,
-		marshalShardPlacements(meta.ShardPlacements),
-		marshalStrings(meta.ShardChecksums),
-		marshalInt64s(meta.ShardSizes),
-	); err != nil {
+	query := querydsl.InsertInto(metadataObjects.table).
+		Values(
+			metadataObjects.bucket.Set(meta.Bucket),
+			metadataObjects.key.Set(meta.Key),
+			metadataObjects.hash.Set(meta.Hash),
+			metadataObjects.etag.Set(meta.ETag),
+			metadataObjects.size.Set(meta.Size),
+			metadataObjects.contentType.Set(meta.ContentType),
+			metadataObjects.cacheControl.Set(meta.CacheControl),
+			metadataObjects.contentDisposition.Set(meta.ContentDisposition),
+			metadataObjects.contentEncoding.Set(meta.ContentEncoding),
+			metadataObjects.contentLanguage.Set(meta.ContentLanguage),
+			metadataObjects.userMetadata.Set(marshalUserMetadata(meta.UserMetadata)),
+			metadataObjects.updatedAt.Set(meta.UpdatedAt.UnixNano()),
+			metadataObjects.state.Set(meta.State),
+			metadataObjects.writeIntentID.Set(intentID),
+			metadataObjects.writeIntentStage.Set(intentStage),
+			metadataObjects.writeIntentStartedAt.Set(intentStartedAt),
+			metadataObjects.writeIntentUpdatedAt.Set(intentUpdatedAt),
+			metadataObjects.shardPlacements.Set(marshalShardPlacements(meta.ShardPlacements)),
+			metadataObjects.shardChecksums.Set(marshalStrings(meta.ShardChecksums)),
+			metadataObjects.shardSizes.Set(marshalInt64s(meta.ShardSizes)),
+		).
+		OnConflict(metadataObjects.bucket, metadataObjects.key).
+		DoUpdateSet(
+			metadataObjects.hash.SetExcluded(),
+			metadataObjects.etag.SetExcluded(),
+			metadataObjects.size.SetExcluded(),
+			metadataObjects.contentType.SetExcluded(),
+			metadataObjects.cacheControl.SetExcluded(),
+			metadataObjects.contentDisposition.SetExcluded(),
+			metadataObjects.contentEncoding.SetExcluded(),
+			metadataObjects.contentLanguage.SetExcluded(),
+			metadataObjects.userMetadata.SetExcluded(),
+			metadataObjects.updatedAt.SetExcluded(),
+			metadataObjects.state.SetExcluded(),
+			metadataObjects.writeIntentID.SetExcluded(),
+			metadataObjects.writeIntentStage.SetExcluded(),
+			metadataObjects.writeIntentStartedAt.SetExcluded(),
+			metadataObjects.writeIntentUpdatedAt.SetExcluded(),
+			metadataObjects.shardPlacements.SetExcluded(),
+			metadataObjects.shardChecksums.SetExcluded(),
+			metadataObjects.shardSizes.SetExcluded(),
+		)
+	if _, err := s.execBuilderContext(ensureContext(ctx), query); err != nil {
 		return fmt.Errorf("%s object meta: %w", op, err)
 	}
 	return nil
@@ -229,14 +204,9 @@ func (s *SQLMetadata) deleteObjectMeta(
 }
 
 func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, state string) (bool, error) {
-	result, err := s.execContext(
-		ensureContext(ctx),
-		`DELETE FROM metadata_objects
-		  WHERE bucket = ? AND object_key = ? AND state = ?`,
-		bucket,
-		key,
-		state,
-	)
+	query := querydsl.DeleteFrom(metadataObjects.table).
+		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state)))
+	result, err := s.execBuilderContext(ensureContext(ctx), query)
 	if err != nil {
 		return false, fmt.Errorf("delete object meta: %w", err)
 	}
@@ -245,6 +215,17 @@ func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, stat
 		return false, fmt.Errorf("delete object meta rows: %w", err)
 	}
 	return affected > 0, nil
+}
+
+func objectMetaFilter(bucket, prefix, state string) querydsl.Predicate {
+	predicates := []querydsl.Predicate{metadataObjects.state.Eq(state)}
+	if bucket != "" {
+		predicates = append(predicates, metadataObjects.bucket.Eq(bucket))
+	}
+	if prefix != "" {
+		predicates = append(predicates, querydsl.Like(metadataObjects.key, prefixPattern(prefix)))
+	}
+	return querydsl.And(predicates...)
 }
 
 func prepareObjectMeta(meta model.ObjectMeta, state string) (model.ObjectMeta, error) {
