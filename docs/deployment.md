@@ -203,7 +203,7 @@ X-Maxio-Cluster
 X-Maxio-API
 ```
 
-Keep internal management and repair endpoints private.
+Keep internal management endpoints private.
 
 ## Readiness model
 

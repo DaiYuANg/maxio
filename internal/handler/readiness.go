@@ -49,7 +49,6 @@ func (s *Service) checkReady(ctx context.Context, checks map[string]string) erro
 		checks["control_membership"] = "disabled"
 		checks["control_leader"] = "disabled"
 	}
-	checks["repair_backlog"] = "removed"
 	return err
 }
 

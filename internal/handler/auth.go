@@ -47,7 +47,8 @@ type objectAuthorization struct {
 }
 
 func (s *Service) requiresClusterAuth(parts []string) bool {
-	return isStorageShardRoute(parts) && strings.TrimSpace(s.cfg.ClusterToken) != ""
+	_ = parts
+	return false
 }
 
 func (s *Service) requiresAdminAuth(route string, parts []string) bool {
@@ -64,7 +65,7 @@ func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 		return false
 	}
 	switch parts[0] {
-	case "_cluster", "_repair", "_dedupe", "_index", "_internal", "_recovery", "_s3":
+	case "_cluster", "_dedupe", "_index", "_s3":
 		return true
 	default:
 		return false

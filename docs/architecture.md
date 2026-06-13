@@ -92,8 +92,6 @@ The management plane is for operators and automation:
 /metrics
 /_index/*
 /_dedupe/*
-/_repair/*
-/_recovery/*
 /_cluster/*       legacy or topology-oriented endpoints while migration continues
 ```
 

@@ -2,6 +2,12 @@ package handler
 
 import "context"
 
+type nodePlacementStats struct {
+	objects   int
+	shards    int
+	usedBytes int64
+}
+
 func (s *Service) ensureClusterMemberDecommissionable(ctx context.Context, replicaID uint64) error {
 	_, _, _ = s, ctx, replicaID
 	return nil

@@ -70,5 +70,6 @@ container image.
 
 The current MVP does not provide built-in point-in-time backup orchestration,
 single-object restore, or automatic schema rollback. Use database and upstream
-provider tools for authoritative backups, and use MaxIO repair/rebuild endpoints
-only as post-restore verification and reconstruction helpers.
+provider tools for authoritative backups. MaxIO should add DB/upstream
+consistency and index rebuild workflows before documenting post-restore
+verification helpers.

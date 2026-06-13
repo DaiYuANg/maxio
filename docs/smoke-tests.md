@@ -124,22 +124,6 @@ curl --fail \
 
 ## Maintenance entry points
 
-Inspect repair status:
-
-```sh
-curl --fail \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_repair/status"
-```
-
-Run a scoped repair scan:
-
-```sh
-curl --fail -X POST \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_repair/run?bucket=$MAXIO_BUCKET"
-```
-
 Inspect dedupe status:
 
 ```sh
@@ -154,22 +138,6 @@ Run object-level dedupe reconciliation:
 curl --fail -X POST \
   -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
   "$MAXIO_URL/_dedupe/run"
-```
-
-Inspect recovery status:
-
-```sh
-curl --fail \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_recovery/status"
-```
-
-Run storage recovery:
-
-```sh
-curl --fail -X POST \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_recovery/run"
 ```
 
 ## Cluster state
@@ -211,4 +179,3 @@ curl --fail -X DELETE \
   -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
   "$MAXIO_URL/$MAXIO_BUCKET"
 ```
-

@@ -29,13 +29,10 @@ func (s *Service) collectMetrics(ctx context.Context) string {
 	collector := metricsCollector{}
 	collector.addHTTPMetrics(s)
 	collector.addReadiness(ctx, s)
-	collector.addStorageNodes(s)
 	collector.addObjectCounts(ctx, s)
 	collector.addControlStatus(ctx, s)
-	collector.addRepairStatus(s)
 	collector.addDedupeStatus(s)
 	collector.addIndexStatus(s)
-	collector.addRecoveryStatus(s)
 	collector.gauge("maxio_metrics_collection_errors", "Number of metric collection failures.", collector.collectionErrors)
 	return collector.String()
 }
@@ -46,15 +43,6 @@ func (collector *metricsCollector) addReadiness(ctx context.Context, s *Service)
 		value = 1
 	}
 	collector.gauge("maxio_ready", "Whether MaxIO is ready to serve traffic.", value)
-}
-
-func (collector *metricsCollector) addStorageNodes(s *Service) {
-	_ = s
-	collector.gauge("maxio_storage_nodes", "Configured storage nodes.", 0)
-	collector.gauge("maxio_storage_nodes_drained", "Storage nodes excluded from new placements.", 0)
-	collector.gauge("maxio_storage_node_objects", "Objects assigned to storage nodes.", 0)
-	collector.gauge("maxio_storage_node_shards", "Shards assigned to storage nodes.", 0)
-	collector.gaugeInt64("maxio_storage_node_used_bytes", "Bytes assigned to storage nodes.", 0)
 }
 
 func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Service) {
@@ -82,15 +70,6 @@ func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Servi
 	}
 	collector.gauge("maxio_buckets", "Buckets known to metadata.", len(buckets))
 	collector.gauge("maxio_objects", "Committed objects known to metadata.", objects)
-}
-
-func (collector *metricsCollector) addRepairStatus(s *Service) {
-	_ = s
-	collector.gauge("maxio_repair_running", "Whether the repair job is running.", 0)
-	collector.gauge("maxio_repair_last_objects", "Objects scanned by the last repair job.", 0)
-	collector.gauge("maxio_repair_last_unhealthy", "Unhealthy objects found by the last repair job.", 0)
-	collector.gauge("maxio_repair_last_repaired_objects", "Objects repaired by the last repair job.", 0)
-	collector.gauge("maxio_repair_last_failed", "Failures recorded by the last repair job.", 0)
 }
 
 func (collector *metricsCollector) addDedupeStatus(s *Service) {
@@ -129,14 +108,6 @@ func (collector *metricsCollector) addIndexStatus(s *Service) {
 	collector.gauge("maxio_index_failed_objects", "Objects that failed content indexing.", status.FailedObjects)
 	collector.gauge("maxio_index_last_rebuild_objects", "Objects indexed by the last content index rebuild.", status.LastRebuildObjects)
 	collector.gauge("maxio_index_last_rebuild_failed", "Objects that failed during the last content index rebuild.", status.LastRebuildFailed)
-}
-
-func (collector *metricsCollector) addRecoveryStatus(s *Service) {
-	_ = s
-	collector.gauge("maxio_recovery_completed", "Whether storage recovery has completed at least once.", 0)
-	collector.gauge("maxio_recovery_last_failed", "Whether the last storage recovery run failed.", 0)
-	collector.gauge("maxio_recovery_last_pending_removed", "Pending objects removed by the last storage recovery run.", 0)
-	collector.gauge("maxio_recovery_last_orphan_shards_removed", "Orphan shard sets removed by the last storage recovery run.", 0)
 }
 
 func (collector *metricsCollector) gauge(name, help string, value int) {

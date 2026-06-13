@@ -38,39 +38,15 @@ func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request
 		strings.Trim(defaultClusterStatusPath, "/"):    func() { s.handleClusterStatus(w, r) },
 		strings.Trim(defaultClusterNodesPath, "/"):     func() { s.handleClusterNodes(w, r) },
 		strings.Trim(defaultClusterReconcilePath, "/"): func() { s.handleClusterReconcile(w, r) },
-		strings.Trim(defaultClusterRebalancePath, "/"): func() { s.handleClusterRebalance(w, r) },
-		strings.Trim(defaultClusterRebalancePlanPath, "/"): func() {
-			s.handleClusterRebalancePlan(w, r)
-		},
-		strings.Trim(defaultClusterStorageNodesPath, "/"): func() {
-			s.handleClusterStorageNodes(w, r)
-		},
-		strings.Trim(defaultClusterStorageNodesSyncPath, "/"): func() {
-			s.handleClusterStorageNodesSync(w, r)
-		},
-		strings.Trim(defaultDiscoveryPath, "/"):     func() { s.handleDiscovery(w, r) },
-		strings.Trim(defaultRepairStatusPath, "/"):  func() { s.handleRepairStatus(w, r) },
-		strings.Trim(defaultRepairRunPath, "/"):     func() { s.handleRepairRun(w, r) },
-		strings.Trim(defaultRepairHistoryPath, "/"): func() { s.handleRepairHistory(w, r) },
-		strings.Trim(defaultRepairIssuesPath, "/"):  func() { s.handleRepairIssues(w, r) },
-		strings.Trim(defaultDedupeStatusPath, "/"):  func() { s.handleDedupeStatus(w, r) },
-		strings.Trim(defaultDedupePlanPath, "/"):    func() { s.handleDedupePlan(w, r) },
-		strings.Trim(defaultDedupeRunPath, "/"):     func() { s.handleDedupeRun(w, r) },
-		strings.Trim(defaultRecoveryPlanPath, "/"): func() {
-			s.handleRecoveryPlan(w, r)
-		},
-		strings.Trim(defaultRecoveryStatusPath, "/"): func() {
-			s.handleRecoveryStatus(w, r)
-		},
-		strings.Trim(defaultRecoveryRunPath, "/"):  func() { s.handleRecoveryRun(w, r) },
-		strings.Trim(defaultIndexStatusPath, "/"):  func() { s.handleIndexStatus(w, r) },
-		strings.Trim(defaultIndexRebuildPath, "/"): func() { s.handleIndexRebuild(w, r) },
+		strings.Trim(defaultDiscoveryPath, "/"):        func() { s.handleDiscovery(w, r) },
+		strings.Trim(defaultDedupeStatusPath, "/"):     func() { s.handleDedupeStatus(w, r) },
+		strings.Trim(defaultDedupePlanPath, "/"):       func() { s.handleDedupePlan(w, r) },
+		strings.Trim(defaultDedupeRunPath, "/"):        func() { s.handleDedupeRun(w, r) },
+		strings.Trim(defaultIndexStatusPath, "/"):      func() { s.handleIndexStatus(w, r) },
+		strings.Trim(defaultIndexRebuildPath, "/"):     func() { s.handleIndexRebuild(w, r) },
 	}
 	if routeHandler, ok := routes[route]; ok {
 		routeHandler()
-		return true
-	}
-	if s.handleStorageShardRoute(w, parts) {
 		return true
 	}
 	if isS3UpstreamRoute(parts) {

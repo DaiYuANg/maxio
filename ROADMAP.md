@@ -21,8 +21,9 @@ with DB metadata and a rebuildable Bleve file index.
 - Use DB transactions and leases for write state, worker queues, rebuilds, and
   recovery.
 - Keep S3 API as the first-class public data plane.
-- Keep management APIs for health, readiness, metrics, indexing, repair, and
-  dedupe operations.
+- Keep management APIs for health, readiness, metrics, indexing, and dedupe
+  operations. Repair/recovery should return later as DB/upstream consistency
+  workflows, not local storage-plane endpoints.
 
 ## Current implementation status
 
