@@ -12,6 +12,7 @@ import (
 const (
 	metadataBackendSQLite   = "sqlite"
 	metadataBackendPostgres = "postgres"
+	metadataBackendMySQL    = "mysql"
 )
 
 func NewMetadataStore(cfg config.Config, logger *slog.Logger) (MetadataStore, error) {
@@ -33,6 +34,8 @@ func NewMetadataStore(cfg config.Config, logger *slog.Logger) (MetadataStore, er
 		return NewSQLiteMetadata(dsn, logger)
 	case metadataBackendPostgres:
 		return NewPostgresMetadata(strings.TrimSpace(cfg.MetadataDSN), logger, cfg.MetadataAutoMigrate)
+	case metadataBackendMySQL:
+		return NewMySQLMetadata(strings.TrimSpace(cfg.MetadataDSN), logger, cfg.MetadataAutoMigrate)
 	default:
 		return nil, fmt.Errorf("unsupported metadata backend: %s", cfg.MetadataBackend)
 	}

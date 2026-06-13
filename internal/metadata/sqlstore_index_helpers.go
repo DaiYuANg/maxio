@@ -10,11 +10,11 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-type sqliteScanner interface {
+type sqlScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanIndexDocument(scanner sqliteScanner) (model.IndexDocument, error) {
+func scanIndexDocument(scanner sqlScanner) (model.IndexDocument, error) {
 	var (
 		document model.IndexDocument
 		indexed  sql.NullInt64
@@ -41,7 +41,7 @@ func scanIndexDocument(scanner sqliteScanner) (model.IndexDocument, error) {
 	return document, nil
 }
 
-func scanIndexJob(scanner sqliteScanner) (model.IndexJob, error) {
+func scanIndexJob(scanner sqlScanner) (model.IndexJob, error) {
 	var (
 		job       model.IndexJob
 		started   sql.NullInt64
@@ -75,7 +75,7 @@ func scanIndexJob(scanner sqliteScanner) (model.IndexJob, error) {
 	return job, nil
 }
 
-func scanIndexOutboxEvent(scanner sqliteScanner) (model.IndexOutboxEvent, error) {
+func scanIndexOutboxEvent(scanner sqlScanner) (model.IndexOutboxEvent, error) {
 	var (
 		event     model.IndexOutboxEvent
 		available int64
@@ -179,15 +179,15 @@ func indexQueueTimes(availableAt, createdAt time.Time) (time.Time, time.Time, ti
 	return availableAt, createdAt, now
 }
 
-func listSQLiteIndexQueue[T any](
+func listSQLIndexQueue[T any](
 	ctx context.Context,
-	store *SQLiteMetadata,
+	store *SQLMetadata,
 	columns string,
 	table string,
 	status string,
 	limit int,
 	label string,
-	scan func(sqliteScanner) (T, error),
+	scan func(sqlScanner) (T, error),
 ) ([]T, error) {
 	status = strings.TrimSpace(status)
 	limit = normalizeListLimit(limit)
@@ -207,7 +207,7 @@ func listSQLiteIndexQueue[T any](
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && store.logger != nil {
-			store.logger.Error("close sqlite rows", "rows", label, "error", closeErr)
+			store.logger.Error("close sql metadata rows", "rows", label, "error", closeErr)
 		}
 	}()
 
@@ -225,7 +225,7 @@ func listSQLiteIndexQueue[T any](
 	return items, nil
 }
 
-func deleteByID(ctx context.Context, store *SQLiteMetadata, query, id, label string) (bool, error) {
+func deleteByID(ctx context.Context, store *SQLMetadata, query, id, label string) (bool, error) {
 	result, err := store.execContext(ctx, query, id)
 	if err != nil {
 		return false, fmt.Errorf("delete %s: %w", label, err)

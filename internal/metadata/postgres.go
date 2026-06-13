@@ -11,7 +11,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLiteMetadata, error) {
+func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLMetadata, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -24,10 +24,10 @@ func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLite
 		return nil, fmt.Errorf("open postgres metadata database: %w", err)
 	}
 
-	store := &SQLiteMetadata{
+	store := &SQLMetadata{
 		db:           db,
 		logger:       logger,
-		queryDialect: metadataQueryDialectPostgres,
+		queryDialect: metadataSQLDialectPostgres,
 	}
 	if err := store.ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("connect postgres metadata database: %w", closePostgresOnInitError(db, logger, err))
@@ -42,7 +42,7 @@ func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLite
 	return store, nil
 }
 
-func (s *SQLiteMetadata) ping(ctx context.Context) error {
+func (s *SQLMetadata) ping(ctx context.Context) error {
 	if s == nil || s.db == nil {
 		return errors.New("metadata db session is nil")
 	}

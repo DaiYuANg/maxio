@@ -94,11 +94,11 @@ func scanDigestRef(scanner interface{ Scan(dest ...any) error }) (model.DigestRe
 	return ref, nil
 }
 
-func (s *SQLiteMetadata) getDigestRefInTx(ctx context.Context, tx *sql.Tx, digest string) (model.DigestRef, error) {
+func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *sql.Tx, digest string) (model.DigestRef, error) {
 	row := s.txQueryRowContext(
 		ctx,
 		tx,
-		`SELECT `+sqliteDigestRefColumns+`
+		`SELECT `+sqlStoreDigestRefColumns+`
 		   FROM metadata_digest_refs
 		  WHERE digest = ?
 		  LIMIT 1`,

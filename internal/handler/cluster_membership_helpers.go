@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 const (
@@ -86,7 +86,7 @@ func (s *Service) maybeHandleRemovedReplica(
 	w http.ResponseWriter,
 	replicaID uint64,
 	target string,
-	membership raftx.Membership,
+	membership control.Membership,
 ) bool {
 	if !isRemovedReplica(membership.Removed, replicaID) {
 		return false
@@ -116,7 +116,7 @@ func (s *Service) writeClusterMembershipBlocked(w http.ResponseWriter, blockers 
 }
 
 func clusterMembershipChangeBlockers(
-	membership raftx.Membership,
+	membership control.Membership,
 	desired map[uint64]string,
 ) []clusterMembershipBlockedChange {
 	blockers := make([]clusterMembershipBlockedChange, 0)
@@ -156,9 +156,9 @@ func clusterMembershipBlockedError(blockers []clusterMembershipBlockedChange) st
 	blocker := blockers[0]
 	switch blocker.Reason {
 	case clusterMembershipReasonAddressChangeBlocked:
-		return fmt.Sprintf("raft replica %d already exists with different target", blocker.ReplicaID)
+		return fmt.Sprintf("cluster replica %d already exists with different target", blocker.ReplicaID)
 	case clusterMembershipReasonRemovedReplicaReappeared:
-		return fmt.Sprintf("raft replica %d has been removed and cannot be added back", blocker.ReplicaID)
+		return fmt.Sprintf("cluster replica %d has been removed and cannot be added back", blocker.ReplicaID)
 	default:
 		return "cluster membership change blocked"
 	}
@@ -182,29 +182,29 @@ func removedReplicaSet(removed []uint64) map[uint64]struct{} {
 }
 
 func (s *Service) syncStorageNodes(ctx context.Context) error {
-	if s == nil || s.engine == nil || s.raft == nil {
+	if s == nil || s.engine == nil || s.control == nil {
 		return nil
 	}
 
-	membership, err := s.raft.GetMembership(ctx)
+	membership, err := s.control.GetMembership(ctx)
 	if err != nil {
-		return fmt.Errorf("get raft membership: %w", err)
+		return fmt.Errorf("get control membership: %w", err)
 	}
-	localReplicaID := s.raft.LocalReplicaID()
+	localReplicaID := s.control.LocalReplicaID()
 	if localReplicaID == 0 {
-		return errors.New("local raft replica id is missing")
+		return errors.New("local cluster replica id is missing")
 	}
 	s.engine.SetControlToken(s.storageNodeToken())
 	storageNodes := s.storageNodesFromMembership(membership.Nodes)
-	if err := s.engine.SyncStorageNodesFromRaft(localReplicaID, storageNodes); err != nil {
+	if err := s.engine.SyncStorageNodesFromControl(localReplicaID, storageNodes); err != nil {
 		return fmt.Errorf("sync engine storage nodes: %w", err)
 	}
 	return nil
 }
 
-func (s *Service) storageNodesFromMembership(raftNodes map[uint64]string) map[uint64]string {
-	storageNodes := make(map[uint64]string, len(raftNodes))
-	maps.Copy(storageNodes, raftNodes)
+func (s *Service) storageNodesFromMembership(controlNodes map[uint64]string) map[uint64]string {
+	storageNodes := make(map[uint64]string, len(controlNodes))
+	maps.Copy(storageNodes, controlNodes)
 	for _, node := range s.discoveryNodes() {
 		if node.ReplicaID == 0 || strings.TrimSpace(node.HTTPAddress) == "" {
 			continue

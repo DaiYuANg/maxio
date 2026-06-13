@@ -33,7 +33,7 @@ func newRemoteHTTPRepairEngines(t *testing.T) (*engine.Engine, *engine.Engine, f
 	node1 := newTestEngine(t)
 	node2 := newTestEngine(t)
 	server := httptest.NewServer(storageShardHandler(node2))
-	if err := node1.SyncStorageNodesFromRaft(1, map[uint64]string{
+	if err := node1.SyncStorageNodesFromControl(1, map[uint64]string{
 		1: "127.0.0.1:9001",
 		2: server.URL,
 	}); err != nil {
@@ -61,7 +61,7 @@ func putRemoteRepairObject(
 
 func corruptLocalPlacement(ctx context.Context, t *testing.T, node *engine.Engine, meta engine.ObjectInfo) int {
 	t.Helper()
-	localIndex := firstPlacementIndex(t, meta.ShardPlacements, "raft-1")
+	localIndex := firstPlacementIndex(t, meta.ShardPlacements, "node-1")
 	err := node.WriteLocalShard(ctx, meta.ShardDir, meta.Hash, localIndex, []byte("corrupted local shard"))
 	if err != nil {
 		t.Fatalf("corrupt local shard: %v", err)

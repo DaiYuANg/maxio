@@ -10,7 +10,7 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-func (s *SQLiteMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
+func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
 	rows, err := s.queryContext(
 		ctx,
 		`SELECT hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
@@ -21,7 +21,7 @@ func (s *SQLiteMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "blob refs", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "blob refs", "error", closeErr)
 		}
 	}()
 
@@ -39,7 +39,7 @@ func (s *SQLiteMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
 	return refs, nil
 }
 
-func (s *SQLiteMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error) {
+func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error) {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return BlobRef{}, false, ErrBadRequest
@@ -62,7 +62,7 @@ func (s *SQLiteMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, 
 	return ref, true, nil
 }
 
-func (s *SQLiteMetadata) CreateBlobRef(
+func (s *SQLMetadata) CreateBlobRef(
 	ctx context.Context,
 	hash string,
 	path string,
@@ -95,7 +95,7 @@ func (s *SQLiteMetadata) CreateBlobRef(
 	return nil
 }
 
-func (s *SQLiteMetadata) UpdateBlobRefPlacements(ctx context.Context, hash string, placements []model.ShardPlacement) error {
+func (s *SQLMetadata) UpdateBlobRefPlacements(ctx context.Context, hash string, placements []model.ShardPlacement) error {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return ErrBadRequest
@@ -112,7 +112,7 @@ func (s *SQLiteMetadata) UpdateBlobRefPlacements(ctx context.Context, hash strin
 	return requireAffectedRow(result, ErrObjectNotFound, "update blob ref placements rows")
 }
 
-func (s *SQLiteMetadata) IncreaseBlobRef(ctx context.Context, hash string) error {
+func (s *SQLMetadata) IncreaseBlobRef(ctx context.Context, hash string) error {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return ErrBadRequest
@@ -128,7 +128,7 @@ func (s *SQLiteMetadata) IncreaseBlobRef(ctx context.Context, hash string) error
 	return requireAffectedRow(result, ErrObjectNotFound, "increase blob ref rows")
 }
 
-func (s *SQLiteMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string, bool, error) {
+func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string, bool, error) {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return "", false, ErrBadRequest
@@ -174,7 +174,7 @@ func scanBlobRef(scanner interface{ Scan(dest ...any) error }) (BlobRef, error) 
 	return ref, nil
 }
 
-func (s *SQLiteMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
+func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
 	var path string
 	var refCount int
 	err := s.txQueryRowContext(
@@ -195,7 +195,7 @@ func (s *SQLiteMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, ha
 	return path, false, s.updateBlobRefCountInTx(ctx, tx, hash)
 }
 
-func (s *SQLiteMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
+func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
 	if err := s.txExecContext(
 		ensureContext(ctx),
 		tx,
@@ -207,7 +207,7 @@ func (s *SQLiteMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash
 	return nil
 }
 
-func (s *SQLiteMetadata) updateBlobRefCountInTx(ctx context.Context, tx *sql.Tx, hash string) error {
+func (s *SQLMetadata) updateBlobRefCountInTx(ctx context.Context, tx *sql.Tx, hash string) error {
 	if err := s.txExecContext(
 		ensureContext(ctx),
 		tx,

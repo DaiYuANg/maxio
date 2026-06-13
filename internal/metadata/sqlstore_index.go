@@ -10,15 +10,15 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-const sqliteIndexDocumentColumns = `document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at`
+const sqlStoreIndexDocumentColumns = `document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at`
 
-const sqliteIndexJobColumns = `job_id, kind, bucket, object_key, version_id, status, attempts, error,
+const sqlStoreIndexJobColumns = `job_id, kind, bucket, object_key, version_id, status, attempts, error,
 available_at, started_at, finished_at, created_at, updated_at`
 
-const sqliteIndexOutboxColumns = `event_id, event_type, bucket, object_key, version_id, payload, status,
+const sqlStoreIndexOutboxColumns = `event_id, event_type, bucket, object_key, version_id, payload, status,
 attempts, error, available_at, created_at, updated_at`
 
-const sqliteIndexDocumentUpsertSQL = `INSERT INTO metadata_index_documents (
+const sqlStoreIndexDocumentUpsertSQL = `INSERT INTO metadata_index_documents (
 	document_id, bucket, object_key, version_id, digest, state, error, indexed_at, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(document_id) DO UPDATE SET
@@ -31,7 +31,7 @@ ON CONFLICT(document_id) DO UPDATE SET
 	indexed_at = excluded.indexed_at,
 	updated_at = excluded.updated_at`
 
-const sqliteIndexJobUpsertSQL = `INSERT INTO metadata_index_jobs (
+const sqlStoreIndexJobUpsertSQL = `INSERT INTO metadata_index_jobs (
 	job_id, kind, bucket, object_key, version_id, status, attempts, error,
 	available_at, started_at, finished_at, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -48,7 +48,7 @@ ON CONFLICT(job_id) DO UPDATE SET
 	finished_at = excluded.finished_at,
 	updated_at = excluded.updated_at`
 
-const sqliteIndexOutboxUpsertSQL = `INSERT INTO metadata_index_outbox (
+const sqlStoreIndexOutboxUpsertSQL = `INSERT INTO metadata_index_outbox (
 	event_id, event_type, bucket, object_key, version_id, payload, status,
 	attempts, error, available_at, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -64,14 +64,14 @@ ON CONFLICT(event_id) DO UPDATE SET
 	available_at = excluded.available_at,
 	updated_at = excluded.updated_at`
 
-func (s *SQLiteMetadata) UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error) {
+func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error) {
 	document, err := prepareIndexDocument(document)
 	if err != nil {
 		return model.IndexDocument{}, err
 	}
 	if _, execErr := s.execContext(
 		ctx,
-		sqliteIndexDocumentUpsertSQL,
+		sqlStoreIndexDocumentUpsertSQL,
 		document.ID,
 		document.Bucket,
 		document.Key,
@@ -95,7 +95,7 @@ func (s *SQLiteMetadata) UpsertIndexDocument(ctx context.Context, document model
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) GetIndexDocument(ctx context.Context, id string) (model.IndexDocument, bool, error) {
+func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.IndexDocument, bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return model.IndexDocument{}, false, ErrBadRequest
@@ -103,7 +103,7 @@ func (s *SQLiteMetadata) GetIndexDocument(ctx context.Context, id string) (model
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteIndexDocumentColumns+`
+		`SELECT `+sqlStoreIndexDocumentColumns+`
 		   FROM metadata_index_documents
 		  WHERE document_id = ?
 		  LIMIT 1`,
@@ -119,12 +119,12 @@ func (s *SQLiteMetadata) GetIndexDocument(ctx context.Context, id string) (model
 	return document, true, nil
 }
 
-func (s *SQLiteMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) ([]model.IndexDocument, error) {
+func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) ([]model.IndexDocument, error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 	rows, err := s.queryContext(
 		ctx,
-		`SELECT `+sqliteIndexDocumentColumns+`
+		`SELECT `+sqlStoreIndexDocumentColumns+`
 		   FROM metadata_index_documents
 		  WHERE (? = '' OR bucket = ?) AND (? = '' OR object_key LIKE ?)
 		  ORDER BY bucket ASC, object_key ASC, version_id ASC`,
@@ -138,7 +138,7 @@ func (s *SQLiteMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix 
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "index documents", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "index documents", "error", closeErr)
 		}
 	}()
 
@@ -156,7 +156,7 @@ func (s *SQLiteMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix 
 	return documents, nil
 }
 
-func (s *SQLiteMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool, error) {
+func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false, ErrBadRequest

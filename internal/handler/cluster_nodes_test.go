@@ -5,27 +5,27 @@ import (
 	"testing"
 
 	"github.com/lyonbrown4d/maxio/engine"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/handler"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 func TestBuildClusterNodeRegistryMergesMemberDiscoveryAndStorage(t *testing.T) {
 	t.Parallel()
 
-	nodes := handler.BuildClusterNodeRegistry(raftx.Membership{
+	nodes := handler.BuildClusterNodeRegistry(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			2: "127.0.0.1:63001",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 1, State: "alive", RaftAddress: "127.0.0.1:63000", HTTPAddress: "127.0.0.1:8080"},
-		{ReplicaID: 2, State: "suspect", RaftAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
-		{ReplicaID: 3, State: "alive", RaftAddress: "127.0.0.1:63002", HTTPAddress: "127.0.0.1:8082"},
+		{ReplicaID: 1, State: "alive", ControlAddress: "127.0.0.1:63000", HTTPAddress: "127.0.0.1:8080"},
+		{ReplicaID: 2, State: "suspect", ControlAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
+		{ReplicaID: 3, State: "alive", ControlAddress: "127.0.0.1:63002", HTTPAddress: "127.0.0.1:8082"},
 	}, []engine.StorageNodeInfo{
-		{ID: "raft-1", Address: "127.0.0.1:8080", Local: true},
-		{ID: "raft-2", Address: "127.0.0.1:8081", ObjectCount: 1, ShardCount: 4, UsedBytes: 128},
+		{ID: "node-1", Address: "127.0.0.1:8080", Local: true},
+		{ID: "node-2", Address: "127.0.0.1:8081", ObjectCount: 1, ShardCount: 4, UsedBytes: 128},
 	})
 
 	if len(nodes) != 3 {
@@ -43,24 +43,24 @@ func TestBuildClusterNodeRegistryMergesMemberDiscoveryAndStorage(t *testing.T) {
 	if nodes[1].UsedBytes != 128 {
 		t.Fatalf("node 2 used_bytes = %d, want 128", nodes[1].UsedBytes)
 	}
-	if !slices.Contains(nodes[2].Issues, "not_in_raft_membership") {
-		t.Fatalf("node 3 issues = %+v, want not_in_raft_membership", nodes[2].Issues)
+	if !slices.Contains(nodes[2].Issues, "not_in_control_membership") {
+		t.Fatalf("node 3 issues = %+v, want not_in_control_membership", nodes[2].Issues)
 	}
 }
 
 func TestBuildClusterNodeRegistryReportsOfflineMissingStorage(t *testing.T) {
 	t.Parallel()
 
-	nodes := handler.BuildClusterNodeRegistry(raftx.Membership{
+	nodes := handler.BuildClusterNodeRegistry(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			2: "127.0.0.1:63001",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 1, State: "alive", RaftAddress: "127.0.0.1:63000"},
+		{ReplicaID: 1, State: "alive", ControlAddress: "127.0.0.1:63000"},
 	}, []engine.StorageNodeInfo{
-		{ID: "raft-1", Address: "127.0.0.1:8080", Local: true},
+		{ID: "node-1", Address: "127.0.0.1:8080", Local: true},
 	})
 
 	assertClusterNode(t, nodes[1], 2, handler.ClusterNodeOffline)
@@ -76,15 +76,15 @@ func TestBuildClusterNodeRegistryReportsOfflineMissingStorage(t *testing.T) {
 func TestBuildClusterNodeRegistryReportsDrainingStorageNode(t *testing.T) {
 	t.Parallel()
 
-	nodes := handler.BuildClusterNodeRegistry(raftx.Membership{
+	nodes := handler.BuildClusterNodeRegistry(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 1, State: "alive", RaftAddress: "127.0.0.1:63000"},
+		{ReplicaID: 1, State: "alive", ControlAddress: "127.0.0.1:63000"},
 	}, []engine.StorageNodeInfo{
-		{ID: "raft-1", Address: "127.0.0.1:8080", Local: true, Drained: true, ObjectCount: 1, ShardCount: 3, UsedBytes: 64},
+		{ID: "node-1", Address: "127.0.0.1:8080", Local: true, Drained: true, ObjectCount: 1, ShardCount: 3, UsedBytes: 64},
 	})
 
 	assertClusterNode(t, nodes[0], 1, handler.ClusterNodeDraining)
@@ -97,16 +97,16 @@ func TestBuildClusterNodeRegistryReportsDrainingStorageNode(t *testing.T) {
 func TestBuildClusterNodeRegistryReportsRemovedNodeReappearance(t *testing.T) {
 	t.Parallel()
 
-	nodes := handler.BuildClusterNodeRegistry(raftx.Membership{
+	nodes := handler.BuildClusterNodeRegistry(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 		},
 		Removed: []uint64{2},
 	}, []discovery.Node{
-		{ReplicaID: 2, State: "alive", RaftAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
+		{ReplicaID: 2, State: "alive", ControlAddress: "127.0.0.1:63001", HTTPAddress: "127.0.0.1:8081"},
 	}, []engine.StorageNodeInfo{
-		{ID: "raft-2", Address: "127.0.0.1:8081"},
+		{ID: "node-2", Address: "127.0.0.1:8081"},
 	})
 
 	assertClusterNode(t, nodes[1], 2, handler.ClusterNodeDiscovered)

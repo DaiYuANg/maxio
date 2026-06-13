@@ -10,9 +10,9 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-const sqliteUpstreamColumns = `id, name, endpoint, region, weight, priority, buckets, enabled, created_at, updated_at`
+const sqlStoreUpstreamColumns = `id, name, endpoint, region, weight, priority, buckets, enabled, created_at, updated_at`
 
-const sqliteUpstreamUpsertSQL = `INSERT INTO metadata_upstreams (
+const sqlStoreUpstreamUpsertSQL = `INSERT INTO metadata_upstreams (
 	id, name, endpoint, region, weight, priority, buckets, enabled, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
@@ -25,10 +25,10 @@ ON CONFLICT(id) DO UPDATE SET
 	enabled = excluded.enabled,
 	updated_at = excluded.updated_at`
 
-func (s *SQLiteMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, error) {
+func (s *SQLMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, error) {
 	rows, err := s.queryContext(
 		ctx,
-		`SELECT `+sqliteUpstreamColumns+`
+		`SELECT `+sqlStoreUpstreamColumns+`
 		   FROM metadata_upstreams
 		  ORDER BY priority ASC, name ASC, id ASC`,
 	)
@@ -37,7 +37,7 @@ func (s *SQLiteMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, e
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "upstreams", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "upstreams", "error", closeErr)
 		}
 	}()
 
@@ -55,7 +55,7 @@ func (s *SQLiteMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, e
 	return upstreams, nil
 }
 
-func (s *SQLiteMetadata) GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error) {
+func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return model.Upstream{}, false, ErrBadRequest
@@ -63,7 +63,7 @@ func (s *SQLiteMetadata) GetUpstream(ctx context.Context, id string) (model.Upst
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteUpstreamColumns+`
+		`SELECT `+sqlStoreUpstreamColumns+`
 		   FROM metadata_upstreams
 		  WHERE id = ?
 		  LIMIT 1`,
@@ -79,7 +79,7 @@ func (s *SQLiteMetadata) GetUpstream(ctx context.Context, id string) (model.Upst
 	return upstream, true, nil
 }
 
-func (s *SQLiteMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstream) (model.Upstream, error) {
+func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstream) (model.Upstream, error) {
 	upstream, err := normalizeUpstream(upstream)
 	if err != nil {
 		return model.Upstream{}, err
@@ -93,7 +93,7 @@ func (s *SQLiteMetadata) UpsertUpstream(ctx context.Context, upstream model.Upst
 
 	_, execErr := s.execContext(
 		ctx,
-		sqliteUpstreamUpsertSQL,
+		sqlStoreUpstreamUpsertSQL,
 		upstream.ID,
 		upstream.Name,
 		upstream.Endpoint,
@@ -115,7 +115,7 @@ func (s *SQLiteMetadata) UpsertUpstream(ctx context.Context, upstream model.Upst
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) DeleteUpstream(ctx context.Context, id string) (bool, error) {
+func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false, ErrBadRequest

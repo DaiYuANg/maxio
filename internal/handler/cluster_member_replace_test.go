@@ -3,13 +3,13 @@ package handler
 import (
 	"testing"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 )
 
 func TestResolveReplacementReplicaIDKeepsRequestedDifferentID(t *testing.T) {
 	t.Parallel()
 
-	membership := raftx.Membership{
+	membership := control.Membership{
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			3: "127.0.0.1:63002",
@@ -28,7 +28,7 @@ func TestResolveReplacementReplicaIDKeepsRequestedDifferentID(t *testing.T) {
 func TestResolveReplacementReplicaIDAutoAllocatesOnOldReplicaID(t *testing.T) {
 	t.Parallel()
 
-	membership := raftx.Membership{
+	membership := control.Membership{
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			3: "127.0.0.1:63002",
@@ -46,7 +46,7 @@ func TestResolveReplacementReplicaIDAutoAllocatesOnOldReplicaID(t *testing.T) {
 func TestResolveReplacementReplicaIDAutoAllocationSkipsInUseAndRemoved(t *testing.T) {
 	t.Parallel()
 
-	membership := raftx.Membership{
+	membership := control.Membership{
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			5: "127.0.0.1:63001",

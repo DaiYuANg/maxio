@@ -21,7 +21,7 @@ var (
 	ErrEngineFailed   = errors.New("storage engine failed")
 )
 
-// Store is the unified object store: Raft metadata + erasure-coded file storage.
+// Store is the unified object store: DB metadata plus legacy erasure-coded file storage.
 type Store struct {
 	meta     metadata.MetadataStore
 	engine   *engine.Engine

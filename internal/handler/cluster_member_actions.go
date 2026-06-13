@@ -66,5 +66,5 @@ func (s *Service) handleResumeClusterMember(w http.ResponseWriter, r *http.Reque
 }
 
 func clusterStorageNodeID(replicaID uint64) string {
-	return fmt.Sprintf("raft-%d", replicaID)
+	return fmt.Sprintf("node-%d", replicaID)
 }

@@ -10,15 +10,15 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-const sqliteObjectRecordColumns = `bucket, object_key, current_version_id, deleted, created_at, updated_at`
+const sqlStoreObjectRecordColumns = `bucket, object_key, current_version_id, deleted, created_at, updated_at`
 
-const sqliteObjectVersionColumns = `bucket, object_key, version_id, digest, etag, size, content_type, cache_control,
+const sqlStoreObjectVersionColumns = `bucket, object_key, version_id, digest, etag, size, content_type, cache_control,
 content_disposition, content_encoding, content_language, user_metadata, upstream_id, upstream_bucket, upstream_key,
 delete_marker, created_at, updated_at`
 
-const sqliteDigestRefColumns = `digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at`
+const sqlStoreDigestRefColumns = `digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at`
 
-const sqliteObjectRecordUpsertSQL = `INSERT INTO metadata_object_records (
+const sqlStoreObjectRecordUpsertSQL = `INSERT INTO metadata_object_records (
 	bucket, object_key, current_version_id, deleted, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT(bucket, object_key) DO UPDATE SET
@@ -26,7 +26,7 @@ ON CONFLICT(bucket, object_key) DO UPDATE SET
 	deleted = excluded.deleted,
 	updated_at = excluded.updated_at`
 
-const sqliteObjectVersionUpsertSQL = `INSERT INTO metadata_object_versions (
+const sqlStoreObjectVersionUpsertSQL = `INSERT INTO metadata_object_versions (
 	bucket, object_key, version_id, digest, etag, size, content_type, cache_control,
 	content_disposition, content_encoding, content_language, user_metadata, upstream_id,
 	upstream_bucket, upstream_key, delete_marker, created_at, updated_at
@@ -47,7 +47,7 @@ ON CONFLICT(bucket, object_key, version_id) DO UPDATE SET
 	delete_marker = excluded.delete_marker,
 	updated_at = excluded.updated_at`
 
-const sqliteDigestRefUpsertSQL = `INSERT INTO metadata_digest_refs (
+const sqlStoreDigestRefUpsertSQL = `INSERT INTO metadata_digest_refs (
 	digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(digest) DO UPDATE SET
@@ -58,7 +58,7 @@ ON CONFLICT(digest) DO UPDATE SET
 	upstream_key = excluded.upstream_key,
 	updated_at = excluded.updated_at`
 
-func (s *SQLiteMetadata) UpsertObjectRecord(ctx context.Context, record model.ObjectRecord) (model.ObjectRecord, error) {
+func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.ObjectRecord) (model.ObjectRecord, error) {
 	record, err := prepareDBObjectRecord(record)
 	if err != nil {
 		return model.ObjectRecord{}, err
@@ -68,7 +68,7 @@ func (s *SQLiteMetadata) UpsertObjectRecord(ctx context.Context, record model.Ob
 	}
 	if _, execErr := s.execContext(
 		ctx,
-		sqliteObjectRecordUpsertSQL,
+		sqlStoreObjectRecordUpsertSQL,
 		record.Bucket,
 		record.Key,
 		record.CurrentVersionID,
@@ -88,7 +88,7 @@ func (s *SQLiteMetadata) UpsertObjectRecord(ctx context.Context, record model.Ob
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (model.ObjectRecord, bool, error) {
+func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (model.ObjectRecord, bool, error) {
 	bucket = strings.TrimSpace(bucket)
 	key = strings.TrimSpace(key)
 	if bucket == "" || key == "" {
@@ -97,7 +97,7 @@ func (s *SQLiteMetadata) GetObjectRecord(ctx context.Context, bucket, key string
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteObjectRecordColumns+`
+		`SELECT `+sqlStoreObjectRecordColumns+`
 		   FROM metadata_object_records
 		  WHERE bucket = ? AND object_key = ?
 		  LIMIT 1`,
@@ -114,7 +114,7 @@ func (s *SQLiteMetadata) GetObjectRecord(ctx context.Context, bucket, key string
 	return record, true, nil
 }
 
-func (s *SQLiteMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string) (bool, error) {
+func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string) (bool, error) {
 	bucket = strings.TrimSpace(bucket)
 	key = strings.TrimSpace(key)
 	if bucket == "" || key == "" {
@@ -136,7 +136,7 @@ func (s *SQLiteMetadata) DeleteObjectRecord(ctx context.Context, bucket, key str
 	return affected > 0, nil
 }
 
-func (s *SQLiteMetadata) UpsertObjectVersion(ctx context.Context, version model.ObjectVersion) (model.ObjectVersion, error) {
+func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.ObjectVersion) (model.ObjectVersion, error) {
 	version, err := prepareDBObjectVersion(version)
 	if err != nil {
 		return model.ObjectVersion{}, err
@@ -146,7 +146,7 @@ func (s *SQLiteMetadata) UpsertObjectVersion(ctx context.Context, version model.
 	}
 	if _, execErr := s.execContext(
 		ctx,
-		sqliteObjectVersionUpsertSQL,
+		sqlStoreObjectVersionUpsertSQL,
 		version.Bucket,
 		version.Key,
 		version.VersionID,
@@ -178,7 +178,7 @@ func (s *SQLiteMetadata) UpsertObjectVersion(ctx context.Context, version model.
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) GetObjectVersion(ctx context.Context, bucket, key, versionID string) (model.ObjectVersion, bool, error) {
+func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, versionID string) (model.ObjectVersion, bool, error) {
 	bucket, key, versionID = trimObjectVersionKey(bucket, key, versionID)
 	if bucket == "" || key == "" || versionID == "" {
 		return model.ObjectVersion{}, false, ErrBadRequest
@@ -186,7 +186,7 @@ func (s *SQLiteMetadata) GetObjectVersion(ctx context.Context, bucket, key, vers
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteObjectVersionColumns+`
+		`SELECT `+sqlStoreObjectVersionColumns+`
 		   FROM metadata_object_versions
 		  WHERE bucket = ? AND object_key = ? AND version_id = ?
 		  LIMIT 1`,
@@ -204,7 +204,7 @@ func (s *SQLiteMetadata) GetObjectVersion(ctx context.Context, bucket, key, vers
 	return version, true, nil
 }
 
-func (s *SQLiteMetadata) ListObjectVersions(ctx context.Context, bucket, key string) ([]model.ObjectVersion, error) {
+func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string) ([]model.ObjectVersion, error) {
 	bucket = strings.TrimSpace(bucket)
 	key = strings.TrimSpace(key)
 	if bucket == "" || key == "" {
@@ -213,7 +213,7 @@ func (s *SQLiteMetadata) ListObjectVersions(ctx context.Context, bucket, key str
 
 	rows, err := s.queryContext(
 		ctx,
-		`SELECT `+sqliteObjectVersionColumns+`
+		`SELECT `+sqlStoreObjectVersionColumns+`
 		   FROM metadata_object_versions
 		  WHERE bucket = ? AND object_key = ?
 		  ORDER BY created_at DESC, version_id DESC`,
@@ -225,7 +225,7 @@ func (s *SQLiteMetadata) ListObjectVersions(ctx context.Context, bucket, key str
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "object versions", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "object versions", "error", closeErr)
 		}
 	}()
 
@@ -243,7 +243,7 @@ func (s *SQLiteMetadata) ListObjectVersions(ctx context.Context, bucket, key str
 	return versions, nil
 }
 
-func (s *SQLiteMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error) {
+func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error) {
 	bucket, key, versionID = trimObjectVersionKey(bucket, key, versionID)
 	if bucket == "" || key == "" || versionID == "" {
 		return false, ErrBadRequest

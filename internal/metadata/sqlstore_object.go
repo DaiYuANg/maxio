@@ -11,11 +11,11 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-const sqliteObjectColumns = `bucket, object_key, hash, etag, size, content_type, cache_control, content_disposition,
+const sqlStoreObjectColumns = `bucket, object_key, hash, etag, size, content_type, cache_control, content_disposition,
 content_encoding, content_language, user_metadata, updated_at, state, write_intent_id, write_intent_stage,
 write_intent_started_at, write_intent_updated_at, shard_placements, shard_checksums, shard_sizes`
 
-const sqliteObjectUpsertSQL = `INSERT INTO metadata_objects (
+const sqlStoreObjectUpsertSQL = `INSERT INTO metadata_objects (
 	bucket, object_key, hash, etag, size, content_type, cache_control, content_disposition,
 	content_encoding, content_language, user_metadata, updated_at, state, write_intent_id,
 	write_intent_stage, write_intent_started_at, write_intent_updated_at, shard_placements,
@@ -41,7 +41,7 @@ ON CONFLICT(bucket, object_key) DO UPDATE SET
 	shard_checksums = excluded.shard_checksums,
 	shard_sizes = excluded.shard_sizes`
 
-func (s *SQLiteMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
+func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 	if bucket == "" {
@@ -53,7 +53,7 @@ func (s *SQLiteMetadata) ListObjectMetas(ctx context.Context, bucket, prefix str
 
 	return s.queryObjectMetas(
 		ctx,
-		`SELECT `+sqliteObjectColumns+`
+		`SELECT `+sqlStoreObjectColumns+`
 		   FROM metadata_objects
 		  WHERE bucket = ? AND state = ? AND (? = '' OR object_key LIKE ?)
 		  ORDER BY object_key ASC`,
@@ -64,7 +64,7 @@ func (s *SQLiteMetadata) ListObjectMetas(ctx context.Context, bucket, prefix str
 	)
 }
 
-func (s *SQLiteMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
+func (s *SQLMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 	if bucket != "" {
@@ -75,7 +75,7 @@ func (s *SQLiteMetadata) ListStagedObjectMetas(ctx context.Context, bucket, pref
 
 	return s.queryObjectMetas(
 		ctx,
-		`SELECT `+sqliteObjectColumns+`
+		`SELECT `+sqlStoreObjectColumns+`
 		   FROM metadata_objects
 		  WHERE state = ? AND (? = '' OR bucket = ?) AND (? = '' OR object_key LIKE ?)
 		  ORDER BY bucket ASC, object_key ASC`,
@@ -87,7 +87,7 @@ func (s *SQLiteMetadata) ListStagedObjectMetas(ctx context.Context, bucket, pref
 	)
 }
 
-func (s *SQLiteMetadata) GetObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
+func (s *SQLMetadata) GetObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
 	bucket = strings.TrimSpace(bucket)
 	key = strings.TrimSpace(key)
 	if bucket == "" || key == "" {
@@ -101,30 +101,30 @@ func (s *SQLiteMetadata) GetObjectMeta(ctx context.Context, bucket, key string) 
 	return meta, found, nil
 }
 
-func (s *SQLiteMetadata) StageObjectMeta(ctx context.Context, meta model.ObjectMeta) error {
+func (s *SQLMetadata) StageObjectMeta(ctx context.Context, meta model.ObjectMeta) error {
 	return s.writeObjectMeta(ctx, meta, model.ObjectStatePending, "stage")
 }
 
-func (s *SQLiteMetadata) UpsertObjectMeta(ctx context.Context, meta model.ObjectMeta) error {
+func (s *SQLMetadata) UpsertObjectMeta(ctx context.Context, meta model.ObjectMeta) error {
 	return s.writeObjectMeta(ctx, meta, model.ObjectStateCommitted, "upsert")
 }
 
-func (s *SQLiteMetadata) DeleteStagedObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
+func (s *SQLMetadata) DeleteStagedObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
 	return s.deleteObjectMeta(ctx, bucket, key, model.ObjectStatePending, "staged")
 }
 
-func (s *SQLiteMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
+func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {
 	return s.deleteObjectMeta(ctx, bucket, key, model.ObjectStateCommitted, "committed")
 }
 
-func (s *SQLiteMetadata) queryObjectMetas(ctx context.Context, query string, args ...any) ([]model.ObjectMeta, error) {
+func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query string, args ...any) ([]model.ObjectMeta, error) {
 	rows, err := s.queryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query object metas: %w", err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "object metas", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "object metas", "error", closeErr)
 		}
 	}()
 
@@ -142,9 +142,9 @@ func (s *SQLiteMetadata) queryObjectMetas(ctx context.Context, query string, arg
 	return metas, nil
 }
 
-func (s *SQLiteMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
+func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
 	row := s.queryRowContext(ctx,
-		`SELECT `+sqliteObjectColumns+`
+		`SELECT `+sqlStoreObjectColumns+`
 		   FROM metadata_objects
 		  WHERE bucket = ? AND object_key = ? AND state = ?
 		  LIMIT 1`,
@@ -162,7 +162,7 @@ func (s *SQLiteMetadata) getObjectMeta(ctx context.Context, bucket, key, state s
 	return meta, true, nil
 }
 
-func (s *SQLiteMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta, state, op string) error {
+func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta, state, op string) error {
 	meta, err := prepareObjectMeta(meta, state)
 	if err != nil {
 		return err
@@ -174,7 +174,7 @@ func (s *SQLiteMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectM
 	intentID, intentStage, intentStartedAt, intentUpdatedAt := extractWriteIntentValues(meta.WriteIntent)
 	if _, err := s.execContext(
 		ensureContext(ctx),
-		sqliteObjectUpsertSQL,
+		sqlStoreObjectUpsertSQL,
 		meta.Bucket,
 		meta.Key,
 		meta.Hash,
@@ -201,7 +201,7 @@ func (s *SQLiteMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectM
 	return nil
 }
 
-func (s *SQLiteMetadata) deleteObjectMeta(
+func (s *SQLMetadata) deleteObjectMeta(
 	ctx context.Context,
 	bucket string,
 	key string,
@@ -228,7 +228,7 @@ func (s *SQLiteMetadata) deleteObjectMeta(
 	return meta, true, nil
 }
 
-func (s *SQLiteMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, state string) (bool, error) {
+func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, state string) (bool, error) {
 	result, err := s.execContext(
 		ensureContext(ctx),
 		`DELETE FROM metadata_objects

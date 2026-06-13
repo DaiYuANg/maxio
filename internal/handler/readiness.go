@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 )
 
 type readinessResponse struct {
@@ -43,11 +43,11 @@ func (s *Service) checkReady(ctx context.Context, checks map[string]string) erro
 	checks["service"] = "ok"
 	err := s.checkGatewayDataPlaneReady(checks)
 	if s.cfg.EnableClusterManagement {
-		err = joinReadiness(err, s.checkRaftReady(ctx, checks))
-		err = joinReadiness(err, s.checkRaftLeaderReady(ctx, checks))
+		err = joinReadiness(err, s.checkControlReady(ctx, checks))
+		err = joinReadiness(err, s.checkControlLeaderReady(ctx, checks))
 	} else {
-		checks["raft_membership"] = "disabled"
-		checks["raft_leader"] = "disabled"
+		checks["control_membership"] = "disabled"
+		checks["control_leader"] = "disabled"
 	}
 	s.checkRepairBacklogReady(checks)
 	return err
@@ -115,34 +115,34 @@ func (s *Service) checkStorageWritableReady(checks map[string]string) error {
 	return errReadinessUnavailable
 }
 
-func (s *Service) checkRaftReady(ctx context.Context, checks map[string]string) error {
-	if s.raft == nil {
-		checks["raft_membership"] = "unavailable"
+func (s *Service) checkControlReady(ctx context.Context, checks map[string]string) error {
+	if s.control == nil {
+		checks["control_membership"] = "unavailable"
 		return errReadinessUnavailable
 	}
-	if _, err := s.raft.GetMembership(ctx); err != nil {
-		checks["raft_membership"] = err.Error()
+	if _, err := s.control.GetMembership(ctx); err != nil {
+		checks["control_membership"] = err.Error()
 		return errReadinessUnavailable
 	}
-	checks["raft_membership"] = "ok"
+	checks["control_membership"] = "ok"
 	return nil
 }
 
-func (s *Service) checkRaftLeaderReady(ctx context.Context, checks map[string]string) error {
-	if s.raft == nil {
-		checks["raft_leader"] = "unavailable"
+func (s *Service) checkControlLeaderReady(ctx context.Context, checks map[string]string) error {
+	if s.control == nil {
+		checks["control_leader"] = "unavailable"
 		return errReadinessUnavailable
 	}
-	err := s.raft.AssertLeader(ctx)
+	err := s.control.AssertLeader(ctx)
 	if err == nil {
-		checks["raft_leader"] = "local"
+		checks["control_leader"] = "local"
 		return nil
 	}
-	if errors.Is(err, raftx.ErrNotLeader) {
-		checks["raft_leader"] = "remote"
+	if errors.Is(err, control.ErrNotLeader) {
+		checks["control_leader"] = "remote"
 		return nil
 	}
-	checks["raft_leader"] = err.Error()
+	checks["control_leader"] = err.Error()
 	return errReadinessUnavailable
 }
 

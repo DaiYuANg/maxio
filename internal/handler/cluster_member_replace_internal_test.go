@@ -4,11 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 )
 
 func TestValidateClusterMemberReplacementAcceptsRemoteReplica(t *testing.T) {
-	err := ValidateClusterMemberReplacement(2, raftx.Membership{
+	err := ValidateClusterMemberReplacement(2, control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "localhost:6301",
@@ -22,7 +22,7 @@ func TestValidateClusterMemberReplacementAcceptsRemoteReplica(t *testing.T) {
 }
 
 func TestValidateClusterMemberReplacementRejectsZeroReplica(t *testing.T) {
-	err := ValidateClusterMemberReplacement(0, raftx.Membership{})
+	err := ValidateClusterMemberReplacement(0, control.Membership{})
 
 	if err == nil {
 		t.Fatal("expected zero replica validation error")
@@ -30,7 +30,7 @@ func TestValidateClusterMemberReplacementRejectsZeroReplica(t *testing.T) {
 }
 
 func TestValidateClusterMemberReplacementRejectsLocalReplica(t *testing.T) {
-	err := ValidateClusterMemberReplacement(1, raftx.Membership{
+	err := ValidateClusterMemberReplacement(1, control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "localhost:6301",
@@ -44,7 +44,7 @@ func TestValidateClusterMemberReplacementRejectsLocalReplica(t *testing.T) {
 }
 
 func TestValidateClusterMemberReplacementRejectsMissingReplica(t *testing.T) {
-	err := ValidateClusterMemberReplacement(3, raftx.Membership{
+	err := ValidateClusterMemberReplacement(3, control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "localhost:6301",

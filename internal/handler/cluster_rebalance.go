@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/model"
 )
 
@@ -83,7 +83,7 @@ func (s *Service) writeClusterRebalanceError(w http.ResponseWriter, err error) {
 }
 
 func (s *Service) rebalanceClusterMember(ctx context.Context, replicaID uint64) (rebalanceResponse, error) {
-	if s == nil || s.objects == nil || s.raft == nil {
+	if s == nil || s.objects == nil || s.control == nil {
 		return rebalanceResponse{}, errors.New("cluster rebalance dependencies unavailable")
 	}
 	nodeID, err := s.resolveClusterRebalanceNode(ctx, replicaID)
@@ -132,7 +132,7 @@ func parseRequiredReplicaID(r *http.Request) (uint64, error) {
 }
 
 func (s *Service) planClusterRebalance(ctx context.Context, replicaID uint64) (rebalancePlanResponse, error) {
-	if s == nil || s.objects == nil || s.raft == nil {
+	if s == nil || s.objects == nil || s.control == nil {
 		return rebalancePlanResponse{}, errors.New("cluster rebalance dependencies unavailable")
 	}
 	nodeID, err := s.resolveClusterRebalanceNode(ctx, replicaID)
@@ -153,9 +153,9 @@ func (s *Service) planClusterRebalance(ctx context.Context, replicaID uint64) (r
 }
 
 func (s *Service) resolveClusterRebalanceNode(ctx context.Context, replicaID uint64) (string, error) {
-	membership, err := s.raft.GetMembership(ctx)
+	membership, err := s.control.GetMembership(ctx)
 	if err != nil {
-		return "", fmt.Errorf("get raft membership: %w", err)
+		return "", fmt.Errorf("get control membership: %w", err)
 	}
 	if err := ValidateClusterMemberRebalance(replicaID, membership); err != nil {
 		return "", err
@@ -164,7 +164,7 @@ func (s *Service) resolveClusterRebalanceNode(ctx context.Context, replicaID uin
 }
 
 // ValidateClusterMemberRebalance validates whether a replica can be used as a rebalance source.
-func ValidateClusterMemberRebalance(replicaID uint64, membership raftx.Membership) error {
+func ValidateClusterMemberRebalance(replicaID uint64, membership control.Membership) error {
 	if replicaID == 0 {
 		return errors.New("replica_id must be greater than zero")
 	}

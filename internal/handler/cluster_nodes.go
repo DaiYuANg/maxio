@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/lyonbrown4d/maxio/engine"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 const (
@@ -37,8 +37,8 @@ type ClusterNodeInfo struct {
 	StorageRegistered bool     `json:"storage_registered"`
 	StorageState      string   `json:"storage_state"`
 	Drained           bool     `json:"drained,omitempty"`
-	RaftTarget        string   `json:"raft_target,omitempty"`
-	RaftAddress       string   `json:"raft_address,omitempty"`
+	ControlTarget     string   `json:"control_target,omitempty"`
+	ControlAddress    string   `json:"control_address,omitempty"`
 	HTTPAddress       string   `json:"http_address,omitempty"`
 	StorageAddress    string   `json:"storage_address,omitempty"`
 	DiscoveryState    string   `json:"discovery_state,omitempty"`
@@ -66,7 +66,7 @@ func (s *Service) handleClusterNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 func BuildClusterNodeRegistry(
-	membership raftx.Membership,
+	membership control.Membership,
 	discovered []discovery.Node,
 	storageNodes []engine.StorageNodeInfo,
 ) []ClusterNodeInfo {
@@ -87,7 +87,7 @@ func BuildClusterNodeRegistry(
 	return result
 }
 
-func mergeMembershipNodes(nodes map[string]ClusterNodeInfo, membership raftx.Membership) {
+func mergeMembershipNodes(nodes map[string]ClusterNodeInfo, membership control.Membership) {
 	for replicaID, target := range membership.Nodes {
 		key := clusterNodeKey(replicaID, clusterStorageNodeID(replicaID))
 		node := nodes[key]
@@ -95,12 +95,12 @@ func mergeMembershipNodes(nodes map[string]ClusterNodeInfo, membership raftx.Mem
 		node.StorageNodeID = clusterStorageNodeID(replicaID)
 		node.Member = true
 		node.Local = replicaID == membership.LocalReplicaID
-		node.RaftTarget = strings.TrimSpace(target)
+		node.ControlTarget = strings.TrimSpace(target)
 		nodes[key] = node
 	}
 }
 
-func mergeRemovedMembershipNodes(nodes map[string]ClusterNodeInfo, membership raftx.Membership) {
+func mergeRemovedMembershipNodes(nodes map[string]ClusterNodeInfo, membership control.Membership) {
 	for _, replicaID := range membership.Removed {
 		if replicaID == 0 {
 			continue
@@ -129,7 +129,7 @@ func mergeDiscoveryNodes(nodes map[string]ClusterNodeInfo, discovered []discover
 		node.StorageNodeID = clusterStorageNodeID(discoveredNode.ReplicaID)
 		node.Discovered = true
 		node.DiscoveryState = strings.TrimSpace(discoveredNode.State)
-		node.RaftAddress = strings.TrimSpace(discoveredNode.RaftAddress)
+		node.ControlAddress = strings.TrimSpace(discoveredNode.ControlAddress)
 		node.HTTPAddress = strings.TrimSpace(discoveredNode.HTTPAddress)
 		nodes[key] = node
 	}
@@ -211,12 +211,12 @@ func clusterNodeIssues(node ClusterNodeInfo) []string {
 	issues := make([]string, 0, 4)
 	issues = appendIssueIf(issues, node.Member && !node.Discovered && !node.Local, "not_discovered")
 	issues = appendIssueIf(issues, node.Member && !node.StorageRegistered, "storage_not_registered")
-	issues = appendIssueIf(issues, node.Discovered && !node.Member, "not_in_raft_membership")
-	issues = appendIssueIf(issues, node.StorageRegistered && !node.Member, "storage_without_raft_member")
+	issues = appendIssueIf(issues, node.Discovered && !node.Member, "not_in_control_membership")
+	issues = appendIssueIf(issues, node.StorageRegistered && !node.Member, "storage_without_control_member")
 	issues = appendIssueIf(issues, node.Removed && node.Discovered, "removed_node_reappeared")
 	issues = appendIssueIf(issues, node.Removed && node.StorageRegistered, "removed_storage_registered")
 	issues = appendIssueIf(issues, drainedStorageHasOwnership(node), "drained_storage_has_ownership")
-	issues = appendIssueIf(issues, addressMismatch(node.RaftTarget, node.RaftAddress), "raft_address_mismatch")
+	issues = appendIssueIf(issues, addressMismatch(node.ControlTarget, node.ControlAddress), "control_address_mismatch")
 	issues = appendIssueIf(issues, addressMismatch(node.StorageAddress, node.HTTPAddress), "storage_address_mismatch")
 	return issues
 }
@@ -240,7 +240,7 @@ func addressMismatch(left, right string) bool {
 }
 
 func storageReplicaID(nodeID string) (uint64, bool) {
-	text, ok := strings.CutPrefix(strings.TrimSpace(nodeID), "raft-")
+	text, ok := strings.CutPrefix(strings.TrimSpace(nodeID), "node-")
 	if !ok || text == "" {
 		return 0, false
 	}

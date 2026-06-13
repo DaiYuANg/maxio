@@ -11,7 +11,7 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-func (s *SQLiteMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
+func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
 	ctx = ensureContext(ctx)
 	rows, err := s.queryContext(
 		ctx,
@@ -24,7 +24,7 @@ func (s *SQLiteMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "buckets", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "buckets", "error", closeErr)
 		}
 	}()
 
@@ -42,7 +42,7 @@ func (s *SQLiteMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error
 	return buckets, nil
 }
 
-func (s *SQLiteMetadata) BucketExists(ctx context.Context, bucket string) (bool, error) {
+func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, error) {
 	bucket = strings.TrimSpace(bucket)
 	if bucket == "" {
 		return false, ErrBadRequest
@@ -51,7 +51,7 @@ func (s *SQLiteMetadata) BucketExists(ctx context.Context, bucket string) (bool,
 	return bucketExistsInQuery(ctx, s.db, s.normalizeQuery(metadataBucketExistsQuery), bucket)
 }
 
-func (s *SQLiteMetadata) CreateBucket(ctx context.Context, bucket string) error {
+func (s *SQLMetadata) CreateBucket(ctx context.Context, bucket string) error {
 	bucket = strings.TrimSpace(bucket)
 	if bucket == "" {
 		return ErrBadRequest
@@ -63,7 +63,7 @@ func (s *SQLiteMetadata) CreateBucket(ctx context.Context, bucket string) error 
 		bucket,
 		time.Now().UTC().UnixNano(),
 	); err != nil {
-		if isSQLiteConstraintError(err) {
+		if isSQLConstraintError(err) {
 			return ErrBucketExists
 		}
 		return fmt.Errorf("create bucket: %w", err)
@@ -71,7 +71,7 @@ func (s *SQLiteMetadata) CreateBucket(ctx context.Context, bucket string) error 
 	return nil
 }
 
-func (s *SQLiteMetadata) DeleteBucket(ctx context.Context, bucket string) error {
+func (s *SQLMetadata) DeleteBucket(ctx context.Context, bucket string) error {
 	bucket = strings.TrimSpace(bucket)
 	if bucket == "" {
 		return ErrBadRequest
@@ -98,7 +98,7 @@ func (s *SQLiteMetadata) DeleteBucket(ctx context.Context, bucket string) error 
 	})
 }
 
-func (s *SQLiteMetadata) ensureBucket(ctx context.Context, bucket string) error {
+func (s *SQLMetadata) ensureBucket(ctx context.Context, bucket string) error {
 	exists, err := s.BucketExists(ctx, bucket)
 	if err != nil {
 		return fmt.Errorf("check bucket exists: %w", err)
@@ -109,7 +109,7 @@ func (s *SQLiteMetadata) ensureBucket(ctx context.Context, bucket string) error 
 	return nil
 }
 
-func (s *SQLiteMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
+func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
 	hashes, err := s.queryBucketCommittedHashesInTx(ctx, tx, bucket)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (s *SQLiteMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql
 	return nil
 }
 
-func (s *SQLiteMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) ([]string, error) {
+func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) ([]string, error) {
 	rows, err := s.txQueryContext(
 		ensureContext(ctx),
 		tx,
@@ -135,7 +135,7 @@ func (s *SQLiteMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx 
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sqlite rows", "rows", "bucket object hashes", "error", closeErr)
+			s.logger.Error("close sql metadata rows", "rows", "bucket object hashes", "error", closeErr)
 		}
 	}()
 
@@ -194,7 +194,7 @@ func bucketExistsInQuery(ctx context.Context, queryer interface {
 	return true, nil
 }
 
-func (s *SQLiteMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, query, bucket, state string) error {
+func (s *SQLMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, query, bucket, state string) error {
 	if err := s.txExecContext(
 		ensureContext(ctx),
 		tx,
@@ -207,7 +207,7 @@ func (s *SQLiteMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (s *SQLiteMetadata) deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, query, bucket string) error {
+func (s *SQLMetadata) deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, query, bucket string) error {
 	if err := s.txExecContext(ensureContext(ctx), tx, query, bucket); err != nil {
 		return fmt.Errorf("delete bucket: %w", err)
 	}
@@ -216,7 +216,11 @@ func (s *SQLiteMetadata) deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, qu
 
 const metadataBucketExistsQuery = "SELECT 1 FROM metadata_buckets WHERE name = ? LIMIT 1"
 
-func isSQLiteConstraintError(err error) bool {
-	message := err.Error()
-	return strings.Contains(message, "UNIQUE constraint failed") || strings.Contains(message, "constraint failed")
+func isSQLConstraintError(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "unique constraint failed") ||
+		strings.Contains(message, "duplicate key value violates unique constraint") ||
+		strings.Contains(message, "duplicate entry") ||
+		strings.Contains(message, "error 1062") ||
+		strings.Contains(message, "constraint failed")
 }

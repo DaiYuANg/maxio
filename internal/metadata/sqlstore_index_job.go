@@ -10,14 +10,14 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-func (s *SQLiteMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (model.IndexJob, error) {
+func (s *SQLMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (model.IndexJob, error) {
 	job, err := prepareIndexJob(job)
 	if err != nil {
 		return model.IndexJob{}, err
 	}
 	if _, execErr := s.execContext(
 		ctx,
-		sqliteIndexJobUpsertSQL,
+		sqlStoreIndexJobUpsertSQL,
 		job.ID,
 		job.Kind,
 		job.Bucket,
@@ -44,7 +44,7 @@ func (s *SQLiteMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob)
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJob, bool, error) {
+func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJob, bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return model.IndexJob{}, false, ErrBadRequest
@@ -52,7 +52,7 @@ func (s *SQLiteMetadata) GetIndexJob(ctx context.Context, id string) (model.Inde
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteIndexJobColumns+`
+		`SELECT `+sqlStoreIndexJobColumns+`
 		   FROM metadata_index_jobs
 		  WHERE job_id = ?
 		  LIMIT 1`,
@@ -68,11 +68,11 @@ func (s *SQLiteMetadata) GetIndexJob(ctx context.Context, id string) (model.Inde
 	return job, true, nil
 }
 
-func (s *SQLiteMetadata) ListIndexJobs(ctx context.Context, status string, limit int) ([]model.IndexJob, error) {
-	return listSQLiteIndexQueue(
+func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) ([]model.IndexJob, error) {
+	return listSQLIndexQueue(
 		ctx,
 		s,
-		sqliteIndexJobColumns,
+		sqlStoreIndexJobColumns,
 		"metadata_index_jobs",
 		status,
 		limit,
@@ -81,7 +81,7 @@ func (s *SQLiteMetadata) ListIndexJobs(ctx context.Context, status string, limit
 	)
 }
 
-func (s *SQLiteMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, error) {
+func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false, ErrBadRequest

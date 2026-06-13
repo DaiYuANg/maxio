@@ -11,14 +11,14 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-func (s *SQLiteMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
+func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
 	ref, err := prepareDBDigestRef(ref)
 	if err != nil {
 		return model.DigestRef{}, err
 	}
 	if _, execErr := s.execContext(
 		ctx,
-		sqliteDigestRefUpsertSQL,
+		sqlStoreDigestRefUpsertSQL,
 		ref.Digest,
 		ref.Size,
 		ref.RefCount,
@@ -40,7 +40,7 @@ func (s *SQLiteMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRe
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) GetDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error) {
+func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error) {
 	digest = strings.TrimSpace(digest)
 	if digest == "" {
 		return model.DigestRef{}, false, ErrBadRequest
@@ -48,7 +48,7 @@ func (s *SQLiteMetadata) GetDigestRef(ctx context.Context, digest string) (model
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteDigestRefColumns+`
+		`SELECT `+sqlStoreDigestRefColumns+`
 		   FROM metadata_digest_refs
 		  WHERE digest = ?
 		  LIMIT 1`,
@@ -64,7 +64,7 @@ func (s *SQLiteMetadata) GetDigestRef(ctx context.Context, digest string) (model
 	return ref, true, nil
 }
 
-func (s *SQLiteMetadata) RetainDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
+func (s *SQLMetadata) RetainDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
 	ref, err := prepareDBDigestRef(ref)
 	if err != nil {
 		return model.DigestRef{}, err
@@ -80,7 +80,7 @@ func (s *SQLiteMetadata) RetainDigestRef(ctx context.Context, ref model.DigestRe
 	return s.UpsertDigestRef(ctx, ref)
 }
 
-func (s *SQLiteMetadata) ReleaseDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error) {
+func (s *SQLMetadata) ReleaseDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error) {
 	digest = strings.TrimSpace(digest)
 	if digest == "" {
 		return model.DigestRef{}, false, ErrBadRequest
@@ -114,7 +114,7 @@ func (s *SQLiteMetadata) ReleaseDigestRef(ctx context.Context, digest string) (m
 	return ref, removed, err
 }
 
-func (s *SQLiteMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool, error) {
+func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool, error) {
 	digest = strings.TrimSpace(digest)
 	if digest == "" {
 		return false, ErrBadRequest

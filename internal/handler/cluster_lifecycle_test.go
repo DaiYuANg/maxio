@@ -11,11 +11,11 @@ import (
 func TestClusterBootstrapIsIdempotentForMatchingMembership(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -29,8 +29,8 @@ func TestClusterBootstrapIsIdempotentForMatchingMembership(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusOK)
 	}
-	if raft.syncCalls != 0 {
-		t.Fatalf("sync calls = %d, want 0", raft.syncCalls)
+	if runtime.syncCalls != 0 {
+		t.Fatalf("sync calls = %d, want 0", runtime.syncCalls)
 	}
 	response := decodeLifecycleJSON[map[string]any](t, recorder)
 	if response["status"] != "already_bootstrapped" {
@@ -44,11 +44,11 @@ func TestClusterBootstrapIsIdempotentForMatchingMembership(t *testing.T) {
 func TestClusterJoinIsIdempotentForExistingReplica(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -62,8 +62,8 @@ func TestClusterJoinIsIdempotentForExistingReplica(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusOK)
 	}
-	if raft.addCalls != 0 {
-		t.Fatalf("add calls = %d, want 0", raft.addCalls)
+	if runtime.addCalls != 0 {
+		t.Fatalf("add calls = %d, want 0", runtime.addCalls)
 	}
 	response := decodeLifecycleJSON[map[string]any](t, recorder)
 	if response["status"] != "already_joined" {
@@ -74,11 +74,11 @@ func TestClusterJoinIsIdempotentForExistingReplica(t *testing.T) {
 func TestClusterJoinRejectsExistingReplicaTargetChange(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -92,8 +92,8 @@ func TestClusterJoinRejectsExistingReplicaTargetChange(t *testing.T) {
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusConflict)
 	}
-	if raft.addCalls != 0 {
-		t.Fatalf("add calls = %d, want 0", raft.addCalls)
+	if runtime.addCalls != 0 {
+		t.Fatalf("add calls = %d, want 0", runtime.addCalls)
 	}
 	response := decodeLifecycleJSON[clusterMembershipBlockedResponse](t, recorder)
 	if response.Status != clusterMembershipStatusBlocked {
@@ -110,10 +110,10 @@ func TestClusterJoinRejectsExistingReplicaTargetChange(t *testing.T) {
 func TestClusterMemberDeleteIsIdempotentForMissingReplica(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/_cluster/members/2", http.NoBody)
 	recorder := httptest.NewRecorder()
 
@@ -122,18 +122,18 @@ func TestClusterMemberDeleteIsIdempotentForMissingReplica(t *testing.T) {
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusNoContent)
 	}
-	if raft.removeCalls != 0 {
-		t.Fatalf("remove calls = %d, want 0", raft.removeCalls)
+	if runtime.removeCalls != 0 {
+		t.Fatalf("remove calls = %d, want 0", runtime.removeCalls)
 	}
 }
 
 func TestDecommissionClusterMemberIsIdempotentWhenReplicaAlreadyRemoved(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 
 	result, err := service.decommissionClusterMember(context.Background(), 2)
 
@@ -143,22 +143,22 @@ func TestDecommissionClusterMemberIsIdempotentWhenReplicaAlreadyRemoved(t *testi
 	if result.Status != "already_decommissioned" {
 		t.Fatalf("status = %q, want already_decommissioned", result.Status)
 	}
-	if result.NodeID != "raft-2" {
-		t.Fatalf("node_id = %q, want raft-2", result.NodeID)
+	if result.NodeID != "node-2" {
+		t.Fatalf("node_id = %q, want node-2", result.NodeID)
 	}
-	if raft.removeCalls != 0 {
-		t.Fatalf("remove calls = %d, want 0", raft.removeCalls)
+	if runtime.removeCalls != 0 {
+		t.Fatalf("remove calls = %d, want 0", runtime.removeCalls)
 	}
 }
 
 func TestClusterRebalancePlanReportsRemainingOwnershipStats(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft, lifecyclePlacedObjects()...)
+	service := newLifecycleService(t, runtime, lifecyclePlacedObjects()...)
 
 	plan, err := service.planClusterRebalance(context.Background(), 2)
 
@@ -168,8 +168,8 @@ func TestClusterRebalancePlanReportsRemainingOwnershipStats(t *testing.T) {
 	if plan.ReplicaID != 2 {
 		t.Fatalf("replica_id = %d, want 2", plan.ReplicaID)
 	}
-	if plan.NodeID != "raft-2" {
-		t.Fatalf("node_id = %q, want raft-2", plan.NodeID)
+	if plan.NodeID != "node-2" {
+		t.Fatalf("node_id = %q, want node-2", plan.NodeID)
 	}
 	if plan.Objects != 2 {
 		t.Fatalf("objects = %d, want 2", plan.Objects)
@@ -185,11 +185,11 @@ func TestClusterRebalancePlanReportsRemainingOwnershipStats(t *testing.T) {
 func TestDecommissionBlockedHTTPResponseIncludesRemainingOwnershipStats(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft, lifecyclePlacedObjects()...)
+	service := newLifecycleService(t, runtime, lifecyclePlacedObjects()...)
 	err := service.ensureClusterMemberDecommissionable(context.Background(), 2)
 	if err == nil {
 		t.Fatal("expected decommission blocked error")
@@ -208,8 +208,8 @@ func TestDecommissionBlockedHTTPResponseIncludesRemainingOwnershipStats(t *testi
 	if response.ReplicaID != 2 {
 		t.Fatalf("replica_id = %d, want 2", response.ReplicaID)
 	}
-	if response.NodeID != "raft-2" {
-		t.Fatalf("node_id = %q, want raft-2", response.NodeID)
+	if response.NodeID != "node-2" {
+		t.Fatalf("node_id = %q, want node-2", response.NodeID)
 	}
 	if response.Objects != 2 {
 		t.Fatalf("objects = %d, want 2", response.Objects)

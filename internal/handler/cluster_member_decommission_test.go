@@ -3,14 +3,14 @@ package handler_test
 import (
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/handler"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 func TestValidateClusterMemberDecommissionRejectsLocalReplica(t *testing.T) {
 	t.Parallel()
 
-	present, err := handler.ValidateClusterMemberDecommission(1, raftx.Membership{
+	present, err := handler.ValidateClusterMemberDecommission(1, control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
@@ -27,7 +27,7 @@ func TestValidateClusterMemberDecommissionRejectsLocalReplica(t *testing.T) {
 func TestValidateClusterMemberDecommissionAllowsRemoteReplica(t *testing.T) {
 	t.Parallel()
 
-	present, err := handler.ValidateClusterMemberDecommission(2, raftx.Membership{
+	present, err := handler.ValidateClusterMemberDecommission(2, control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
@@ -45,7 +45,7 @@ func TestValidateClusterMemberDecommissionAllowsRemoteReplica(t *testing.T) {
 func TestValidateClusterMemberDecommissionTreatsMissingReplicaAsIdempotent(t *testing.T) {
 	t.Parallel()
 
-	present, err := handler.ValidateClusterMemberDecommission(3, raftx.Membership{
+	present, err := handler.ValidateClusterMemberDecommission(3, control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",

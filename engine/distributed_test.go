@@ -136,7 +136,7 @@ func TestPutAndGetObjectWithRemoteShardHTTPTransport(t *testing.T) {
 	server := httptest.NewServer(storageShardHandler(node2))
 	defer server.Close()
 
-	if err := node1.SyncStorageNodesFromRaft(1, map[uint64]string{
+	if err := node1.SyncStorageNodesFromControl(1, map[uint64]string{
 		1: "127.0.0.1:9001",
 		2: server.URL,
 	}); err != nil {
@@ -238,7 +238,7 @@ func assertRemoteHTTPShardsStored(ctx context.Context, t *testing.T, e *engine.E
 	t.Helper()
 	remoteShards := 0
 	for _, placement := range meta.ShardPlacements {
-		if placement.NodeID != "raft-2" {
+		if placement.NodeID != "node-2" {
 			continue
 		}
 		remoteShards++

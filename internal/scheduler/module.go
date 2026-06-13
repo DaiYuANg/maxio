@@ -14,8 +14,11 @@ import (
 
 // Runtime wraps gocron with MaxIO lifecycle and optional leader-aware scheduling.
 type Runtime struct {
-	scheduler gocron.Scheduler
-	logger    *slog.Logger
+	scheduler       gocron.Scheduler
+	logger          *slog.Logger
+	leaseRepository LeaseRepository
+	leaseOwner      string
+	leaseSequence   uint64
 }
 
 func Module() dix.Module {
@@ -38,13 +41,9 @@ func newRuntime(
 		logger = slog.Default()
 	}
 
-	schedulerOptions := make([]gocron.SchedulerOption, 0, 3)
+	schedulerOptions := make([]gocron.SchedulerOption, 0, 2)
 	schedulerOptions = append(schedulerOptions,
 		gocron.WithLogger(slogCronLogger{logger: logger.With("component", "gocron")}),
-		gocron.WithGlobalJobOptions(
-			gocron.WithSingletonMode(gocron.LimitModeReschedule),
-			gocron.WithIntervalFromCompletion(),
-		),
 		gocron.WithStopTimeout(10*time.Second),
 	)
 
@@ -54,8 +53,10 @@ func newRuntime(
 	}
 
 	return &Runtime{
-		scheduler: schedulerRuntime,
-		logger:    logger,
+		scheduler:       schedulerRuntime,
+		logger:          logger,
+		leaseRepository: NewInMemoryLeaseRepository(),
+		leaseOwner:      defaultLeaseOwner(),
 	}, nil
 }
 

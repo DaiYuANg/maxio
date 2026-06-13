@@ -9,7 +9,7 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-func TestSQLiteMetadataCatalogLifecycle(t *testing.T) {
+func TestSQLMetadataCatalogLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store := newTestSQLiteCatalogStore(t)
 	createTestBucket(t, ctx, store, "photos")
@@ -24,9 +24,9 @@ func TestSQLiteMetadataCatalogLifecycle(t *testing.T) {
 	deleteTestCatalogEntries(t, ctx, store)
 }
 
-func newTestSQLiteCatalogStore(t *testing.T) *SQLiteMetadata {
+func newTestSQLiteCatalogStore(t *testing.T) *SQLMetadata {
 	t.Helper()
-	store, openErr := NewSQLiteMetadata(filepath.Join(t.TempDir(), "metadata.db"), slog.Default())
+	store, openErr := NewSQLMetadata(filepath.Join(t.TempDir(), "metadata.db"), slog.Default())
 	if openErr != nil {
 		t.Fatalf("new sqlite metadata: %v", openErr)
 	}
@@ -38,14 +38,14 @@ func newTestSQLiteCatalogStore(t *testing.T) *SQLiteMetadata {
 	return store
 }
 
-func createTestBucket(t *testing.T, ctx context.Context, store *SQLiteMetadata, bucket string) {
+func createTestBucket(t *testing.T, ctx context.Context, store *SQLMetadata, bucket string) {
 	t.Helper()
 	if createErr := store.CreateBucket(ctx, bucket); createErr != nil {
 		t.Fatalf("create bucket: %v", createErr)
 	}
 }
 
-func retainTestDigestRef(t *testing.T, ctx context.Context, store *SQLiteMetadata) model.DigestRef {
+func retainTestDigestRef(t *testing.T, ctx context.Context, store *SQLMetadata) model.DigestRef {
 	t.Helper()
 	digest, retainErr := store.RetainDigestRef(ctx, model.DigestRef{
 		Digest:         "sha256:abc",
@@ -66,7 +66,7 @@ func retainTestDigestRef(t *testing.T, ctx context.Context, store *SQLiteMetadat
 func upsertTestObjectVersion(
 	t *testing.T,
 	ctx context.Context,
-	store *SQLiteMetadata,
+	store *SQLMetadata,
 	digest model.DigestRef,
 ) model.ObjectVersion {
 	t.Helper()
@@ -92,7 +92,7 @@ func upsertTestObjectVersion(
 	return version
 }
 
-func upsertTestObjectRecord(t *testing.T, ctx context.Context, store *SQLiteMetadata, version model.ObjectVersion) {
+func upsertTestObjectRecord(t *testing.T, ctx context.Context, store *SQLMetadata, version model.ObjectVersion) {
 	t.Helper()
 	record, upsertErr := store.UpsertObjectRecord(ctx, model.ObjectRecord{
 		Bucket:           version.Bucket,
@@ -107,7 +107,7 @@ func upsertTestObjectRecord(t *testing.T, ctx context.Context, store *SQLiteMeta
 	}
 }
 
-func assertTestObjectVersions(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func assertTestObjectVersions(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	versions, listErr := store.ListObjectVersions(ctx, "photos", "cat.jpg")
 	if listErr != nil {
@@ -118,7 +118,7 @@ func assertTestObjectVersions(t *testing.T, ctx context.Context, store *SQLiteMe
 	}
 }
 
-func upsertTestIndexDocument(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func upsertTestIndexDocument(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	document, upsertErr := store.UpsertIndexDocument(ctx, model.IndexDocument{
 		ID:        "doc-1",
@@ -136,7 +136,7 @@ func upsertTestIndexDocument(t *testing.T, ctx context.Context, store *SQLiteMet
 	}
 }
 
-func upsertTestIndexJob(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func upsertTestIndexJob(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	job, upsertErr := store.UpsertIndexJob(ctx, model.IndexJob{
 		ID:        "job-1",
@@ -154,7 +154,7 @@ func upsertTestIndexJob(t *testing.T, ctx context.Context, store *SQLiteMetadata
 	assertQueuedIndexJobs(t, ctx, store)
 }
 
-func assertQueuedIndexJobs(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func assertQueuedIndexJobs(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	jobs, listErr := store.ListIndexJobs(ctx, model.IndexJobStatusQueued, 10)
 	if listErr != nil {
@@ -165,7 +165,7 @@ func assertQueuedIndexJobs(t *testing.T, ctx context.Context, store *SQLiteMetad
 	}
 }
 
-func upsertTestIndexOutboxEvent(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func upsertTestIndexOutboxEvent(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	event, upsertErr := store.UpsertIndexOutboxEvent(ctx, model.IndexOutboxEvent{
 		ID:        "event-1",
@@ -183,14 +183,14 @@ func upsertTestIndexOutboxEvent(t *testing.T, ctx context.Context, store *SQLite
 	}
 }
 
-func deleteTestCatalogEntries(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func deleteTestCatalogEntries(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	assertDeleteObjectVersion(t, ctx, store)
 	assertDeleteObjectRecord(t, ctx, store)
 	assertReleaseDigestRef(t, ctx, store)
 }
 
-func assertDeleteObjectVersion(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func assertDeleteObjectVersion(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	removed, deleteErr := store.DeleteObjectVersion(ctx, "photos", "cat.jpg", "v1")
 	if deleteErr != nil {
@@ -201,7 +201,7 @@ func assertDeleteObjectVersion(t *testing.T, ctx context.Context, store *SQLiteM
 	}
 }
 
-func assertDeleteObjectRecord(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func assertDeleteObjectRecord(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	removed, deleteErr := store.DeleteObjectRecord(ctx, "photos", "cat.jpg")
 	if deleteErr != nil {
@@ -212,7 +212,7 @@ func assertDeleteObjectRecord(t *testing.T, ctx context.Context, store *SQLiteMe
 	}
 }
 
-func assertReleaseDigestRef(t *testing.T, ctx context.Context, store *SQLiteMetadata) {
+func assertReleaseDigestRef(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	t.Helper()
 	_, removed, releaseErr := store.ReleaseDigestRef(ctx, "sha256:abc")
 	if releaseErr != nil {

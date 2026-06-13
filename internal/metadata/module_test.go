@@ -7,7 +7,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 )
 
-func TestModuleSelectsSQLiteMetadataWhenClusterDisabled(t *testing.T) {
+func TestModuleSelectsSQLMetadataWhenClusterDisabled(t *testing.T) {
 	cfg := config.Config{
 		EnableClusterManagement: false,
 		DataDir:                 t.TempDir(),
@@ -16,16 +16,16 @@ func TestModuleSelectsSQLiteMetadataWhenClusterDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new metadata store: %v", err)
 	}
-	sqliteStore, ok := store.(*SQLiteMetadata)
+	sqlStore, ok := store.(*SQLMetadata)
 	if !ok {
-		t.Fatalf("metadata store type = %T, want *SQLiteMetadata", store)
+		t.Fatalf("metadata store type = %T, want *SQLMetadata", store)
 	}
-	if err := sqliteStore.Close(); err != nil {
+	if err := sqlStore.Close(); err != nil {
 		t.Fatalf("close sqlite metadata: %v", err)
 	}
 }
 
-func TestModuleUsesSQLiteMetadataWhenLegacyClusterFlagIsEnabled(t *testing.T) {
+func TestModuleUsesSQLMetadataWhenLegacyClusterFlagIsEnabled(t *testing.T) {
 	cfg := config.Config{
 		EnableClusterManagement: true,
 		DataDir:                 t.TempDir(),
@@ -34,11 +34,11 @@ func TestModuleUsesSQLiteMetadataWhenLegacyClusterFlagIsEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new metadata store: %v", err)
 	}
-	sqliteStore, ok := store.(*SQLiteMetadata)
+	sqlStore, ok := store.(*SQLMetadata)
 	if !ok {
-		t.Fatalf("metadata store type = %T, want *SQLiteMetadata", store)
+		t.Fatalf("metadata store type = %T, want *SQLMetadata", store)
 	}
-	if err := sqliteStore.Close(); err != nil {
+	if err := sqlStore.Close(); err != nil {
 		t.Fatalf("close sqlite metadata: %v", err)
 	}
 }

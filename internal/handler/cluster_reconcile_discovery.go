@@ -34,7 +34,7 @@ func mergeDiscoveredMember(
 	if !usableDiscoveredNode(node) {
 		return clusterDiscoveryConflict{}, false
 	}
-	target := strings.TrimSpace(node.RaftAddress)
+	target := strings.TrimSpace(node.ControlAddress)
 	if _, ok := removed[node.ReplicaID]; ok {
 		return removedReplicaReappearedConflict(node.ReplicaID, target), true
 	}

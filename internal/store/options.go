@@ -8,7 +8,7 @@ import (
 )
 
 // PutOptions captures protocol-level object metadata that is persisted in the
-// raft metadata layer. The engine layout intentionally stays focused on shard
+// metadata layer. The engine layout intentionally stays focused on shard
 // placement and content addressing.
 type PutOptions struct {
 	ContentType        string

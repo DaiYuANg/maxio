@@ -9,7 +9,7 @@ import (
 func TestDecommissionBlockedResponseIncludesOwnershipStats(t *testing.T) {
 	err := fmt.Errorf("blocked: %w", &clusterDecommissionBlockedError{
 		replicaID: 2,
-		nodeID:    "raft-2",
+		nodeID:    "node-2",
 		stats: nodePlacementStats{
 			objects:   3,
 			shards:    7,
@@ -25,8 +25,8 @@ func TestDecommissionBlockedResponseIncludesOwnershipStats(t *testing.T) {
 	if response.ReplicaID != 2 {
 		t.Fatalf("replica_id = %d, want 2", response.ReplicaID)
 	}
-	if response.NodeID != "raft-2" {
-		t.Fatalf("node_id = %q, want raft-2", response.NodeID)
+	if response.NodeID != "node-2" {
+		t.Fatalf("node_id = %q, want node-2", response.NodeID)
 	}
 	if response.Objects != 3 {
 		t.Fatalf("objects = %d, want 3", response.Objects)
@@ -48,7 +48,7 @@ func TestDecommissionBlockedResponseIncludesOwnershipStats(t *testing.T) {
 func TestClusterDecommissionBlockedErrorWrapsSentinel(t *testing.T) {
 	err := &clusterDecommissionBlockedError{
 		replicaID: 2,
-		nodeID:    "raft-2",
+		nodeID:    "node-2",
 		stats:     nodePlacementStats{objects: 1},
 	}
 

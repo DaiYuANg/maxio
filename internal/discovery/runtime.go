@@ -18,12 +18,12 @@ import (
 )
 
 type Node struct {
-	Name        string `json:"name"`
-	Address     string `json:"address"`
-	State       string `json:"state"`
-	ReplicaID   uint64 `json:"replica_id"`
-	RaftAddress string `json:"raft_address"`
-	HTTPAddress string `json:"http_address"`
+	Name           string `json:"name"`
+	Address        string `json:"address"`
+	State          string `json:"state"`
+	ReplicaID      uint64 `json:"replica_id"`
+	ControlAddress string `json:"control_address"`
+	HTTPAddress    string `json:"http_address"`
 }
 
 type Runtime struct {
@@ -38,10 +38,10 @@ type Runtime struct {
 }
 
 type nodeMeta struct {
-	Version     int    `json:"version"`
-	ReplicaID   uint64 `json:"replica_id"`
-	RaftAddress string `json:"raft_address"`
-	HTTPAddress string `json:"http_address"`
+	Version        int    `json:"version"`
+	ReplicaID      uint64 `json:"replica_id"`
+	ControlAddress string `json:"control_address"`
+	HTTPAddress    string `json:"http_address"`
 }
 
 func NewRuntime(cfg config.Config, logger *slog.Logger) *Runtime {
@@ -52,10 +52,10 @@ func NewRuntime(cfg config.Config, logger *slog.Logger) *Runtime {
 		cfg:    cfg,
 		logger: logger,
 		meta: nodeMeta{
-			Version:     1,
-			ReplicaID:   cfg.RaftNodeID,
-			RaftAddress: cfg.RaftAddress,
-			HTTPAddress: cfg.StorageAdvertiseAddress(),
+			Version:        1,
+			ReplicaID:      cfg.NodeID,
+			ControlAddress: cfg.StorageAdvertiseAddress(),
+			HTTPAddress:    cfg.StorageAdvertiseAddress(),
 		},
 		seeds: splitSeeds(cfg.GossipSeeds),
 	}
@@ -130,7 +130,7 @@ func (rt *Runtime) memberlistConfig() (*memberlist.Config, error) {
 		return nil, fmt.Errorf("parse gossip bind address: %w", err)
 	}
 	cfg := memberlist.DefaultLANConfig()
-	cfg.Name = fmt.Sprintf("maxio-%d", rt.cfg.RaftNodeID)
+	cfg.Name = fmt.Sprintf("maxio-%d", rt.cfg.NodeID)
 	cfg.BindAddr = host
 	cfg.BindPort = port
 	cfg.Delegate = &delegate{meta: rt.meta}
@@ -163,12 +163,12 @@ func nodeFromMember(member *memberlist.Node) Node {
 	}
 	meta := decodeNodeMeta(member.Meta)
 	return Node{
-		Name:        member.Name,
-		Address:     member.Address(),
-		State:       nodeStateName(member.State),
-		ReplicaID:   meta.ReplicaID,
-		RaftAddress: meta.RaftAddress,
-		HTTPAddress: meta.HTTPAddress,
+		Name:           member.Name,
+		Address:        member.Address(),
+		State:          nodeStateName(member.State),
+		ReplicaID:      meta.ReplicaID,
+		ControlAddress: meta.ControlAddress,
+		HTTPAddress:    meta.HTTPAddress,
 	}
 }
 

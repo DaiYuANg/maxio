@@ -21,12 +21,7 @@ func Default() Config {
 		CacheKeyPrefix:               "maxio",
 		DataDir:                      "./data",
 		LogLevel:                     "info",
-		RaftNodeID:                   1,
-		RaftShardID:                  1,
-		RaftAddress:                  "127.0.0.1:63000",
-		RaftDataDir:                  "raft",
-		RaftBootstrap:                true,
-		RaftOperationTimeout:         "5s",
+		NodeID:                       1,
 		GossipBindAddress:            "0.0.0.0:7946",
 		PendingObjectTTL:             "1h",
 		RepairInterval:               "10m",
@@ -59,8 +54,8 @@ func applyRuntimeZeroDefaults(cfg Config) Config {
 	if cfg.MetadataBackend == "" {
 		cfg.MetadataBackend = Default().MetadataBackend
 	}
-	if cfg.RaftNodeID == 0 {
-		cfg.RaftNodeID = 1
+	if cfg.NodeID == 0 {
+		cfg.NodeID = 1
 	}
 	if cfg.StorageAddress == "" {
 		cfg.StorageAddress = storageAddressFromHTTPAddress(cfg.HTTPAddress)
@@ -68,18 +63,11 @@ func applyRuntimeZeroDefaults(cfg Config) Config {
 	if cfg.HTTPBodyLimit <= 0 {
 		cfg.HTTPBodyLimit = Default().HTTPBodyLimit
 	}
-	if cfg.RaftShardID == 0 {
-		cfg.RaftShardID = 1
-	}
-	if cfg.RaftDataDir == "" {
-		cfg.RaftDataDir = "raft"
-	}
+
 	if cfg.PendingObjectTTL == "" {
 		cfg.PendingObjectTTL = Default().PendingObjectTTL
 	}
-	if cfg.RaftOperationTimeout == "" {
-		cfg.RaftOperationTimeout = Default().RaftOperationTimeout
-	}
+
 	if cfg.GossipBindAddress == "" {
 		cfg.GossipBindAddress = Default().GossipBindAddress
 	}

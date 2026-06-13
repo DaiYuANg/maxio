@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 )
 
 var (
@@ -82,12 +82,12 @@ func (s *Service) decommissionClusterMember(
 	ctx context.Context,
 	replicaID uint64,
 ) (clusterMemberDecommissionResponse, error) {
-	if s == nil || s.raft == nil || s.engine == nil || s.objects == nil {
+	if s == nil || s.control == nil || s.engine == nil || s.objects == nil {
 		return clusterMemberDecommissionResponse{}, errors.New("cluster decommission dependencies unavailable")
 	}
-	membership, err := s.raft.GetMembership(ctx)
+	membership, err := s.control.GetMembership(ctx)
 	if err != nil {
-		return clusterMemberDecommissionResponse{}, fmt.Errorf("get raft membership: %w", err)
+		return clusterMemberDecommissionResponse{}, fmt.Errorf("get control membership: %w", err)
 	}
 	present, err := ValidateClusterMemberDecommission(replicaID, membership)
 	if err != nil {
@@ -129,8 +129,8 @@ func (s *Service) runClusterMemberDecommission(
 	if err := s.ensureClusterMemberDecommissionable(ctx, replicaID); err != nil {
 		return clusterMemberDecommissionResponse{}, fmt.Errorf("%w: %w", errClusterDecommissionBlocked, err)
 	}
-	if err := s.raft.RemoveReplica(ctx, replicaID); err != nil {
-		return clusterMemberDecommissionResponse{}, fmt.Errorf("remove decommissioned raft replica: %w", err)
+	if err := s.control.RemoveReplica(ctx, replicaID); err != nil {
+		return clusterMemberDecommissionResponse{}, fmt.Errorf("remove decommissioned cluster replica: %w", err)
 	}
 	if err := s.syncStorageNodes(ctx); err != nil {
 		return clusterMemberDecommissionResponse{}, fmt.Errorf("sync storage nodes after decommission: %w", err)
@@ -146,7 +146,7 @@ func (s *Service) runClusterMemberDecommission(
 }
 
 // ValidateClusterMemberDecommission validates whether a non-local replica can be decommissioned.
-func ValidateClusterMemberDecommission(replicaID uint64, membership raftx.Membership) (bool, error) {
+func ValidateClusterMemberDecommission(replicaID uint64, membership control.Membership) (bool, error) {
 	if replicaID == 0 {
 		return false, errors.New("replica_id must be greater than zero")
 	}

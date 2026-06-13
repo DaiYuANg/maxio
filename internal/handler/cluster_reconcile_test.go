@@ -3,22 +3,22 @@ package handler_test
 import (
 	"testing"
 
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/handler"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 func TestBuildClusterReconcilePlanAddsAliveDiscoveredNodes(t *testing.T) {
 	t.Parallel()
 
-	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+	plan := handler.BuildClusterReconcilePlan(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 2, RaftAddress: "127.0.0.1:63001", State: "alive"},
-		{ReplicaID: 3, RaftAddress: "127.0.0.1:63002", State: "suspect"},
+		{ReplicaID: 2, ControlAddress: "127.0.0.1:63001", State: "alive"},
+		{ReplicaID: 3, ControlAddress: "127.0.0.1:63002", State: "suspect"},
 	}, false)
 
 	if plan.Mode != "add_only" {
@@ -38,14 +38,14 @@ func TestBuildClusterReconcilePlanAddsAliveDiscoveredNodes(t *testing.T) {
 func TestBuildClusterReconcilePlanKeepsLocalWhenExact(t *testing.T) {
 	t.Parallel()
 
-	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+	plan := handler.BuildClusterReconcilePlan(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			2: "127.0.0.1:63001",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 3, RaftAddress: "127.0.0.1:63002", State: "alive"},
+		{ReplicaID: 3, ControlAddress: "127.0.0.1:63002", State: "alive"},
 	}, true)
 
 	if plan.Mode != "exact" {
@@ -65,14 +65,14 @@ func TestBuildClusterReconcilePlanKeepsLocalWhenExact(t *testing.T) {
 func TestBuildClusterReconcilePlanReportsTargetConflicts(t *testing.T) {
 	t.Parallel()
 
-	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+	plan := handler.BuildClusterReconcilePlan(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			2: "127.0.0.1:63001",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 2, RaftAddress: "127.0.0.1:63999", State: "alive"},
+		{ReplicaID: 2, ControlAddress: "127.0.0.1:63999", State: "alive"},
 	}, false)
 
 	if len(plan.Conflicts) != 1 {
@@ -89,14 +89,14 @@ func TestBuildClusterReconcilePlanReportsTargetConflicts(t *testing.T) {
 func TestBuildClusterReconcilePlanBlocksAddressChangeInExactMode(t *testing.T) {
 	t.Parallel()
 
-	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+	plan := handler.BuildClusterReconcilePlan(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 			2: "127.0.0.1:63001",
 		},
 	}, []discovery.Node{
-		{ReplicaID: 2, RaftAddress: "127.0.0.1:63999", State: "alive"},
+		{ReplicaID: 2, ControlAddress: "127.0.0.1:63999", State: "alive"},
 	}, true)
 
 	if len(plan.Conflicts) != 1 {
@@ -113,14 +113,14 @@ func TestBuildClusterReconcilePlanBlocksAddressChangeInExactMode(t *testing.T) {
 func TestBuildClusterReconcilePlanReportsRemovedReplicaReappearance(t *testing.T) {
 	t.Parallel()
 
-	plan := handler.BuildClusterReconcilePlan(raftx.Membership{
+	plan := handler.BuildClusterReconcilePlan(control.Membership{
 		LocalReplicaID: 1,
 		Nodes: map[uint64]string{
 			1: "127.0.0.1:63000",
 		},
 		Removed: []uint64{2},
 	}, []discovery.Node{
-		{ReplicaID: 2, RaftAddress: "127.0.0.1:63001", State: "alive"},
+		{ReplicaID: 2, ControlAddress: "127.0.0.1:63001", State: "alive"},
 	}, false)
 
 	if len(plan.Conflicts) != 1 {

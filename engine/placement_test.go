@@ -69,10 +69,10 @@ func TestRegisterStorageNodeRejectsEmptyID(t *testing.T) {
 	}
 }
 
-func TestSyncStorageNodesFromRaft(t *testing.T) {
+func TestSyncStorageNodesFromControl(t *testing.T) {
 	e := newTestEngine(t)
 
-	err := e.SyncStorageNodesFromRaft(1, map[uint64]string{
+	err := e.SyncStorageNodesFromControl(1, map[uint64]string{
 		1: "127.0.0.1:7001",
 		2: "127.0.0.1:7002",
 		3: "127.0.0.1:7003",
@@ -87,9 +87,9 @@ func TestSyncStorageNodesFromRaft(t *testing.T) {
 	}
 
 	expected := map[string]bool{
-		"raft-1": false,
-		"raft-2": false,
-		"raft-3": false,
+		"node-1": false,
+		"node-2": false,
+		"node-3": false,
 	}
 	for _, node := range nodes {
 		nodeID := node.ID()
@@ -104,15 +104,15 @@ func TestSyncStorageNodesFromRaft(t *testing.T) {
 	}
 }
 
-func TestSyncStorageNodesFromRaftUpdatesNodeAddresses(t *testing.T) {
+func TestSyncStorageNodesFromControlUpdatesNodeAddresses(t *testing.T) {
 	e := newTestEngine(t)
-	if err := e.SyncStorageNodesFromRaft(1, map[uint64]string{
+	if err := e.SyncStorageNodesFromControl(1, map[uint64]string{
 		1: "127.0.0.1:7001",
 		2: "127.0.0.1:7002",
 	}); err != nil {
 		t.Fatalf("sync storage nodes: %v", err)
 	}
-	if err := e.SyncStorageNodesFromRaft(1, map[uint64]string{
+	if err := e.SyncStorageNodesFromControl(1, map[uint64]string{
 		1: "127.0.0.1:7101",
 		2: "127.0.0.1:7102",
 	}); err != nil {
@@ -126,7 +126,7 @@ func TestSyncStorageNodesFromRaftUpdatesNodeAddresses(t *testing.T) {
 	if local.Address() != "127.0.0.1:7101" {
 		t.Fatalf("local address = %q, want %q", local.Address(), "127.0.0.1:7101")
 	}
-	remote, err := e.StorageNode("raft-2")
+	remote, err := e.StorageNode("node-2")
 	if err != nil {
 		t.Fatalf("remote storage node: %v", err)
 	}

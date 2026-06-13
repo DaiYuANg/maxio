@@ -9,8 +9,8 @@ import (
 	"log/slog"
 
 	"github.com/lyonbrown4d/maxio/internal/config"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/dedupe"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/object"
 )
@@ -80,12 +80,12 @@ func TestAddHTTPMetricsAddsRequestCounters(t *testing.T) {
 	}
 }
 
-func TestAddRaftStatusAddsLeaderAndMembershipMetrics(t *testing.T) {
+func TestAddControlStatusAddsLeaderAndMembershipMetrics(t *testing.T) {
 	t.Parallel()
 
 	collector := metricsCollector{}
-	collector.addRaftLeaderStatus(raftx.ErrNotLeader)
-	collector.addRaftMembershipMetrics(raftx.Membership{
+	collector.addControlLeaderStatus(control.ErrNotLeader)
+	collector.addControlMembershipMetrics(control.Membership{
 		ConfigChangeID: 9,
 		Nodes:          map[uint64]string{1: "node-a", 2: "node-b"},
 		NonVotings:     map[uint64]string{3: "node-c"},
@@ -95,13 +95,13 @@ func TestAddRaftStatusAddsLeaderAndMembershipMetrics(t *testing.T) {
 	output := collector.String()
 
 	required := []string{
-		"maxio_raft_leader_available 1",
-		"maxio_raft_local_is_leader 0",
-		"maxio_raft_members 2",
-		"maxio_raft_removed_members 1",
-		"maxio_raft_non_voting_members 1",
-		"maxio_raft_witness_members 1",
-		"maxio_raft_config_change_id 9",
+		"maxio_control_leader_available 1",
+		"maxio_control_local_is_leader 0",
+		"maxio_control_members 2",
+		"maxio_control_removed_members 1",
+		"maxio_control_non_voting_members 1",
+		"maxio_control_witness_members 1",
+		"maxio_control_config_change_id 9",
 	}
 
 	for _, name := range required {

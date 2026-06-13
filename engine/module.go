@@ -24,7 +24,7 @@ func Module() dix.Module {
 				if err != nil {
 					return nil, fmt.Errorf("engine init: %w", err)
 				}
-				storageNodeID := raftStorageNodeID(cfg.RaftNodeID)
+				storageNodeID := clusterStorageNodeID(cfg.NodeID)
 				engine.ConfigureLocalNode(storageNodeID, cfg.StorageAdvertiseAddress())
 				logger.Info("erasure engine initialized",
 					"data_chunks", DefaultDataChunks,

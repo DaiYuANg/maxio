@@ -34,11 +34,16 @@ func (runtime *Runtime) ScheduleIndexWorker(
 		gocron.WithTags("index", "outbox"),
 	)
 	jobOptions = append(jobOptions, options...)
-	job, err := runtime.NewJob(
+	job, err := runtime.NewLeasedJob(
 		gocron.DurationJob(interval),
-		gocron.NewTask(func(runCtx context.Context) {
+		LeaseSpec{
+			TaskName: IndexWorkerJobName,
+			TaskType: TaskTypeSingleton,
+			Scope:    LeaseScopeGlobal,
+		},
+		func(runCtx context.Context) {
 			runtime.runIndexWorker(runCtx, worker)
-		}),
+		},
 		jobOptions...,
 	)
 	if err != nil {
@@ -55,12 +60,6 @@ func (runtime *Runtime) ScheduleIndexWorker(
 
 func (runtime *Runtime) runIndexWorker(ctx context.Context, worker *searchindex.Worker) {
 	if runtime == nil || worker == nil {
-		return
-	}
-	if err := runtime.RequireLeader(ctx); err != nil {
-		if runtime.logger != nil {
-			runtime.logger.DebugContext(ctx, "skip index worker on non-leader", "error", err)
-		}
 		return
 	}
 	result, err := worker.RunOnce(ctx)

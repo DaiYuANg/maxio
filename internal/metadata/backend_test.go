@@ -21,11 +21,11 @@ func TestNewMetadataStoreSupportsSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new metadata store: %v", err)
 	}
-	sqliteStore, ok := store.(*SQLiteMetadata)
+	sqlStore, ok := store.(*SQLMetadata)
 	if !ok {
 		t.Fatalf("unexpected metadata store type: %T", store)
 	}
-	if closeErr := sqliteStore.Close(); closeErr != nil {
+	if closeErr := sqlStore.Close(); closeErr != nil {
 		t.Fatalf("close metadata store: %v", closeErr)
 	}
 }
@@ -44,8 +44,8 @@ func TestNewMetadataStoreRejectsUnsupportedBackend(t *testing.T) {
 	}
 }
 
-func TestSQLiteMetadataUpstreamLifecycle(t *testing.T) {
-	store, err := NewSQLiteMetadata(filepath.Join(t.TempDir(), "metadata.db"), slog.Default())
+func TestSQLMetadataUpstreamLifecycle(t *testing.T) {
+	store, err := NewSQLMetadata(filepath.Join(t.TempDir(), "metadata.db"), slog.Default())
 	if err != nil {
 		t.Fatalf("new sqlite metadata: %v", err)
 	}
@@ -75,7 +75,7 @@ func testUpstream() model.Upstream {
 	}
 }
 
-func mustUpsertTestUpstream(t *testing.T, store *SQLiteMetadata) model.Upstream {
+func mustUpsertTestUpstream(t *testing.T, store *SQLMetadata) model.Upstream {
 	t.Helper()
 
 	upstream := testUpstream()
@@ -98,7 +98,7 @@ func assertStoredTestUpstream(t *testing.T, stored model.Upstream) {
 	}
 }
 
-func mustGetTestUpstream(t *testing.T, store *SQLiteMetadata) {
+func mustGetTestUpstream(t *testing.T, store *SQLMetadata) {
 	t.Helper()
 
 	found, ok, err := store.GetUpstream(context.Background(), "u-1")
@@ -110,7 +110,7 @@ func mustGetTestUpstream(t *testing.T, store *SQLiteMetadata) {
 	}
 }
 
-func mustListTestUpstream(t *testing.T, store *SQLiteMetadata) {
+func mustListTestUpstream(t *testing.T, store *SQLMetadata) {
 	t.Helper()
 
 	upstreams, err := store.ListUpstreams(context.Background())
@@ -122,7 +122,7 @@ func mustListTestUpstream(t *testing.T, store *SQLiteMetadata) {
 	}
 }
 
-func mustDeleteTestUpstream(t *testing.T, store *SQLiteMetadata) {
+func mustDeleteTestUpstream(t *testing.T, store *SQLMetadata) {
 	t.Helper()
 
 	deleted, err := store.DeleteUpstream(context.Background(), "u-1")

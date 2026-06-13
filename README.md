@@ -13,8 +13,7 @@ dedupe relationships, index state, and operational events.
 - Metadata DB is the source of truth.
 - Bleve is derived state and can be rebuilt.
 - Object-level dedupe starts in observe mode and can evolve to alias mode.
-- Local Raft/object-shard storage is legacy and not part of the target default
-  architecture.
+- Local object-shard storage and embedded consensus are not part of the target architecture.
 
 ## Core documents
 
@@ -88,8 +87,6 @@ Implemented:
   APIs.
 - Bleve search engine exists, and a first index job state machine plus worker
   abstraction exists.
-- Raft-backed metadata remains legacy; new DB-only catalog operations return
-  unsupported on the Raft implementation.
 
 Not yet implemented:
 

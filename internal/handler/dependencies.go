@@ -4,28 +4,28 @@ import (
 	"context"
 
 	"github.com/lyonbrown4d/maxio/engine"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/repair"
 	"github.com/lyonbrown4d/maxio/object"
 )
 
-type raftRuntime interface {
+type controlRuntime interface {
 	AddReplica(ctx context.Context, replicaID uint64, target string) error
 	AssertLeader(ctx context.Context) error
-	GetMembership(ctx context.Context) (raftx.Membership, error)
-	LocalRaftAddress() string
+	GetMembership(ctx context.Context) (control.Membership, error)
+	LocalControlAddress() string
 	LocalReplicaID() uint64
 	RemoveReplica(ctx context.Context, replicaID uint64) error
-	SyncReplicas(ctx context.Context, desired map[uint64]string) (raftx.SyncMembershipResult, error)
+	SyncReplicas(ctx context.Context, desired map[uint64]string) (control.SyncMembershipResult, error)
 }
 
 // Dependencies groups handler dependencies to keep dix providers shallow.
 type Dependencies struct {
 	objects   *object.Service
 	engine    *engine.Engine
-	raft      raftRuntime
+	control   controlRuntime
 	discovery *discovery.Runtime
 	metadata  metadata.MetadataStore
 	repair    *repair.Runtime
@@ -46,7 +46,7 @@ func NewDependencies(
 	return Dependencies{
 		objects:   objects,
 		engine:    engineStore,
-		raft:      nil,
+		control:   nil,
 		discovery: discoveryRuntime,
 		metadata:  repo,
 		repair:    repairRuntime,

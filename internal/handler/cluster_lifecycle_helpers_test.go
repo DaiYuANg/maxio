@@ -11,16 +11,16 @@ import (
 
 	"github.com/lyonbrown4d/maxio/engine"
 	"github.com/lyonbrown4d/maxio/internal/config"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 	"github.com/lyonbrown4d/maxio/internal/store"
 	"github.com/lyonbrown4d/maxio/model"
 	"github.com/lyonbrown4d/maxio/object"
 	"github.com/spf13/afero"
 )
 
-type lifecycleRaft struct {
-	membership  raftx.Membership
+type lifecycleControl struct {
+	membership  control.Membership
 	leaderErr   error
 	addErr      error
 	removeErr   error
@@ -30,9 +30,9 @@ type lifecycleRaft struct {
 	syncCalls   int
 }
 
-func newLifecycleRaft(nodes map[uint64]string) *lifecycleRaft {
-	return &lifecycleRaft{
-		membership: raftx.Membership{
+func newLifecycleControl(nodes map[uint64]string) *lifecycleControl {
+	return &lifecycleControl{
+		membership: control.Membership{
 			ConfigChangeID: 1,
 			LocalReplicaID: 1,
 			Nodes:          maps.Clone(nodes),
@@ -40,65 +40,65 @@ func newLifecycleRaft(nodes map[uint64]string) *lifecycleRaft {
 	}
 }
 
-func (raft *lifecycleRaft) AddReplica(_ context.Context, replicaID uint64, target string) error {
-	raft.addCalls++
-	if raft.addErr != nil {
-		return raft.addErr
+func (runtime *lifecycleControl) AddReplica(_ context.Context, replicaID uint64, target string) error {
+	runtime.addCalls++
+	if runtime.addErr != nil {
+		return runtime.addErr
 	}
-	if raft.membership.Nodes == nil {
-		raft.membership.Nodes = map[uint64]string{}
+	if runtime.membership.Nodes == nil {
+		runtime.membership.Nodes = map[uint64]string{}
 	}
-	raft.membership.Nodes[replicaID] = target
-	raft.membership.ConfigChangeID++
+	runtime.membership.Nodes[replicaID] = target
+	runtime.membership.ConfigChangeID++
 	return nil
 }
 
-func (raft *lifecycleRaft) AssertLeader(context.Context) error {
-	return raft.leaderErr
+func (runtime *lifecycleControl) AssertLeader(context.Context) error {
+	return runtime.leaderErr
 }
 
-func (raft *lifecycleRaft) GetMembership(context.Context) (raftx.Membership, error) {
-	return cloneLifecycleMembership(raft.membership), nil
+func (runtime *lifecycleControl) GetMembership(context.Context) (control.Membership, error) {
+	return cloneLifecycleMembership(runtime.membership), nil
 }
 
-func (raft *lifecycleRaft) LocalRaftAddress() string {
-	return raft.membership.Nodes[raft.membership.LocalReplicaID]
+func (runtime *lifecycleControl) LocalControlAddress() string {
+	return runtime.membership.Nodes[runtime.membership.LocalReplicaID]
 }
 
-func (raft *lifecycleRaft) LocalReplicaID() uint64 {
-	return raft.membership.LocalReplicaID
+func (runtime *lifecycleControl) LocalReplicaID() uint64 {
+	return runtime.membership.LocalReplicaID
 }
 
-func (raft *lifecycleRaft) RemoveReplica(_ context.Context, replicaID uint64) error {
-	raft.removeCalls++
-	if raft.removeErr != nil {
-		return raft.removeErr
+func (runtime *lifecycleControl) RemoveReplica(_ context.Context, replicaID uint64) error {
+	runtime.removeCalls++
+	if runtime.removeErr != nil {
+		return runtime.removeErr
 	}
-	delete(raft.membership.Nodes, replicaID)
-	raft.membership.Removed = append(raft.membership.Removed, replicaID)
-	raft.membership.ConfigChangeID++
+	delete(runtime.membership.Nodes, replicaID)
+	runtime.membership.Removed = append(runtime.membership.Removed, replicaID)
+	runtime.membership.ConfigChangeID++
 	return nil
 }
 
-func (raft *lifecycleRaft) SyncReplicas(
+func (runtime *lifecycleControl) SyncReplicas(
 	_ context.Context,
 	desired map[uint64]string,
-) (raftx.SyncMembershipResult, error) {
-	raft.syncCalls++
-	before := cloneLifecycleMembership(raft.membership)
-	if raft.syncErr != nil {
-		return raftx.SyncMembershipResult{Before: before}, raft.syncErr
+) (control.SyncMembershipResult, error) {
+	runtime.syncCalls++
+	before := cloneLifecycleMembership(runtime.membership)
+	if runtime.syncErr != nil {
+		return control.SyncMembershipResult{Before: before}, runtime.syncErr
 	}
-	raft.membership.Nodes = maps.Clone(desired)
-	raft.membership.ConfigChangeID++
-	return raftx.SyncMembershipResult{
+	runtime.membership.Nodes = maps.Clone(desired)
+	runtime.membership.ConfigChangeID++
+	return control.SyncMembershipResult{
 		Before: before,
-		After:  cloneLifecycleMembership(raft.membership),
+		After:  cloneLifecycleMembership(runtime.membership),
 	}, nil
 }
 
-func cloneLifecycleMembership(membership raftx.Membership) raftx.Membership {
-	return raftx.Membership{
+func cloneLifecycleMembership(membership control.Membership) control.Membership {
+	return control.Membership{
 		ConfigChangeID: membership.ConfigChangeID,
 		LocalReplicaID: membership.LocalReplicaID,
 		Nodes:          maps.Clone(membership.Nodes),
@@ -108,12 +108,12 @@ func cloneLifecycleMembership(membership raftx.Membership) raftx.Membership {
 	}
 }
 
-func newLifecycleService(t *testing.T, raft raftRuntime, objects ...model.ObjectMeta) *Service {
+func newLifecycleService(t *testing.T, runtime controlRuntime, objects ...model.ObjectMeta) *Service {
 	t.Helper()
 	return newService(Dependencies{
 		objects: newLifecycleObjectService(t, objects...),
 		engine:  newLifecycleEngine(t),
-		raft:    raft,
+		control: runtime,
 	}, slog.New(slog.DiscardHandler), config.Config{EnableClusterManagement: true}, nil)
 }
 
@@ -157,9 +157,9 @@ func lifecyclePlacedObjects() []model.ObjectMeta {
 			Key:        "object-a",
 			ShardSizes: []int64{100, 200, 300},
 			ShardPlacements: []model.ShardPlacement{
-				{Index: 0, NodeID: "raft-2"},
-				{Index: 1, NodeID: "raft-1"},
-				{Index: 2, NodeID: "raft-2"},
+				{Index: 0, NodeID: "node-2"},
+				{Index: 1, NodeID: "node-1"},
+				{Index: 2, NodeID: "node-2"},
 			},
 		},
 		{
@@ -167,7 +167,7 @@ func lifecyclePlacedObjects() []model.ObjectMeta {
 			Key:        "object-b",
 			ShardSizes: []int64{400},
 			ShardPlacements: []model.ShardPlacement{
-				{Index: 0, NodeID: "raft-2"},
+				{Index: 0, NodeID: "node-2"},
 			},
 		},
 	}

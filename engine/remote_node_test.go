@@ -139,7 +139,7 @@ func TestRemoteStorageNodeWritesAndReadsShardsViaHTTP(t *testing.T) {
 	defer server.Close()
 
 	e := newTestEngineForRemote(t, server.URL)
-	node, err := e.StorageNode("raft-2")
+	node, err := e.StorageNode("node-2")
 	if err != nil {
 		t.Fatalf("StorageNode: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestRemoteStorageNodeReadMissingReturnsErrNotExist(t *testing.T) {
 	defer server.Close()
 
 	e := newTestEngineForRemote(t, server.URL)
-	node, err := e.StorageNode("raft-2")
+	node, err := e.StorageNode("node-2")
 	if err != nil {
 		t.Fatalf("StorageNode: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestRemoteStorageNodeSendsClusterHeaderViaHTTP(t *testing.T) {
 	defer server.Close()
 
 	e := newTestEngineForRemoteWithToken(t, server.URL, storage.clusterValue)
-	node, err := e.StorageNode("raft-2")
+	node, err := e.StorageNode("node-2")
 	if err != nil {
 		t.Fatalf("StorageNode: %v", err)
 	}
@@ -220,7 +220,7 @@ func newTestEngineForRemoteWithToken(t *testing.T, remoteAddress, controlValue s
 		t.Fatalf("create test engine: %v", err)
 	}
 	e.SetControlToken(controlValue)
-	if err := e.SyncStorageNodesFromRaft(1, map[uint64]string{
+	if err := e.SyncStorageNodesFromControl(1, map[uint64]string{
 		1: "127.0.0.1:9000",
 		2: remoteAddress,
 	}); err != nil {

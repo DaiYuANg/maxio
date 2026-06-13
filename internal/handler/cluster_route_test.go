@@ -102,12 +102,12 @@ func TestUsableDiscoveredNodeRequiresAliveAndTarget(t *testing.T) {
 	t.Parallel()
 
 	node := discovery.Node{
-		ReplicaID:   1,
-		State:       "alive",
-		RaftAddress: "127.0.0.1:63000",
+		ReplicaID:      1,
+		State:          "alive",
+		ControlAddress: "127.0.0.1:63000",
 	}
 	if !usableDiscoveredNode(node) {
-		t.Fatal("expected alive discovered node with raft address to be usable")
+		t.Fatal("expected alive discovered node with control address to be usable")
 	}
 
 	node.State = "dead"
@@ -116,16 +116,16 @@ func TestUsableDiscoveredNodeRequiresAliveAndTarget(t *testing.T) {
 	}
 
 	node.State = "alive"
-	node.RaftAddress = ""
+	node.ControlAddress = ""
 	if usableDiscoveredNode(node) {
-		t.Fatal("discovered node without raft address should not be usable")
+		t.Fatal("discovered node without control address should not be usable")
 	}
 }
 
 func TestStorageReplicaIDParsesNumericID(t *testing.T) {
 	t.Parallel()
 
-	replicaID, ok := storageReplicaID("raft-42")
+	replicaID, ok := storageReplicaID("node-42")
 	if !ok || replicaID != 42 {
 		t.Fatalf("storageReplicaID = %d, %t, want 42, true", replicaID, ok)
 	}
@@ -134,7 +134,7 @@ func TestStorageReplicaIDParsesNumericID(t *testing.T) {
 func TestStorageReplicaIDRejectsInvalidNodeID(t *testing.T) {
 	t.Parallel()
 
-	replicaID, ok := storageReplicaID("node-99")
+	replicaID, ok := storageReplicaID("storage-99")
 	if ok || replicaID != 0 {
 		t.Fatalf("storageReplicaID = %d, %t, want 0, false", replicaID, ok)
 	}

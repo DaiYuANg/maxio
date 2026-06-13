@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -36,7 +35,6 @@ func validateDurations(cfg Config) error {
 
 func durationConfigs(cfg Config) []durationConfig {
 	configs := []durationConfig{
-		{name: "raft_operation_timeout", value: cfg.RaftOperationTimeout},
 		{name: "pending_object_ttl", value: cfg.PendingObjectTTL},
 		{name: "repair_interval", value: cfg.RepairInterval},
 		{name: "repair_retry_backoff", value: cfg.RepairRetryBackoff},
@@ -56,9 +54,10 @@ func durationConfigs(cfg Config) []durationConfig {
 }
 
 func validateMetadataConfig(cfg Config) error {
-	if cfg.MetadataBackend == "postgres" {
+	switch cfg.MetadataBackend {
+	case "postgres", "mysql":
 		if strings.TrimSpace(cfg.MetadataDSN) == "" {
-			return errors.New("invalid config: metadata_dsn is required when metadata_backend is postgres")
+			return fmt.Errorf("invalid config: metadata_dsn is required when metadata_backend is %s", cfg.MetadataBackend)
 		}
 	}
 	return nil

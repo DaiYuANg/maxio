@@ -9,17 +9,12 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "127.0.0.1:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_RAFT_NODE_ID: "1"
-      MAXIO_RAFT_ADDRESS: "127.0.0.1:63000"
-      MAXIO_RAFT_DATA_DIR: "raft"
-      MAXIO_RAFT_BOOTSTRAP: "true"
-      MAXIO_RAFT_JOIN: "false"
+      MAXIO_NODE_ID: "1"
       MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
       MAXIO_CLUSTER_TOKEN: "${MAXIO_CLUSTER_TOKEN:-dev-cluster-token}"
     ports:
       - "8080:8080"
-      - "63000:63000"
       - "7946:7946"
     volumes:
       - maxio-data:/app/data

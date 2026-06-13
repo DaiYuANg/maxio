@@ -31,7 +31,7 @@ func (s *Service) collectMetrics(ctx context.Context) string {
 	collector.addReadiness(ctx, s)
 	collector.addStorageNodes(s)
 	collector.addObjectCounts(ctx, s)
-	collector.addRaftStatus(ctx, s)
+	collector.addControlStatus(ctx, s)
 	collector.addRepairStatus(s)
 	collector.addDedupeStatus(s)
 	collector.addIndexStatus(s)

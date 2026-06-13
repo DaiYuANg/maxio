@@ -7,17 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 )
 
 func TestClusterJoinBlocksRemovedReplicaReappearance(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 	})
-	raft.membership.Removed = []uint64{2}
-	service := newLifecycleService(t, raft)
+	runtime.membership.Removed = []uint64{2}
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -31,8 +31,8 @@ func TestClusterJoinBlocksRemovedReplicaReappearance(t *testing.T) {
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusConflict)
 	}
-	if raft.addCalls != 0 {
-		t.Fatalf("add calls = %d, want 0", raft.addCalls)
+	if runtime.addCalls != 0 {
+		t.Fatalf("add calls = %d, want 0", runtime.addCalls)
 	}
 	response := decodeLifecycleJSON[clusterMembershipBlockedResponse](t, recorder)
 	if response.Status != clusterMembershipStatusBlocked {
@@ -49,11 +49,11 @@ func TestClusterJoinBlocksRemovedReplicaReappearance(t *testing.T) {
 func TestClusterMembersSyncBlocksAddressChange(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPut,
@@ -67,8 +67,8 @@ func TestClusterMembersSyncBlocksAddressChange(t *testing.T) {
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusConflict)
 	}
-	if raft.syncCalls != 0 {
-		t.Fatalf("sync calls = %d, want 0", raft.syncCalls)
+	if runtime.syncCalls != 0 {
+		t.Fatalf("sync calls = %d, want 0", runtime.syncCalls)
 	}
 	response := decodeLifecycleJSON[clusterMembershipBlockedResponse](t, recorder)
 	if response.Reason != clusterMembershipReasonAddressChangeBlocked {
@@ -85,11 +85,11 @@ func TestClusterMembersSyncBlocksAddressChange(t *testing.T) {
 func TestClusterBootstrapReturnsConflictDuringLeaderChange(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 	})
-	raft.syncErr = raftx.ErrNotLeader
-	service := newLifecycleService(t, raft)
+	runtime.syncErr = control.ErrNotLeader
+	service := newLifecycleService(t, runtime)
 	request := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -103,11 +103,11 @@ func TestClusterBootstrapReturnsConflictDuringLeaderChange(t *testing.T) {
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusConflict)
 	}
-	if raft.syncCalls != 1 {
-		t.Fatalf("sync calls = %d, want 1", raft.syncCalls)
+	if runtime.syncCalls != 1 {
+		t.Fatalf("sync calls = %d, want 1", runtime.syncCalls)
 	}
 	response := decodeLifecycleJSON[map[string]string](t, recorder)
-	if !strings.Contains(response["error"], raftx.ErrNotLeader.Error()) {
+	if !strings.Contains(response["error"], control.ErrNotLeader.Error()) {
 		t.Fatalf("error = %q, want not leader", response["error"])
 	}
 }
@@ -115,12 +115,12 @@ func TestClusterBootstrapReturnsConflictDuringLeaderChange(t *testing.T) {
 func TestDecommissionReturnsConflictWhenLeaderChangesBeforeRemove(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	raft.removeErr = raftx.ErrNotLeader
-	service := newLifecycleService(t, raft)
+	runtime.removeErr = control.ErrNotLeader
+	service := newLifecycleService(t, runtime)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/_cluster/members/2/decommission", http.NoBody)
 
@@ -129,11 +129,11 @@ func TestDecommissionReturnsConflictWhenLeaderChangesBeforeRemove(t *testing.T) 
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status code = %d, want %d", recorder.Code, http.StatusConflict)
 	}
-	if raft.removeCalls != 1 {
-		t.Fatalf("remove calls = %d, want 1", raft.removeCalls)
+	if runtime.removeCalls != 1 {
+		t.Fatalf("remove calls = %d, want 1", runtime.removeCalls)
 	}
 	response := decodeLifecycleJSON[map[string]string](t, recorder)
-	if !strings.Contains(response["error"], raftx.ErrNotLeader.Error()) {
+	if !strings.Contains(response["error"], control.ErrNotLeader.Error()) {
 		t.Fatalf("error = %q, want not leader", response["error"])
 	}
 }
@@ -141,11 +141,11 @@ func TestDecommissionReturnsConflictWhenLeaderChangesBeforeRemove(t *testing.T) 
 func TestClusterRebalanceIsIdempotentForEmptyMember(t *testing.T) {
 	t.Parallel()
 
-	raft := newLifecycleRaft(map[uint64]string{
+	runtime := newLifecycleControl(map[uint64]string{
 		1: "127.0.0.1:63001",
 		2: "127.0.0.1:63002",
 	})
-	service := newLifecycleService(t, raft)
+	service := newLifecycleService(t, runtime)
 
 	result, err := service.rebalanceClusterMember(context.Background(), 2)
 

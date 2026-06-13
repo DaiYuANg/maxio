@@ -4,12 +4,12 @@ import (
 	"errors"
 	"testing"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/model"
 )
 
 func TestValidateClusterMemberRebalanceAcceptsPresentReplica(t *testing.T) {
-	err := ValidateClusterMemberRebalance(2, raftx.Membership{
+	err := ValidateClusterMemberRebalance(2, control.Membership{
 		Nodes: map[uint64]string{1: "localhost:6301", 2: "localhost:6302"},
 	})
 
@@ -19,7 +19,7 @@ func TestValidateClusterMemberRebalanceAcceptsPresentReplica(t *testing.T) {
 }
 
 func TestValidateClusterMemberRebalanceRejectsZeroReplica(t *testing.T) {
-	err := ValidateClusterMemberRebalance(0, raftx.Membership{})
+	err := ValidateClusterMemberRebalance(0, control.Membership{})
 
 	if err == nil {
 		t.Fatal("expected zero replica validation error")
@@ -27,7 +27,7 @@ func TestValidateClusterMemberRebalanceRejectsZeroReplica(t *testing.T) {
 }
 
 func TestValidateClusterMemberRebalanceRejectsMissingReplica(t *testing.T) {
-	err := ValidateClusterMemberRebalance(3, raftx.Membership{
+	err := ValidateClusterMemberRebalance(3, control.Membership{
 		Nodes: map[uint64]string{1: "localhost:6301", 2: "localhost:6302"},
 	})
 

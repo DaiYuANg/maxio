@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/object"
 )
 
@@ -23,7 +23,7 @@ func (s *Service) writeJSON(w http.ResponseWriter, code int, value any) {
 
 func (s *Service) writeError(w http.ResponseWriter, err error) {
 	msg := err.Error()
-	if errors.Is(err, raft.ErrNotLeader) || errors.Is(err, raft.ErrLeaderUnavailable) {
+	if errors.Is(err, control.ErrNotLeader) || errors.Is(err, control.ErrLeaderUnavailable) {
 		s.writeJSON(w, http.StatusConflict, map[string]string{"error": msg})
 		return
 	}

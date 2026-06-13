@@ -32,8 +32,8 @@ Readiness should include checks such as:
 object_service
 engine
 storage_writable
-raft_membership
-raft_leader
+control_membership
+control_leader
 repair_backlog
 ```
 
@@ -43,11 +43,10 @@ repair_backlog
 curl --fail \
   -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
   "$MAXIO_URL/metrics" \
-  | grep -E "maxio_ready|maxio_http_requests_total|maxio_raft_members"
+  | grep -E "maxio_ready|maxio_http_requests_total|maxio_control_members"
 ```
 
-Expected result: the command prints at least readiness, HTTP request, and Raft
-membership metrics.
+Expected result: the command prints at least readiness, HTTP request, and control membership metrics.
 
 ## Bucket and object API
 

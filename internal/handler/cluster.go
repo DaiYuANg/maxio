@@ -30,7 +30,7 @@ func (s *Service) handleClusterBootstrap(w http.ResponseWriter, r *http.Request)
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	membership, err := s.raft.GetMembership(r.Context())
+	membership, err := s.control.GetMembership(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -51,7 +51,7 @@ func (s *Service) handleClusterBootstrap(w http.ResponseWriter, r *http.Request)
 		s.writeClusterMembershipBlocked(w, blockers)
 		return
 	}
-	result, err := s.raft.SyncReplicas(r.Context(), nodes)
+	result, err := s.control.SyncReplicas(r.Context(), nodes)
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -76,7 +76,7 @@ func (s *Service) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	membership, err := s.raft.GetMembership(r.Context())
+	membership, err := s.control.GetMembership(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -87,7 +87,7 @@ func (s *Service) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 	if s.maybeHandleRemovedReplica(w, req.ReplicaID, req.Target, membership) {
 		return
 	}
-	err = s.raft.AddReplica(r.Context(), req.ReplicaID, req.Target)
+	err = s.control.AddReplica(r.Context(), req.ReplicaID, req.Target)
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -106,7 +106,7 @@ func (s *Service) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleListClusterMembers(w http.ResponseWriter, r *http.Request) {
-	membership, err := s.raft.GetMembership(r.Context())
+	membership, err := s.control.GetMembership(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -120,7 +120,7 @@ func (s *Service) handleAddClusterMember(w http.ResponseWriter, r *http.Request)
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	membership, err := s.raft.GetMembership(r.Context())
+	membership, err := s.control.GetMembership(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -131,7 +131,7 @@ func (s *Service) handleAddClusterMember(w http.ResponseWriter, r *http.Request)
 	if s.maybeHandleRemovedReplica(w, req.ReplicaID, req.Target, membership) {
 		return
 	}
-	err = s.raft.AddReplica(r.Context(), req.ReplicaID, req.Target)
+	err = s.control.AddReplica(r.Context(), req.ReplicaID, req.Target)
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -155,7 +155,7 @@ func (s *Service) handleSyncClusterMembers(w http.ResponseWriter, r *http.Reques
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	membership, err := s.raft.GetMembership(r.Context())
+	membership, err := s.control.GetMembership(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -164,7 +164,7 @@ func (s *Service) handleSyncClusterMembers(w http.ResponseWriter, r *http.Reques
 		s.writeClusterMembershipBlocked(w, blockers)
 		return
 	}
-	result, err := s.raft.SyncReplicas(r.Context(), nodes)
+	result, err := s.control.SyncReplicas(r.Context(), nodes)
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -188,7 +188,7 @@ func (s *Service) handleClusterMember(w http.ResponseWriter, r *http.Request, re
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	membership, err := s.raft.GetMembership(r.Context())
+	membership, err := s.control.GetMembership(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -208,7 +208,7 @@ func (s *Service) handleClusterMember(w http.ResponseWriter, r *http.Request, re
 		s.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 		return
 	}
-	err = s.raft.RemoveReplica(r.Context(), id)
+	err = s.control.RemoveReplica(r.Context(), id)
 	if err != nil {
 		s.writeError(w, err)
 		return

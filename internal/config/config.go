@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/arcgolabs/configx"
 	"github.com/lyonbrown4d/maxio/model"
@@ -25,7 +24,7 @@ type Config struct {
 	APIToken                     string           `json:"api_token"                 koanf:"api_token"`
 	EnableClusterManagement      bool             `json:"enable_cluster_management" koanf:"enable_cluster_management"`
 	EnableNativeObjectAPI        bool             `json:"enable_native_object_api"  koanf:"enable_native_object_api"`
-	MetadataBackend              string           `json:"metadata_backend"          koanf:"metadata_backend"          validate:"required,oneof=sqlite postgres"`
+	MetadataBackend              string           `json:"metadata_backend"          koanf:"metadata_backend"          validate:"required,oneof=sqlite postgres mysql"`
 	MetadataDSN                  string           `json:"metadata_dsn"              koanf:"metadata_dsn"`
 	MetadataAutoMigrate          bool             `json:"metadata_auto_migrate"     koanf:"metadata_auto_migrate"`
 	EnableS3Proxy                bool             `json:"enable_s3_proxy"           koanf:"enable_s3_proxy"`
@@ -44,14 +43,7 @@ type Config struct {
 	CacheKeyPrefix               string           `json:"cache_key_prefix"          koanf:"cache_key_prefix"`
 	DataDir                      string           `json:"data_dir"                  koanf:"data_dir"                  validate:"required,min=1"`
 	LogLevel                     string           `json:"log_level"                 koanf:"log_level"                 validate:"required,oneof=debug info warn error"`
-	RaftNodeID                   uint64           `json:"raft_node_id"              koanf:"raft_node_id"`
-	RaftShardID                  uint64           `json:"raft_shard_id"             koanf:"raft_shard_id"`
-	RaftAddress                  string           `json:"raft_address"              koanf:"raft_address"`
-	RaftDataDir                  string           `json:"raft_data_dir"             koanf:"raft_data_dir"`
-	RaftBootstrap                bool             `json:"raft_bootstrap"            koanf:"raft_bootstrap"`
-	RaftJoin                     bool             `json:"raft_join"                 koanf:"raft_join"`
-	RaftInitialMembers           string           `json:"raft_initial_members"      koanf:"raft_initial_members"`
-	RaftOperationTimeout         string           `json:"raft_operation_timeout"    koanf:"raft_operation_timeout"    validate:"required,min=1"`
+	NodeID                       uint64           `json:"node_id"                   koanf:"node_id"`
 	GossipBindAddress            string           `json:"gossip_bind_address"       koanf:"gossip_bind_address"       validate:"required,min=1"`
 	GossipAdvertiseAddress       string           `json:"gossip_advertise_address"  koanf:"gossip_advertise_address"`
 	GossipSeeds                  string           `json:"gossip_seeds"              koanf:"gossip_seeds"`
@@ -143,11 +135,6 @@ func normalize(cfg Config) (Config, error) {
 	if err := validateDurations(cfg); err != nil {
 		return cfg, err
 	}
-	cfg.RaftDataDir = filepath.Clean(cfg.RaftDataDir)
-
-	if !filepath.IsAbs(cfg.RaftDataDir) {
-		cfg.RaftDataDir = filepath.Join(cfg.DataDir, cfg.RaftDataDir)
-	}
 
 	return cfg, nil
 }
@@ -172,10 +159,6 @@ func trim(cfg Config) Config {
 	cfg.S3ProxyAdminAddress = strings.TrimSpace(cfg.S3ProxyAdminAddress)
 	cfg.S3ProxyHealthInterval = strings.TrimSpace(cfg.S3ProxyHealthInterval)
 	cfg.S3ProxyHealthTimeout = strings.TrimSpace(cfg.S3ProxyHealthTimeout)
-	cfg.RaftAddress = strings.TrimSpace(cfg.RaftAddress)
-	cfg.RaftDataDir = strings.TrimSpace(cfg.RaftDataDir)
-	cfg.RaftInitialMembers = strings.TrimSpace(cfg.RaftInitialMembers)
-	cfg.RaftOperationTimeout = strings.TrimSpace(cfg.RaftOperationTimeout)
 	cfg.GossipBindAddress = strings.TrimSpace(cfg.GossipBindAddress)
 	cfg.GossipAdvertiseAddress = strings.TrimSpace(cfg.GossipAdvertiseAddress)
 	cfg.GossipSeeds = strings.TrimSpace(cfg.GossipSeeds)
@@ -203,9 +186,6 @@ func validateRequired(cfg Config) error {
 }
 
 func validateClusterRequired(cfg Config) error {
-	if cfg.RaftAddress == "" {
-		return errors.New("invalid config: raft_address is required")
-	}
 	if cfg.GossipBindAddress == "" {
 		return errors.New("invalid config: gossip_bind_address is required")
 	}
@@ -239,12 +219,4 @@ func applyDedupeZeroDefaults(cfg Config) Config {
 		cfg.DedupeMaxFixes = Default().DedupeMaxFixes
 	}
 	return cfg
-}
-
-func (cfg Config) RaftOperationTimeoutDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.RaftOperationTimeout)
-	if err != nil {
-		return 5 * time.Second
-	}
-	return duration
 }

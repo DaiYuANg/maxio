@@ -22,22 +22,22 @@ func (e *Engine) RegisterStorageNode(node StorageNode) error {
 	return nil
 }
 
-// SyncStorageNodesFromRaft replaces registered storage nodes with raft membership mapping.
-func (e *Engine) SyncStorageNodesFromRaft(localReplicaID uint64, raftNodes map[uint64]string) error {
+// SyncStorageNodesFromControl replaces registered storage nodes with control membership mapping.
+func (e *Engine) SyncStorageNodesFromControl(localReplicaID uint64, controlNodes map[uint64]string) error {
 	if e == nil {
 		return errors.New("storage engine is required")
 	}
 	if localReplicaID == 0 {
-		return errors.New("local raft replica id must be greater than zero")
+		return errors.New("local replica id must be greater than zero")
 	}
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	drainedNodes := e.drainedNodeIDsLocked()
-	localNodeID := raftStorageNodeID(localReplicaID)
+	localNodeID := clusterStorageNodeID(localReplicaID)
 	localNodeAddress := e.localNodeAddress(localNodeID)
-	nextNodes, nextLocalNodeAddress, err := syncRaftStorageNodes(localReplicaID, raftNodes, e.controlToken)
+	nextNodes, nextLocalNodeAddress, err := syncControlStorageNodes(localReplicaID, controlNodes, e.controlToken)
 	if err != nil {
 		return err
 	}
@@ -130,31 +130,31 @@ func (e *Engine) DeleteLocalShard(ctx context.Context, shardDir, hash string, in
 	return nil
 }
 
-func syncRaftStorageNodes(
+func syncControlStorageNodes(
 	localReplicaID uint64,
-	raftNodes map[uint64]string,
+	controlNodes map[uint64]string,
 	controlToken string,
 ) (map[string]StorageNode, string, error) {
-	nodes := make(map[string]StorageNode, len(raftNodes))
+	nodes := make(map[string]StorageNode, len(controlNodes))
 	localNodeAddress := ""
-	for replicaID, target := range raftNodes {
+	for replicaID, target := range controlNodes {
 		target = strings.TrimSpace(target)
 		if replicaID == 0 {
-			return nil, "", errors.New("raft replica id must be greater than zero")
+			return nil, "", errors.New("replica id must be greater than zero")
 		}
 		if target == "" {
-			return nil, "", fmt.Errorf("raft target is required for replica %d", replicaID)
+			return nil, "", fmt.Errorf("control target is required for replica %d", replicaID)
 		}
 
-		remote, err := newRemoteStorageNode(raftStorageNodeID(replicaID), target, nil)
+		remote, err := newRemoteStorageNode(clusterStorageNodeID(replicaID), target, nil)
 		if err != nil {
 			return nil, "", fmt.Errorf("build remote storage node for replica %d: %w", replicaID, err)
 		}
 		remote.controlToken = strings.TrimSpace(controlToken)
-		nodes[raftStorageNodeID(replicaID)] = remote
+		nodes[clusterStorageNodeID(replicaID)] = remote
 		if replicaID == localReplicaID {
 			localNodeAddress = strings.TrimSpace(target)
-			delete(nodes, raftStorageNodeID(replicaID))
+			delete(nodes, clusterStorageNodeID(replicaID))
 		}
 	}
 	return nodes, localNodeAddress, nil

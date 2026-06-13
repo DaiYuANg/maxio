@@ -102,8 +102,8 @@ func (node *LocalStorageNode) DeleteShard(ctx context.Context, shardDir, hash st
 	return nil
 }
 
-func raftStorageNodeID(replicaID uint64) string {
-	return fmt.Sprintf("raft-%d", replicaID)
+func clusterStorageNodeID(replicaID uint64) string {
+	return fmt.Sprintf("node-%d", replicaID)
 }
 
 func (e *Engine) writeShard(ctx context.Context, placement ShardPlacement, shardDir, hash string, index int, data []byte) error {

@@ -13,18 +13,18 @@ import (
 	"strings"
 
 	"github.com/lyonbrown4d/maxio/engine"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
 )
 
 type clusterStatusResponse struct {
-	LocalReplicaID  uint64                   `json:"local_replica_id"`
-	LocalRaftTarget string                   `json:"local_raft_target"`
-	Membership      raftx.Membership         `json:"membership"`
-	Nodes           []ClusterNodeInfo        `json:"nodes"`
-	StorageNodes    []engine.StorageNodeInfo `json:"storage_nodes"`
-	DiscoveryNodes  []discovery.Node         `json:"discovery_nodes"`
-	Reconcile       clusterReconcilePlan     `json:"reconcile"`
+	LocalReplicaID     uint64                   `json:"local_replica_id"`
+	LocalControlTarget string                   `json:"local_control_target"`
+	Membership         control.Membership       `json:"membership"`
+	Nodes              []ClusterNodeInfo        `json:"nodes"`
+	StorageNodes       []engine.StorageNodeInfo `json:"storage_nodes"`
+	DiscoveryNodes     []discovery.Node         `json:"discovery_nodes"`
+	Reconcile          clusterReconcilePlan     `json:"reconcile"`
 }
 
 type clusterReconcileRequest struct {
@@ -32,16 +32,16 @@ type clusterReconcileRequest struct {
 }
 
 type clusterReconcileResponse struct {
-	Plan   clusterReconcilePlan       `json:"plan"`
-	Result raftx.SyncMembershipResult `json:"result"`
-	Status string                     `json:"status"`
+	Plan   clusterReconcilePlan         `json:"plan"`
+	Result control.SyncMembershipResult `json:"result"`
+	Status string                       `json:"status"`
 }
 
 type clusterReconcilePlan struct {
 	Mode      string                     `json:"mode"`
 	Current   map[uint64]string          `json:"current"`
 	Desired   map[uint64]string          `json:"desired"`
-	Added     []raftx.Replica            `json:"added,omitempty"`
+	Added     []control.Replica          `json:"added,omitempty"`
 	Removed   []uint64                   `json:"removed,omitempty"`
 	Conflicts []clusterDiscoveryConflict `json:"conflicts,omitempty"`
 }
@@ -66,13 +66,13 @@ func (s *Service) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
 	plan := BuildClusterReconcilePlan(membership, s.discoveryNodes(), false)
 	storageNodes := s.clusterStorageNodeInfos()
 	s.writeJSON(w, http.StatusOK, clusterStatusResponse{
-		LocalReplicaID:  membership.LocalReplicaID,
-		LocalRaftTarget: s.localRaftTarget(),
-		Membership:      membership,
-		Nodes:           BuildClusterNodeRegistry(membership, s.discoveryNodes(), storageNodes),
-		StorageNodes:    storageNodes,
-		DiscoveryNodes:  s.discoveryNodes(),
-		Reconcile:       plan,
+		LocalReplicaID:     membership.LocalReplicaID,
+		LocalControlTarget: s.localControlTarget(),
+		Membership:         membership,
+		Nodes:              BuildClusterNodeRegistry(membership, s.discoveryNodes(), storageNodes),
+		StorageNodes:       storageNodes,
+		DiscoveryNodes:     s.discoveryNodes(),
+		Reconcile:          plan,
 	})
 }
 
@@ -118,7 +118,7 @@ func (s *Service) handleClusterReconcileApply(w http.ResponseWriter, r *http.Req
 		s.writeJSON(w, http.StatusConflict, clusterReconcileResponse{Plan: plan, Status: "conflict"})
 		return
 	}
-	result, err := s.raft.SyncReplicas(r.Context(), plan.Desired)
+	result, err := s.control.SyncReplicas(r.Context(), plan.Desired)
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -143,22 +143,22 @@ func (s *Service) clusterReconcilePlan(ctx context.Context, removeMissing bool) 
 	return BuildClusterReconcilePlan(membership, s.discoveryNodes(), removeMissing), nil
 }
 
-func (s *Service) clusterMembership(ctx context.Context) (raftx.Membership, error) {
-	if s == nil || s.raft == nil {
-		return raftx.Membership{}, errors.New("raft runtime unavailable")
+func (s *Service) clusterMembership(ctx context.Context) (control.Membership, error) {
+	if s == nil || s.control == nil {
+		return control.Membership{}, errors.New("control runtime unavailable")
 	}
-	membership, err := s.raft.GetMembership(ctx)
+	membership, err := s.control.GetMembership(ctx)
 	if err != nil {
-		return raftx.Membership{}, fmt.Errorf("get raft membership: %w", err)
+		return control.Membership{}, fmt.Errorf("get control membership: %w", err)
 	}
 	return membership, nil
 }
 
-func (s *Service) localRaftTarget() string {
-	if s == nil || s.raft == nil {
+func (s *Service) localControlTarget() string {
+	if s == nil || s.control == nil {
 		return ""
 	}
-	return s.raft.LocalRaftAddress()
+	return s.control.LocalControlAddress()
 }
 
 func (s *Service) clusterStorageNodeInfos() []engine.StorageNodeInfo {
@@ -168,9 +168,9 @@ func (s *Service) clusterStorageNodeInfos() []engine.StorageNodeInfo {
 	return s.engine.StorageNodeInfos()
 }
 
-// BuildClusterReconcilePlan builds a safe raft membership reconcile plan from gossip discovery.
+// BuildClusterReconcilePlan builds a safe control membership reconcile plan from gossip discovery.
 func BuildClusterReconcilePlan(
-	membership raftx.Membership,
+	membership control.Membership,
 	discovered []discovery.Node,
 	removeMissing bool,
 ) clusterReconcilePlan {
@@ -189,7 +189,7 @@ func BuildClusterReconcilePlan(
 	}
 }
 
-func desiredMembersBase(membership raftx.Membership, removeMissing bool) map[uint64]string {
+func desiredMembersBase(membership control.Membership, removeMissing bool) map[uint64]string {
 	if removeMissing {
 		return make(map[uint64]string)
 	}
@@ -197,10 +197,10 @@ func desiredMembersBase(membership raftx.Membership, removeMissing bool) map[uin
 }
 
 func usableDiscoveredNode(node discovery.Node) bool {
-	return node.ReplicaID > 0 && strings.EqualFold(node.State, "alive") && strings.TrimSpace(node.RaftAddress) != ""
+	return node.ReplicaID > 0 && strings.EqualFold(node.State, "alive") && strings.TrimSpace(node.ControlAddress) != ""
 }
 
-func keepLocalMember(membership raftx.Membership, desired map[uint64]string) {
+func keepLocalMember(membership control.Membership, desired map[uint64]string) {
 	if membership.LocalReplicaID == 0 {
 		return
 	}
@@ -219,14 +219,14 @@ func reconcileMode(removeMissing bool) string {
 	return "add_only"
 }
 
-func reconcileAdded(current, desired map[uint64]string) []raftx.Replica {
-	replicas := make([]raftx.Replica, 0)
+func reconcileAdded(current, desired map[uint64]string) []control.Replica {
+	replicas := make([]control.Replica, 0)
 	for replicaID, target := range desired {
 		if _, ok := current[replicaID]; !ok {
-			replicas = append(replicas, raftx.Replica{ReplicaID: replicaID, Target: target})
+			replicas = append(replicas, control.Replica{ReplicaID: replicaID, Target: target})
 		}
 	}
-	slices.SortFunc(replicas, func(left, right raftx.Replica) int {
+	slices.SortFunc(replicas, func(left, right control.Replica) int {
 		return cmp.Compare(left.ReplicaID, right.ReplicaID)
 	})
 	return replicas

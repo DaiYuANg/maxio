@@ -10,7 +10,7 @@ import (
 
 	"math"
 
-	raftx "github.com/lyonbrown4d/maxio/internal/raft"
+	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/object"
 )
 
@@ -30,7 +30,7 @@ type replacementReplicaResponse struct {
 }
 
 var (
-	errCannotReplaceLocalReplica    = errors.New("cannot replace local raft replica")
+	errCannotReplaceLocalReplica    = errors.New("cannot replace local cluster replica")
 	errClusterReplaceMemberNotFound = errors.New("cluster replace member not found")
 )
 
@@ -88,7 +88,7 @@ func (s *Service) replaceClusterMember(
 	oldReplicaID uint64,
 	req replacementReplicaRequest,
 ) (replacementReplicaResponse, error) {
-	if s == nil || s.raft == nil || s.engine == nil || s.objects == nil {
+	if s == nil || s.control == nil || s.engine == nil || s.objects == nil {
 		return replacementReplicaResponse{}, errors.New("cluster replacement dependencies unavailable")
 	}
 
@@ -117,9 +117,9 @@ func (s *Service) prepareClusterMemberReplacement(
 	oldReplicaID uint64,
 	req replacementReplicaRequest,
 ) (replacementReplicaRequest, nodePlacementStats, error) {
-	membership, err := s.raft.GetMembership(ctx)
+	membership, err := s.control.GetMembership(ctx)
 	if err != nil {
-		return req, nodePlacementStats{}, fmt.Errorf("get raft membership: %w", err)
+		return req, nodePlacementStats{}, fmt.Errorf("get control membership: %w", err)
 	}
 	if validationErr := ValidateClusterMemberReplacement(oldReplicaID, membership); validationErr != nil {
 		return req, nodePlacementStats{}, validationErr
@@ -139,7 +139,7 @@ func (s *Service) prepareClusterMemberReplacement(
 }
 
 // ValidateClusterMemberReplacement validates whether a non-local existing replica can be replaced.
-func ValidateClusterMemberReplacement(oldReplicaID uint64, membership raftx.Membership) error {
+func ValidateClusterMemberReplacement(oldReplicaID uint64, membership control.Membership) error {
 	if oldReplicaID == 0 {
 		return errors.New("old replica_id must be greater than zero")
 	}
@@ -152,7 +152,7 @@ func ValidateClusterMemberReplacement(oldReplicaID uint64, membership raftx.Memb
 	return nil
 }
 
-func resolveReplacementReplicaID(oldReplicaID, requestedReplicaID uint64, membership raftx.Membership) (uint64, error) {
+func resolveReplacementReplicaID(oldReplicaID, requestedReplicaID uint64, membership control.Membership) (uint64, error) {
 	if requestedReplicaID != oldReplicaID {
 		return requestedReplicaID, nil
 	}
@@ -176,7 +176,7 @@ func resolveReplacementReplicaID(oldReplicaID, requestedReplicaID uint64, member
 	}
 }
 
-func maxMembershipReplicaID(baseID uint64, membership raftx.Membership) uint64 {
+func maxMembershipReplicaID(baseID uint64, membership control.Membership) uint64 {
 	maxReplicaID := baseID
 	for replicaID := range membership.Nodes {
 		if replicaID > maxReplicaID {
@@ -191,7 +191,7 @@ func maxMembershipReplicaID(baseID uint64, membership raftx.Membership) uint64 {
 	return maxReplicaID
 }
 
-func buildReplicaIDSet(membership raftx.Membership) map[uint64]struct{} {
+func buildReplicaIDSet(membership control.Membership) map[uint64]struct{} {
 	total := len(membership.Nodes) + len(membership.Removed)
 	used := make(map[uint64]struct{}, total)
 	for id := range membership.Nodes {
@@ -223,7 +223,7 @@ func (s *Service) runClusterMemberReplacement(
 }
 
 func (s *Service) addReplacementReplica(ctx context.Context, req replacementReplicaRequest) error {
-	if err := s.raft.AddReplica(ctx, req.ReplicaID, req.Target); err != nil {
+	if err := s.control.AddReplica(ctx, req.ReplicaID, req.Target); err != nil {
 		return fmt.Errorf("add replacement replica: %w", err)
 	}
 	if err := s.syncStorageNodes(ctx); err != nil {
@@ -247,7 +247,7 @@ func (s *Service) removeReplacedReplica(ctx context.Context, oldReplicaID uint64
 	if err := s.ensureClusterMemberDecommissionable(ctx, oldReplicaID); err != nil {
 		return fmt.Errorf("verify old replica decommission: %w", err)
 	}
-	if err := s.raft.RemoveReplica(ctx, oldReplicaID); err != nil {
+	if err := s.control.RemoveReplica(ctx, oldReplicaID); err != nil {
 		return fmt.Errorf("remove old replica: %w", err)
 	}
 	if err := s.syncStorageNodes(ctx); err != nil {

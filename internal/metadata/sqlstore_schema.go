@@ -1,6 +1,6 @@
 package metadata
 
-var sqliteSchemaStatements = []string{
+var sqlStoreSchemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS metadata_upstreams (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,

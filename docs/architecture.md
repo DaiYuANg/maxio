@@ -22,7 +22,7 @@ It does:
 It does not:
 
 - store authoritative object bytes locally;
-- use local shard files or Raft state as the default control plane;
+- use local shard files or embedded consensus state as the control plane;
 - treat Bleve as authoritative state;
 - require gateway-local state for horizontal scaling.
 

@@ -15,7 +15,7 @@ with DB metadata and a rebuildable Bleve file index.
 
 ## Architecture decisions
 
-- Remove Raft as the default control-plane foundation.
+- Remove the embedded consensus control plane from the runtime foundation.
 - Do not store authoritative object bytes in MaxIO local shard files.
 - Persist object visibility, routing, fingerprints, and index status in DB.
 - Use DB transactions and leases for write state, worker queues, rebuilds, and
@@ -42,8 +42,7 @@ Status as of 2026-06-13:
   DB and wired into the runtime worker loop.
 - Dedupe is still metadata-first: digest reference structures exist, but
   observe-mode reporting is not yet connected to the proxy write path.
-- Raft/local object-shard storage remains legacy code and is not part of the
-  target default product path.
+- Local object-shard storage remains legacy code and is not part of the target default product path.
 
 ## P0: Metadata foundation
 
@@ -152,7 +151,7 @@ Goal: prepare the proxy runtime for production use.
 - Chunk-level dedupe.
 - Cross-region active-active replication.
 - Local object shard storage as a default product path.
-- Gateway-local Raft as the control plane.
+- Gateway-local consensus as the control plane.
 - Treating Bleve as authoritative object state.
 
 ## Immediate next steps

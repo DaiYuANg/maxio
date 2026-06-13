@@ -10,14 +10,14 @@ import (
 	"github.com/lyonbrown4d/maxio/model"
 )
 
-func (s *SQLiteMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.IndexOutboxEvent) (model.IndexOutboxEvent, error) {
+func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.IndexOutboxEvent) (model.IndexOutboxEvent, error) {
 	event, err := prepareIndexOutboxEvent(event)
 	if err != nil {
 		return model.IndexOutboxEvent{}, err
 	}
 	if _, execErr := s.execContext(
 		ctx,
-		sqliteIndexOutboxUpsertSQL,
+		sqlStoreIndexOutboxUpsertSQL,
 		event.ID,
 		event.EventType,
 		event.Bucket,
@@ -43,7 +43,7 @@ func (s *SQLiteMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model
 	return stored, nil
 }
 
-func (s *SQLiteMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model.IndexOutboxEvent, bool, error) {
+func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model.IndexOutboxEvent, bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return model.IndexOutboxEvent{}, false, ErrBadRequest
@@ -51,7 +51,7 @@ func (s *SQLiteMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (mo
 
 	row := s.queryRowContext(
 		ctx,
-		`SELECT `+sqliteIndexOutboxColumns+`
+		`SELECT `+sqlStoreIndexOutboxColumns+`
 		   FROM metadata_index_outbox
 		  WHERE event_id = ?
 		  LIMIT 1`,
@@ -67,11 +67,11 @@ func (s *SQLiteMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (mo
 	return event, true, nil
 }
 
-func (s *SQLiteMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) ([]model.IndexOutboxEvent, error) {
-	return listSQLiteIndexQueue(
+func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) ([]model.IndexOutboxEvent, error) {
+	return listSQLIndexQueue(
 		ctx,
 		s,
-		sqliteIndexOutboxColumns,
+		sqlStoreIndexOutboxColumns,
 		"metadata_index_outbox",
 		status,
 		limit,
@@ -80,7 +80,7 @@ func (s *SQLiteMetadata) ListIndexOutboxEvents(ctx context.Context, status strin
 	)
 }
 
-func (s *SQLiteMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bool, error) {
+func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bool, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false, ErrBadRequest
