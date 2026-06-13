@@ -16,8 +16,6 @@ const sqlStoreObjectVersionColumns = `bucket, object_key, version_id, digest, et
 content_disposition, content_encoding, content_language, user_metadata, upstream_id, upstream_bucket, upstream_key,
 delete_marker, created_at, updated_at`
 
-const sqlStoreDigestRefColumns = `digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at`
-
 const sqlStoreObjectRecordUpsertSQL = `INSERT INTO metadata_object_records (
 	bucket, object_key, current_version_id, deleted, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?)
@@ -45,17 +43,6 @@ ON CONFLICT(bucket, object_key, version_id) DO UPDATE SET
 	upstream_bucket = excluded.upstream_bucket,
 	upstream_key = excluded.upstream_key,
 	delete_marker = excluded.delete_marker,
-	updated_at = excluded.updated_at`
-
-const sqlStoreDigestRefUpsertSQL = `INSERT INTO metadata_digest_refs (
-	digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(digest) DO UPDATE SET
-	size = excluded.size,
-	ref_count = excluded.ref_count,
-	upstream_id = excluded.upstream_id,
-	upstream_bucket = excluded.upstream_bucket,
-	upstream_key = excluded.upstream_key,
 	updated_at = excluded.updated_at`
 
 func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.ObjectRecord) (model.ObjectRecord, error) {

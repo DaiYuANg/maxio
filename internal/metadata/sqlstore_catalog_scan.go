@@ -98,7 +98,7 @@ func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *sql.Tx, digest s
 	row := s.txQueryRowContext(
 		ctx,
 		tx,
-		`SELECT `+sqlStoreDigestRefColumns+`
+		`SELECT digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at
 		   FROM metadata_digest_refs
 		  WHERE digest = ?
 		  LIMIT 1`,

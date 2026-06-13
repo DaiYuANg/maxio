@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arcgolabs/dbx/querydsl"
+
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -16,18 +18,27 @@ func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) 
 	if err != nil {
 		return model.DigestRef{}, err
 	}
-	if _, execErr := s.execContext(
-		ctx,
-		sqlStoreDigestRefUpsertSQL,
-		ref.Digest,
-		ref.Size,
-		ref.RefCount,
-		ref.UpstreamID,
-		ref.UpstreamBucket,
-		ref.UpstreamKey,
-		ref.CreatedAt.UnixNano(),
-		ref.UpdatedAt.UnixNano(),
-	); execErr != nil {
+	query := querydsl.InsertInto(metadataDigestRefs.table).
+		Values(
+			metadataDigestRefs.digest.Set(ref.Digest),
+			metadataDigestRefs.size.Set(ref.Size),
+			metadataDigestRefs.refCount.Set(ref.RefCount),
+			metadataDigestRefs.upstreamID.Set(ref.UpstreamID),
+			metadataDigestRefs.upstreamBucket.Set(ref.UpstreamBucket),
+			metadataDigestRefs.upstreamKey.Set(ref.UpstreamKey),
+			metadataDigestRefs.createdAt.Set(ref.CreatedAt.UnixNano()),
+			metadataDigestRefs.updatedAt.Set(ref.UpdatedAt.UnixNano()),
+		).
+		OnConflict(metadataDigestRefs.digest).
+		DoUpdateSet(
+			metadataDigestRefs.size.SetExcluded(),
+			metadataDigestRefs.refCount.SetExcluded(),
+			metadataDigestRefs.upstreamID.SetExcluded(),
+			metadataDigestRefs.upstreamBucket.SetExcluded(),
+			metadataDigestRefs.upstreamKey.SetExcluded(),
+			metadataDigestRefs.updatedAt.SetExcluded(),
+		)
+	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
 		return model.DigestRef{}, fmt.Errorf("upsert digest ref: %w", execErr)
 	}
 	stored, found, err := s.GetDigestRef(ctx, ref.Digest)
@@ -46,14 +57,13 @@ func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.Di
 		return model.DigestRef{}, false, ErrBadRequest
 	}
 
-	row := s.queryRowContext(
-		ctx,
-		`SELECT `+sqlStoreDigestRefColumns+`
-		   FROM metadata_digest_refs
-		  WHERE digest = ?
-		  LIMIT 1`,
-		digest,
-	)
+	query := querydsl.SelectFrom(metadataDigestRefs.table, metadataDigestRefs.selectItems()...).
+		Where(metadataDigestRefs.digest.Eq(digest)).
+		Limit(1)
+	row, queryErr := s.queryRowBuilderContext(ctx, query)
+	if queryErr != nil {
+		return model.DigestRef{}, false, fmt.Errorf("get digest ref: %w", queryErr)
+	}
 	ref, err := scanDigestRef(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.DigestRef{}, false, nil
@@ -119,7 +129,9 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 	if digest == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.execContext(ctx, `DELETE FROM metadata_digest_refs WHERE digest = ?`, digest)
+	query := querydsl.DeleteFrom(metadataDigestRefs.table).
+		Where(metadataDigestRefs.digest.Eq(digest))
+	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete digest ref: %w", err)
 	}
