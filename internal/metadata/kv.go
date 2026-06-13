@@ -30,7 +30,7 @@ type BlobRef struct {
 	Size            int64
 }
 
-type MetadataStore interface {
+type Repository interface {
 	ListBuckets(ctx context.Context) ([]model.Bucket, error)
 	BucketExists(ctx context.Context, bucket string) (bool, error)
 	CreateBucket(ctx context.Context, bucket string) error
@@ -51,6 +51,8 @@ type MetadataStore interface {
 	IncreaseBlobRef(ctx context.Context, hash string) error
 	DecreaseBlobRef(ctx context.Context, hash string) (string, bool, error)
 }
+
+type MetadataStore = Repository
 
 type InMemoryMetadata struct {
 	mu      sync.RWMutex

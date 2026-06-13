@@ -14,10 +14,14 @@ const (
 	defaultEnabledProxyEntrypoint = ":8080"
 )
 
+type ValeRuntime struct {
+	gateway *vale.Gateway
+}
+
 // Module wires the Vale reverse-proxy runtime.
 //
-// When S3 proxy is disabled or no upstreams are configured, the module registers
-// a nil gateway so application startup remains unchanged.
+// When S3 proxy is disabled, the module registers an empty runtime so application
+// startup remains unchanged.
 func Module() dix.Module {
 	return dix.NewModule(
 		"proxy",
@@ -31,9 +35,9 @@ func Module() dix.Module {
 	)
 }
 
-func newValeGateway(cfg config.Config, logger *slog.Logger) (*vale.Gateway, error) {
+func newValeGateway(cfg config.Config, logger *slog.Logger) (*ValeRuntime, error) {
 	if !cfg.EnableS3Proxy {
-		return nil, nil
+		return &ValeRuntime{}, nil
 	}
 
 	options := ValeProxyBuildOptions{
@@ -54,21 +58,27 @@ func newValeGateway(cfg config.Config, logger *slog.Logger) (*vale.Gateway, erro
 	if err != nil {
 		return nil, fmt.Errorf("new vale gateway: %w", err)
 	}
-	return gateway, nil
+	return &ValeRuntime{gateway: gateway}, nil
 }
 
-func startValeGateway(ctx context.Context, gateway *vale.Gateway) error {
-	if gateway == nil {
+func startValeGateway(ctx context.Context, runtime *ValeRuntime) error {
+	if runtime == nil || runtime.gateway == nil {
 		return nil
 	}
-	return gateway.Start(ctx)
+	if err := runtime.gateway.Start(ctx); err != nil {
+		return fmt.Errorf("start vale gateway: %w", err)
+	}
+	return nil
 }
 
-func stopValeGateway(_ context.Context, gateway *vale.Gateway) error {
-	if gateway == nil {
+func stopValeGateway(ctx context.Context, runtime *ValeRuntime) error {
+	if runtime == nil || runtime.gateway == nil {
 		return nil
 	}
-	return gateway.Stop(context.Background())
+	if err := runtime.gateway.Stop(ctx); err != nil {
+		return fmt.Errorf("stop vale gateway: %w", err)
+	}
+	return nil
 }
 
 func normalizeValeOptionsWithDefaults(options ValeProxyBuildOptions) ValeProxyBuildOptions {

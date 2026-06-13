@@ -13,7 +13,7 @@ import (
 
 func (s *SQLiteMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
 	ctx = ensureContext(ctx)
-	rows, err := s.db.QueryContext(
+	rows, err := s.queryContext(
 		ctx,
 		`SELECT name, created_at
 		   FROM metadata_buckets
@@ -22,7 +22,11 @@ func (s *SQLiteMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error
 	if err != nil {
 		return nil, fmt.Errorf("query buckets: %w", err)
 	}
-	defer s.closeRows(rows, "buckets")
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
+			s.logger.Error("close sqlite rows", "rows", "buckets", "error", closeErr)
+		}
+	}()
 
 	buckets := make([]model.Bucket, 0)
 	for rows.Next() {
@@ -44,7 +48,7 @@ func (s *SQLiteMetadata) BucketExists(ctx context.Context, bucket string) (bool,
 		return false, ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	return bucketExistsInQuery(ctx, s.db, bucket)
+	return bucketExistsInQuery(ctx, s.db, s.normalizeQuery(metadataBucketExistsQuery), bucket)
 }
 
 func (s *SQLiteMetadata) CreateBucket(ctx context.Context, bucket string) error {
@@ -53,7 +57,7 @@ func (s *SQLiteMetadata) CreateBucket(ctx context.Context, bucket string) error 
 		return ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	if _, err := s.db.ExecContext(
+	if _, err := s.execContext(
 		ctx,
 		"INSERT INTO metadata_buckets (name, created_at) VALUES (?, ?)",
 		bucket,
@@ -74,19 +78,23 @@ func (s *SQLiteMetadata) DeleteBucket(ctx context.Context, bucket string) error 
 	}
 
 	return s.withTx(ctx, "delete bucket", func(tx *sql.Tx) error {
-		if err := ensureBucketInTx(ctx, tx, bucket); err != nil {
+		existsQuery := s.normalizeQuery(metadataBucketExistsQuery)
+		deleteCommittedQuery := s.normalizeQuery("DELETE FROM metadata_objects WHERE bucket = ? AND state = ?")
+		deletePendingQuery := s.normalizeQuery("DELETE FROM metadata_objects WHERE bucket = ? AND state = ?")
+		deleteBucketQuery := s.normalizeQuery("DELETE FROM metadata_buckets WHERE name = ?")
+		if err := ensureBucketInTx(ctx, tx, existsQuery, bucket); err != nil {
 			return err
 		}
 		if err := s.decreaseBucketBlobRefsInTx(ctx, tx, bucket); err != nil {
 			return err
 		}
-		if err := deleteBucketObjectsInTx(ctx, tx, bucket, model.ObjectStateCommitted); err != nil {
+		if err := s.deleteBucketObjectsInTx(ctx, tx, deleteCommittedQuery, bucket, model.ObjectStateCommitted); err != nil {
 			return err
 		}
-		if err := deleteBucketObjectsInTx(ctx, tx, bucket, model.ObjectStatePending); err != nil {
+		if err := s.deleteBucketObjectsInTx(ctx, tx, deletePendingQuery, bucket, model.ObjectStatePending); err != nil {
 			return err
 		}
-		return deleteBucketRowInTx(ctx, tx, bucket)
+		return s.deleteBucketRowInTx(ctx, tx, deleteBucketQuery, bucket)
 	})
 }
 
@@ -107,7 +115,7 @@ func (s *SQLiteMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql
 		return err
 	}
 	for _, hash := range hashes {
-		if _, _, err := decreaseBlobRefInTx(ctx, tx, hash); err != nil && !errors.Is(err, ErrObjectNotFound) {
+		if _, _, err := s.decreaseBlobRefInTx(ctx, tx, hash); err != nil && !errors.Is(err, ErrObjectNotFound) {
 			return fmt.Errorf("decrease blob ref: %w", err)
 		}
 	}
@@ -115,8 +123,9 @@ func (s *SQLiteMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql
 }
 
 func (s *SQLiteMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) ([]string, error) {
-	rows, err := tx.QueryContext(
+	rows, err := s.txQueryContext(
 		ensureContext(ctx),
+		tx,
 		"SELECT hash FROM metadata_objects WHERE bucket = ? AND state = ?",
 		bucket,
 		model.ObjectStateCommitted,
@@ -124,7 +133,11 @@ func (s *SQLiteMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx 
 	if err != nil {
 		return nil, fmt.Errorf("query bucket committed objects: %w", err)
 	}
-	defer s.closeRows(rows, "bucket object hashes")
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
+			s.logger.Error("close sqlite rows", "rows", "bucket object hashes", "error", closeErr)
+		}
+	}()
 
 	hashes := make([]string, 0)
 	for rows.Next() {
@@ -152,8 +165,8 @@ func scanBucket(scanner interface{ Scan(dest ...any) error }) (model.Bucket, err
 	}, nil
 }
 
-func ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
-	exists, err := bucketExistsInQuery(ctx, tx, bucket)
+func ensureBucketInTx(ctx context.Context, tx *sql.Tx, query, bucket string) error {
+	exists, err := bucketExistsInQuery(ctx, tx, query, bucket)
 	if err != nil {
 		return err
 	}
@@ -165,11 +178,11 @@ func ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
 
 func bucketExistsInQuery(ctx context.Context, queryer interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
-}, bucket string) (bool, error) {
+}, query, bucket string) (bool, error) {
 	var exists int
 	err := queryer.QueryRowContext(
 		ensureContext(ctx),
-		"SELECT 1 FROM metadata_buckets WHERE name = ? LIMIT 1",
+		query,
 		bucket,
 	).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -181,10 +194,11 @@ func bucketExistsInQuery(ctx context.Context, queryer interface {
 	return true, nil
 }
 
-func deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, bucket, state string) error {
-	if _, err := tx.ExecContext(
+func (s *SQLiteMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, query, bucket, state string) error {
+	if err := s.txExecContext(
 		ensureContext(ctx),
-		"DELETE FROM metadata_objects WHERE bucket = ? AND state = ?",
+		tx,
+		query,
 		bucket,
 		state,
 	); err != nil {
@@ -193,12 +207,14 @@ func deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, bucket, state stri
 	return nil
 }
 
-func deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
-	if _, err := tx.ExecContext(ensureContext(ctx), "DELETE FROM metadata_buckets WHERE name = ?", bucket); err != nil {
+func (s *SQLiteMetadata) deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, query, bucket string) error {
+	if err := s.txExecContext(ensureContext(ctx), tx, query, bucket); err != nil {
 		return fmt.Errorf("delete bucket: %w", err)
 	}
 	return nil
 }
+
+const metadataBucketExistsQuery = "SELECT 1 FROM metadata_buckets WHERE name = ? LIMIT 1"
 
 func isSQLiteConstraintError(err error) bool {
 	message := err.Error()

@@ -11,15 +11,19 @@ import (
 )
 
 func (s *SQLiteMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
-	rows, err := s.db.QueryContext(
-		ensureContext(ctx),
+	rows, err := s.queryContext(
+		ctx,
 		`SELECT hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
 		   FROM metadata_blob_refs`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query blob refs: %w", err)
 	}
-	defer s.closeRows(rows, "blob refs")
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
+			s.logger.Error("close sqlite rows", "rows", "blob refs", "error", closeErr)
+		}
+	}()
 
 	refs := make([]BlobRef, 0)
 	for rows.Next() {
@@ -41,8 +45,8 @@ func (s *SQLiteMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, 
 		return BlobRef{}, false, ErrBadRequest
 	}
 
-	row := s.db.QueryRowContext(
-		ensureContext(ctx),
+	row := s.queryRowContext(
+		ctx,
 		`SELECT hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
 		   FROM metadata_blob_refs
 		  WHERE hash = ?`,
@@ -73,8 +77,8 @@ func (s *SQLiteMetadata) CreateBlobRef(
 		return ErrBadRequest
 	}
 
-	if _, err := s.db.ExecContext(
-		ensureContext(ctx),
+	if _, err := s.execContext(
+		ctx,
 		`INSERT INTO metadata_blob_refs (
 			hash, path, size, ref_count, shard_placements, shard_checksums, shard_sizes
 		) VALUES (?, ?, ?, 1, ?, ?, ?)
@@ -96,8 +100,8 @@ func (s *SQLiteMetadata) UpdateBlobRefPlacements(ctx context.Context, hash strin
 	if hash == "" {
 		return ErrBadRequest
 	}
-	result, err := s.db.ExecContext(
-		ensureContext(ctx),
+	result, err := s.execContext(
+		ctx,
 		"UPDATE metadata_blob_refs SET shard_placements = ? WHERE hash = ?",
 		marshalShardPlacements(placements),
 		hash,
@@ -113,8 +117,8 @@ func (s *SQLiteMetadata) IncreaseBlobRef(ctx context.Context, hash string) error
 	if hash == "" {
 		return ErrBadRequest
 	}
-	result, err := s.db.ExecContext(
-		ensureContext(ctx),
+	result, err := s.execContext(
+		ctx,
 		"UPDATE metadata_blob_refs SET ref_count = ref_count + 1 WHERE hash = ?",
 		hash,
 	)
@@ -134,7 +138,7 @@ func (s *SQLiteMetadata) DecreaseBlobRef(ctx context.Context, hash string) (stri
 	var removed bool
 	err := s.withTx(ctx, "decrease blob ref", func(tx *sql.Tx) error {
 		var err error
-		path, removed, err = decreaseBlobRefInTx(ctx, tx, hash)
+		path, removed, err = s.decreaseBlobRefInTx(ctx, tx, hash)
 		return err
 	})
 	return path, removed, err
@@ -170,12 +174,13 @@ func scanBlobRef(scanner interface{ Scan(dest ...any) error }) (BlobRef, error) 
 	return ref, nil
 }
 
-func decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
+func (s *SQLiteMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
 	var path string
 	var refCount int
-	err := tx.QueryRowContext(
-		ensureContext(ctx),
-		"SELECT path, ref_count FROM metadata_blob_refs WHERE hash = ?",
+	err := s.txQueryRowContext(
+		ctx,
+		tx,
+		s.normalizeQuery("SELECT path, ref_count FROM metadata_blob_refs WHERE hash = ?"),
 		hash,
 	).Scan(&path, &refCount)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -185,22 +190,28 @@ func decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, 
 		return "", false, fmt.Errorf("query blob ref: %w", err)
 	}
 	if refCount <= 1 {
-		return path, true, deleteBlobRefInTx(ctx, tx, hash)
+		return path, true, s.deleteBlobRefInTx(ctx, tx, hash)
 	}
-	return path, false, updateBlobRefCountInTx(ctx, tx, hash)
+	return path, false, s.updateBlobRefCountInTx(ctx, tx, hash)
 }
 
-func deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
-	if _, err := tx.ExecContext(ensureContext(ctx), "DELETE FROM metadata_blob_refs WHERE hash = ?", hash); err != nil {
+func (s *SQLiteMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
+	if err := s.txExecContext(
+		ensureContext(ctx),
+		tx,
+		s.normalizeQuery("DELETE FROM metadata_blob_refs WHERE hash = ?"),
+		hash,
+	); err != nil {
 		return fmt.Errorf("delete blob ref: %w", err)
 	}
 	return nil
 }
 
-func updateBlobRefCountInTx(ctx context.Context, tx *sql.Tx, hash string) error {
-	if _, err := tx.ExecContext(
+func (s *SQLiteMetadata) updateBlobRefCountInTx(ctx context.Context, tx *sql.Tx, hash string) error {
+	if err := s.txExecContext(
 		ensureContext(ctx),
-		"UPDATE metadata_blob_refs SET ref_count = ref_count - 1 WHERE hash = ?",
+		tx,
+		s.normalizeQuery("UPDATE metadata_blob_refs SET ref_count = ref_count - 1 WHERE hash = ?"),
 		hash,
 	); err != nil {
 		return fmt.Errorf("decrease blob ref: %w", err)

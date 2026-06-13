@@ -25,6 +25,9 @@ type Config struct {
 	APIToken                     string           `json:"api_token"                 koanf:"api_token"`
 	EnableClusterManagement      bool             `json:"enable_cluster_management" koanf:"enable_cluster_management"`
 	EnableNativeObjectAPI        bool             `json:"enable_native_object_api"  koanf:"enable_native_object_api"`
+	MetadataBackend              string           `json:"metadata_backend"          koanf:"metadata_backend"          validate:"required,oneof=sqlite postgres"`
+	MetadataDSN                  string           `json:"metadata_dsn"              koanf:"metadata_dsn"`
+	MetadataAutoMigrate          bool             `json:"metadata_auto_migrate"     koanf:"metadata_auto_migrate"`
 	EnableS3Proxy                bool             `json:"enable_s3_proxy"           koanf:"enable_s3_proxy"`
 	S3ProxyUpstreams             []model.Upstream `json:"s3_proxy_upstreams"        koanf:"s3_proxy_upstreams"`
 	S3ProxyEntrypoint            string           `json:"s3_proxy_entrypoint"       koanf:"s3_proxy_entrypoint"`
@@ -152,6 +155,8 @@ func normalize(cfg Config) (Config, error) {
 func trim(cfg Config) Config {
 	cfg.DataDir = strings.TrimSpace(cfg.DataDir)
 	cfg.HTTPAddress = strings.TrimSpace(cfg.HTTPAddress)
+	cfg.MetadataBackend = strings.TrimSpace(strings.ToLower(cfg.MetadataBackend))
+	cfg.MetadataDSN = strings.TrimSpace(cfg.MetadataDSN)
 	cfg.StorageAddress = strings.TrimSpace(cfg.StorageAddress)
 	cfg.AdminToken = strings.TrimSpace(cfg.AdminToken)
 	cfg.ClusterToken = strings.TrimSpace(cfg.ClusterToken)
@@ -185,19 +190,6 @@ func trim(cfg Config) Config {
 }
 
 func validateRequired(cfg Config) error {
-	if !cfg.EnableClusterManagement {
-		if cfg.HTTPAddress == "" {
-			return errors.New("invalid config: http_address is required")
-		}
-		if cfg.LogLevel == "" {
-			return errors.New("invalid config: log_level is required")
-		}
-		if cfg.EnableS3Proxy && len(cfg.S3ProxyUpstreams) == 0 {
-			return errors.New("invalid config: enable_s3_proxy requires s3_proxy_upstreams")
-		}
-		return nil
-	}
-
 	if cfg.HTTPAddress == "" {
 		return errors.New("invalid config: http_address is required")
 	}
@@ -207,6 +199,13 @@ func validateRequired(cfg Config) error {
 	if cfg.EnableS3Proxy && len(cfg.S3ProxyUpstreams) == 0 {
 		return errors.New("invalid config: enable_s3_proxy requires s3_proxy_upstreams")
 	}
+	if !cfg.EnableClusterManagement {
+		return nil
+	}
+	return validateClusterRequired(cfg)
+}
+
+func validateClusterRequired(cfg Config) error {
 	if cfg.RaftAddress == "" {
 		return errors.New("invalid config: raft_address is required")
 	}

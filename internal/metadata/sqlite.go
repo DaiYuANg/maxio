@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/arcgolabs/dbx"
@@ -16,10 +17,18 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+type metadataQueryDialect string
+
+const (
+	metadataQueryDialectSQLite   metadataQueryDialect = "sqlite"
+	metadataQueryDialectPostgres metadataQueryDialect = "postgres"
+)
+
 type SQLiteMetadata struct {
-	db     *sql.DB
-	dbxDB  *dbx.DB
-	logger *slog.Logger
+	db           *sql.DB
+	dbxDB        *dbx.DB
+	logger       *slog.Logger
+	queryDialect metadataQueryDialect
 }
 
 func NewSQLiteMetadata(path string, logger *slog.Logger) (*SQLiteMetadata, error) {
@@ -47,9 +56,10 @@ func NewSQLiteMetadata(path string, logger *slog.Logger) (*SQLiteMetadata, error
 	}
 
 	metadata := &SQLiteMetadata{
-		db:     db,
-		dbxDB:  session,
-		logger: logger,
+		db:           db,
+		dbxDB:        session,
+		logger:       logger,
+		queryDialect: metadataQueryDialectSQLite,
 	}
 
 	if err := metadata.applyPragmas(context.Background()); err != nil {
@@ -108,11 +118,67 @@ func (s *SQLiteMetadata) execContext(ctx context.Context, query string, args ...
 	if s == nil {
 		return nil, errors.New("metadata db session is nil")
 	}
+	query = s.normalizeQuery(query)
 	session := s.db
 	if s.dbxDB != nil {
-		return s.dbxDB.ExecContext(ctx, query, args...)
+		result, err := s.dbxDB.ExecContext(ctx, query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("exec metadata query: %w", err)
+		}
+		return result, nil
 	}
-	return session.ExecContext(ctx, query, args...)
+	result, err := session.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("exec metadata query: %w", err)
+	}
+	return result, nil
+}
+
+func (s *SQLiteMetadata) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	query = s.normalizeQuery(query)
+	rows, err := s.db.QueryContext(ensureContext(ctx), query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query metadata rows: %w", err)
+	}
+	return rows, nil
+}
+
+func (s *SQLiteMetadata) queryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	query = s.normalizeQuery(query)
+	return s.db.QueryRowContext(ensureContext(ctx), query, args...)
+}
+
+func (s *SQLiteMetadata) txQueryContext(ctx context.Context, tx *sql.Tx, query string, args ...any) (*sql.Rows, error) {
+	query = s.normalizeQuery(query)
+	rows, err := tx.QueryContext(ensureContext(ctx), query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query metadata tx rows: %w", err)
+	}
+	return rows, nil
+}
+
+func (s *SQLiteMetadata) txQueryRowContext(ctx context.Context, tx *sql.Tx, query string, args ...any) *sql.Row {
+	query = s.normalizeQuery(query)
+	return tx.QueryRowContext(ensureContext(ctx), query, args...)
+}
+
+func (s *SQLiteMetadata) txExecContext(ctx context.Context, tx *sql.Tx, query string, args ...any) error {
+	query = s.normalizeQuery(query)
+	_, err := tx.ExecContext(ensureContext(ctx), query, args...)
+	if err != nil {
+		return fmt.Errorf("exec metadata tx query: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLiteMetadata) normalizeQuery(query string) string {
+	if s == nil {
+		return query
+	}
+	if s.queryDialect == metadataQueryDialectPostgres {
+		return rewriteSQLitePlaceholdersToPostgres(query)
+	}
+	return query
 }
 
 func (s *SQLiteMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx) error) error {
@@ -142,12 +208,6 @@ func (s *SQLiteMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx)
 	return nil
 }
 
-func (s *SQLiteMetadata) closeRows(rows *sql.Rows, label string) {
-	if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-		s.logger.Error("close sqlite rows", "rows", label, "error", closeErr)
-	}
-}
-
 func closeSQLiteOnInitError(db *sql.DB, logger *slog.Logger, cause error) error {
 	if closeErr := db.Close(); closeErr != nil {
 		if logger != nil {
@@ -156,4 +216,83 @@ func closeSQLiteOnInitError(db *sql.DB, logger *slog.Logger, cause error) error 
 		return errors.Join(cause, fmt.Errorf("close sqlite database: %w", closeErr))
 	}
 	return cause
+}
+
+type placeholderRewriteState struct {
+	builder      strings.Builder
+	inSingle     bool
+	inDouble     bool
+	position     int
+	prevWasSlash bool
+}
+
+func rewriteSQLitePlaceholdersToPostgres(query string) string {
+	var state placeholderRewriteState
+	for i := range len(query) {
+		state.write(query[i])
+	}
+	return state.builder.String()
+}
+
+func (s *placeholderRewriteState) write(ch byte) {
+	if s.writeEscaped(ch) {
+		return
+	}
+	if s.writeQuote(ch) {
+		return
+	}
+	if s.writePlaceholder(ch) {
+		return
+	}
+	s.writeByte(ch)
+}
+
+func (s *placeholderRewriteState) writeEscaped(ch byte) bool {
+	if s.prevWasSlash {
+		s.prevWasSlash = false
+		s.writeByte(ch)
+		return true
+	}
+	if ch != '\\' {
+		return false
+	}
+	s.prevWasSlash = true
+	s.writeByte(ch)
+	return true
+}
+
+func (s *placeholderRewriteState) writeQuote(ch byte) bool {
+	if ch == '\'' && !s.inDouble {
+		s.inSingle = !s.inSingle
+		s.writeByte(ch)
+		return true
+	}
+	if ch != '"' || s.inSingle {
+		return false
+	}
+	s.inDouble = !s.inDouble
+	s.writeByte(ch)
+	return true
+}
+
+func (s *placeholderRewriteState) writePlaceholder(ch byte) bool {
+	if ch != '?' || s.inSingle || s.inDouble {
+		return false
+	}
+	s.position++
+	s.writeString("$")
+	s.writeString(strconv.Itoa(s.position))
+	return true
+}
+
+func (s *placeholderRewriteState) writeByte(ch byte) {
+	if err := s.builder.WriteByte(ch); err != nil {
+		panic(fmt.Errorf("write query byte: %w", err))
+	}
+}
+
+func (s *placeholderRewriteState) writeString(value string) {
+	if _, err := s.builder.WriteString(value); err != nil {
+		panic(fmt.Errorf("write query string: %w", err))
+	}
 }

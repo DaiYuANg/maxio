@@ -7,6 +7,8 @@ func Default() Config {
 		StorageAddress:               "127.0.0.1:8080",
 		EnableClusterManagement:      false,
 		EnableNativeObjectAPI:        false,
+		MetadataBackend:              "sqlite",
+		MetadataAutoMigrate:          true,
 		EnableS3Proxy:                false,
 		S3ProxyEntrypoint:            "",
 		S3ProxyAdminAddress:          ":19090",
@@ -54,6 +56,9 @@ func applyZeroDefaults(cfg Config) Config {
 }
 
 func applyRuntimeZeroDefaults(cfg Config) Config {
+	if cfg.MetadataBackend == "" {
+		cfg.MetadataBackend = Default().MetadataBackend
+	}
 	if cfg.RaftNodeID == 0 {
 		cfg.RaftNodeID = 1
 	}

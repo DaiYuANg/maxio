@@ -118,11 +118,15 @@ func (s *SQLiteMetadata) DeleteObjectMeta(ctx context.Context, bucket, key strin
 }
 
 func (s *SQLiteMetadata) queryObjectMetas(ctx context.Context, query string, args ...any) ([]model.ObjectMeta, error) {
-	rows, err := s.db.QueryContext(ensureContext(ctx), query, args...)
+	rows, err := s.queryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query object metas: %w", err)
 	}
-	defer s.closeRows(rows, "object metas")
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
+			s.logger.Error("close sqlite rows", "rows", "object metas", "error", closeErr)
+		}
+	}()
 
 	metas := make([]model.ObjectMeta, 0)
 	for rows.Next() {
@@ -139,8 +143,7 @@ func (s *SQLiteMetadata) queryObjectMetas(ctx context.Context, query string, arg
 }
 
 func (s *SQLiteMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
-	row := s.db.QueryRowContext(
-		ensureContext(ctx),
+	row := s.queryRowContext(ctx,
 		`SELECT `+sqliteObjectColumns+`
 		   FROM metadata_objects
 		  WHERE bucket = ? AND object_key = ? AND state = ?
@@ -169,7 +172,7 @@ func (s *SQLiteMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectM
 	}
 
 	intentID, intentStage, intentStartedAt, intentUpdatedAt := extractWriteIntentValues(meta.WriteIntent)
-	if _, err := s.db.ExecContext(
+	if _, err := s.execContext(
 		ensureContext(ctx),
 		sqliteObjectUpsertSQL,
 		meta.Bucket,
@@ -226,7 +229,7 @@ func (s *SQLiteMetadata) deleteObjectMeta(
 }
 
 func (s *SQLiteMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, state string) (bool, error) {
-	result, err := s.db.ExecContext(
+	result, err := s.execContext(
 		ensureContext(ctx),
 		`DELETE FROM metadata_objects
 		  WHERE bucket = ? AND object_key = ? AND state = ?`,

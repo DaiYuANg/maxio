@@ -60,7 +60,8 @@ func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyB
 	}
 
 	bucketsByUpstream := sortUpstreamsForDeterministicBuild(upstreams)
-	for _, upstream := range bucketsByUpstream {
+	for i := range bucketsByUpstream {
+		upstream := bucketsByUpstream[i]
 		if err := addUpstreamToBuilder(b, upstream, options.EntrypointName); err != nil {
 			return nil, err
 		}
@@ -68,7 +69,7 @@ func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyB
 
 	cfg, err := b.BuildValidated()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build validated vale config: %w", err)
 	}
 	return cfg, nil
 }
@@ -83,7 +84,11 @@ func BuildValeGatewayFromConfig(cfg *valeconfig.Config, logger *slog.Logger) (*v
 	if logger != nil {
 		opts = append(opts, vale.WithLogger(logger))
 	}
-	return vale.New(opts...)
+	gateway, err := vale.New(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("initialize vale gateway: %w", err)
+	}
+	return gateway, nil
 }
 
 func sortUpstreamsForDeterministicBuild(upstreams []model.Upstream) []model.Upstream {
@@ -111,7 +116,7 @@ func addUpstreamToBuilder(b *provider.ConfigBuilder, upstream model.Upstream, en
 		name = strings.TrimSpace(upstream.ID)
 	}
 	if name == "" {
-		return fmt.Errorf("upstream name is required")
+		return errors.New("upstream name is required")
 	}
 	endpoint := strings.TrimSpace(upstream.Endpoint)
 	if endpoint == "" {
@@ -122,9 +127,7 @@ func addUpstreamToBuilder(b *provider.ConfigBuilder, upstream model.Upstream, en
 		return fmt.Errorf("upstream %q endpoint invalid: %q", name, endpoint)
 	}
 
-	if err := buildServiceAndRoutes(b, name, parsedEndpoint.String(), upstream.Buckets, entrypointName); err != nil {
-		return fmt.Errorf("upstream %q config: %w", name, err)
-	}
+	buildServiceAndRoutes(b, name, parsedEndpoint.String(), upstream.Buckets, entrypointName)
 	return nil
 }
 
@@ -133,12 +136,12 @@ func buildServiceAndRoutes(
 	serviceName, endpointURL string,
 	buckets []string,
 	entrypointName string,
-) error {
+) {
 	b.Service(serviceName, endpointURL)
 
 	if len(buckets) == 0 {
 		b.RouteTo(serviceName+"-default", entrypointName, serviceName, provider.RoutePathPrefix("/"))
-		return nil
+		return
 	}
 
 	candidates := slices.Clip(append([]string(nil), buckets...))
@@ -153,7 +156,6 @@ func buildServiceAndRoutes(
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
 		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix))
 	}
-	return nil
 }
 
 func normalizeValeOptions(options ValeProxyBuildOptions) ValeProxyBuildOptions {

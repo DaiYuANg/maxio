@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -17,7 +19,23 @@ type intConfig struct {
 }
 
 func validateDurations(cfg Config) error {
-	durationConfigs := []durationConfig{
+	if err := validateMetadataConfig(cfg); err != nil {
+		return err
+	}
+	if err := validateDurationConfigs(durationConfigs(cfg)); err != nil {
+		return err
+	}
+	if err := validateIntegerConfigs(integerConfigs(cfg)); err != nil {
+		return err
+	}
+	if err := validateMultiplier("repair_retry_multiplier", cfg.RepairRetryBackoffMultiplier); err != nil {
+		return err
+	}
+	return validateIndexConfig(cfg)
+}
+
+func durationConfigs(cfg Config) []durationConfig {
+	configs := []durationConfig{
 		{name: "raft_operation_timeout", value: cfg.RaftOperationTimeout},
 		{name: "pending_object_ttl", value: cfg.PendingObjectTTL},
 		{name: "repair_interval", value: cfg.RepairInterval},
@@ -29,18 +47,34 @@ func validateDurations(cfg Config) error {
 		{name: "cache_ttl", value: cfg.CacheTTL},
 	}
 	if cfg.EnableS3Proxy {
-		durationConfigs = append(durationConfigs,
+		configs = append(configs,
 			durationConfig{name: "s3_proxy_health_interval", value: cfg.S3ProxyHealthInterval},
 			durationConfig{name: "s3_proxy_health_timeout", value: cfg.S3ProxyHealthTimeout},
 		)
 	}
-	for _, cfgValue := range durationConfigs {
+	return configs
+}
+
+func validateMetadataConfig(cfg Config) error {
+	if cfg.MetadataBackend == "postgres" {
+		if strings.TrimSpace(cfg.MetadataDSN) == "" {
+			return errors.New("invalid config: metadata_dsn is required when metadata_backend is postgres")
+		}
+	}
+	return nil
+}
+
+func validateDurationConfigs(configs []durationConfig) error {
+	for _, cfgValue := range configs {
 		if err := validateDuration(cfgValue.name, cfgValue.value); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
-	integerConfigs := []intConfig{
+func integerConfigs(cfg Config) []intConfig {
+	return []intConfig{
 		{name: "repair_max_retries", value: cfg.RepairMaxRetries, minimum: 0},
 		{name: "repair_rate_limit", value: cfg.RepairRateLimit, minimum: 0},
 		{name: "dedupe_max_fixes", value: cfg.DedupeMaxFixes, minimum: 0},
@@ -50,16 +84,15 @@ func validateDurations(cfg Config) error {
 		{name: "cache_max_cost", value: cfg.CacheMaxCost, minimum: 0},
 		{name: "cache_redis_db", value: cfg.CacheRedisDB, minimum: 0},
 	}
-	for _, cfgValue := range integerConfigs {
+}
+
+func validateIntegerConfigs(configs []intConfig) error {
+	for _, cfgValue := range configs {
 		if err := validateNonNegativeInt(cfgValue.name, cfgValue.value, cfgValue.minimum); err != nil {
 			return err
 		}
 	}
-
-	if err := validateMultiplier("repair_retry_multiplier", cfg.RepairRetryBackoffMultiplier); err != nil {
-		return err
-	}
-	return validateIndexConfig(cfg)
+	return nil
 }
 
 func validateDuration(name, value string) error {
