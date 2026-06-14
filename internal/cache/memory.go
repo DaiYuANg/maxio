@@ -14,10 +14,12 @@ import (
 )
 
 const (
-	objectKeyPrefix = "object:"
-	listKeyPrefix   = "list:"
-	bucketsKey      = "buckets"
-	keySeparator    = "\x00"
+	objectKeyPrefix        = "object:"
+	objectVersionKeyPrefix = "object-version:"
+	digestRefKeyPrefix     = "digest-ref:"
+	listKeyPrefix          = "list:"
+	bucketsKey             = "buckets"
+	keySeparator           = "\x00"
 
 	// DefaultMemoryTTL is the default time-to-live for metadata cache entries.
 	DefaultMemoryTTL = 5 * time.Minute
@@ -211,16 +213,10 @@ func (c *MemoryMetadataCache) InvalidateAll(_ context.Context) error {
 		return nil
 	}
 
-	c.cache.Del(bucketsKey)
+	c.cache.Clear()
 	c.mu.Lock()
-	keysByBucket := c.bucketKeys
 	c.bucketKeys = make(map[string]map[string]struct{})
 	c.mu.Unlock()
-	for _, keys := range keysByBucket {
-		for key := range keys {
-			c.cache.Del(key)
-		}
-	}
 	return nil
 }
 

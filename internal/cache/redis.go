@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/arcgolabs/kvx"
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/redis/go-redis/v9"
 )
@@ -33,6 +33,7 @@ type RedisClient interface {
 // RedisCache stores metadata cache entries in Redis.
 type RedisCache struct {
 	client    RedisClient
+	kv        kvx.KV
 	prefix    string
 	ttl       time.Duration
 	scanCount int64
@@ -68,6 +69,7 @@ func WithRedisScanCount(count int64) RedisOption {
 func NewRedisCache(client RedisClient, opts ...RedisOption) *RedisCache {
 	cache := &RedisCache{
 		client:    client,
+		kv:        newRedisKVAdapter(client),
 		prefix:    defaultRedisPrefix,
 		ttl:       defaultRedisTTL,
 		scanCount: defaultRedisScanCount,
@@ -103,7 +105,7 @@ func (cache *RedisCache) GetBuckets(ctx context.Context) ([]model.Bucket, bool, 
 // SetBuckets caches bucket metadata.
 func (cache *RedisCache) SetBuckets(ctx context.Context, buckets []model.Bucket) error {
 	if buckets == nil {
-		if err := cache.client.Del(ctx, cache.bucketsKey()).Err(); err != nil {
+		if err := cache.kv.Delete(ctx, cache.bucketsKey()); err != nil {
 			return fmt.Errorf("delete cached buckets: %w", err)
 		}
 		return nil
@@ -137,7 +139,7 @@ func (cache *RedisCache) SetObject(ctx context.Context, meta model.ObjectMeta) e
 
 // DeleteObject removes an object metadata cache entry and invalidates bucket list caches.
 func (cache *RedisCache) DeleteObject(ctx context.Context, bucket, key string) error {
-	if err := cache.client.Del(ctx, cache.objectKey(bucket, key)).Err(); err != nil {
+	if err := cache.kv.Delete(ctx, cache.objectKey(bucket, key)); err != nil {
 		return fmt.Errorf("delete cached object: %w", err)
 	}
 	if err := cache.invalidatePattern(ctx, cache.listPattern(bucket)); err != nil {
@@ -169,7 +171,7 @@ func (cache *RedisCache) InvalidateBucket(ctx context.Context, bucket string) er
 	if err := cache.invalidatePattern(ctx, cache.bucketPattern(bucket)); err != nil {
 		return fmt.Errorf("invalidate cached bucket: %w", err)
 	}
-	if err := cache.client.Del(ctx, cache.bucketsKey()).Err(); err != nil {
+	if err := cache.kv.Delete(ctx, cache.bucketsKey()); err != nil {
 		return fmt.Errorf("delete cached buckets: %w", err)
 	}
 	return nil
@@ -195,14 +197,14 @@ func (cache *RedisCache) Close() error {
 }
 
 func (cache *RedisCache) getJSON(ctx context.Context, key string) ([]byte, bool, error) {
-	value, err := cache.client.Get(ctx, key).Result()
-	if errors.Is(err, redis.Nil) {
+	value, err := cache.kv.Get(ctx, key)
+	if kvx.IsNil(err) {
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, fmt.Errorf("get redis metadata cache: %w", err)
 	}
-	return []byte(value), true, nil
+	return value, true, nil
 }
 
 func (cache *RedisCache) setJSON(ctx context.Context, key string, value any) error {
@@ -210,7 +212,7 @@ func (cache *RedisCache) setJSON(ctx context.Context, key string, value any) err
 	if err != nil {
 		return fmt.Errorf("encode redis metadata cache: %w", err)
 	}
-	if err := cache.client.Set(ctx, key, data, cache.ttl).Err(); err != nil {
+	if err := cache.kv.Set(ctx, key, data, cache.ttl); err != nil {
 		return fmt.Errorf("set redis metadata cache: %w", err)
 	}
 	return nil
@@ -219,12 +221,13 @@ func (cache *RedisCache) setJSON(ctx context.Context, key string, value any) err
 func (cache *RedisCache) invalidatePattern(ctx context.Context, pattern string) error {
 	var cursor uint64
 	for {
-		keys, next, err := cache.client.Scan(ctx, cursor, pattern, cache.scanCount).Result()
+		keys, next, err := cache.kv.Scan(ctx, pattern, cursor, cache.scanCount)
 		if err != nil {
 			return fmt.Errorf("scan redis metadata cache: %w", err)
 		}
-		if len(keys) > 0 {
-			if err := cache.client.Del(ctx, keys...).Err(); err != nil {
+		values := keys.Values()
+		if len(values) > 0 {
+			if err := cache.kv.DeleteMulti(ctx, values); err != nil {
 				return fmt.Errorf("delete redis metadata cache keys: %w", err)
 			}
 		}
@@ -237,6 +240,14 @@ func (cache *RedisCache) invalidatePattern(ctx context.Context, pattern string) 
 
 func (cache *RedisCache) objectKey(bucket, key string) string {
 	return cache.prefix + ":object:" + redisKeyPart(bucket) + ":" + redisKeyPart(key)
+}
+
+func (cache *RedisCache) objectVersionKey(bucket, key string) string {
+	return cache.prefix + ":object-version:" + redisKeyPart(bucket) + ":" + redisKeyPart(key)
+}
+
+func (cache *RedisCache) digestRefKey(digest string) string {
+	return cache.prefix + ":digest-ref:" + redisKeyPart(digest)
 }
 
 func (cache *RedisCache) bucketsKey() string {

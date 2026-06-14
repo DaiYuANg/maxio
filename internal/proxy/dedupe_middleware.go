@@ -10,6 +10,7 @@ import (
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/vale"
 	valeruntime "github.com/arcgolabs/vale/runtime"
+	"github.com/lyonbrown4d/maxio/internal/cache"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -57,19 +58,21 @@ func (event ObjectDeleteSucceededEvent) Name() string {
 type dedupeMiddleware struct {
 	bus    eventx.BusRuntime
 	store  metadata.MetadataStore
+	cache  cache.MetadataCache
 	logger *slog.Logger
 }
 
 func NewDedupeMiddlewareRegistry(
 	bus eventx.BusRuntime,
 	store metadata.MetadataStore,
+	metadataCache cache.MetadataCache,
 	logger *slog.Logger,
 ) *vale.MiddlewareRegistry {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	registry := vale.DefaultMiddlewareRegistry()
-	middleware := &dedupeMiddleware{bus: bus, store: store, logger: logger}
+	middleware := &dedupeMiddleware{bus: bus, store: store, cache: metadataCache, logger: logger}
 	if err := registry.Register(dedupeMiddlewareType, middleware.wrap); err != nil {
 		logger.Error("register vale dedupe middleware", "error", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"time"
 
+	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
@@ -17,6 +18,12 @@ type MetadataCache interface {
 	DeleteObject(ctx context.Context, bucket, key string) error
 	GetListObjects(ctx context.Context, bucket, prefix string) ([]object.ObjectMeta, bool, error)
 	SetListObjects(ctx context.Context, bucket, prefix string, objects []object.ObjectMeta) error
+	GetObjectVersion(ctx context.Context, bucket, key string) (model.ObjectVersion, bool, error)
+	SetObjectVersion(ctx context.Context, version model.ObjectVersion) error
+	DeleteObjectVersion(ctx context.Context, bucket, key string) error
+	GetDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error)
+	SetDigestRef(ctx context.Context, ref model.DigestRef) error
+	DeleteDigestRef(ctx context.Context, digest string) error
 	InvalidateBucket(ctx context.Context, bucket string) error
 	InvalidateAll(ctx context.Context) error
 	Close() error
@@ -67,6 +74,30 @@ func (c *NoopCache) SetListObjects(context.Context, string, string, []object.Obj
 	return nil
 }
 
+func (c *NoopCache) GetObjectVersion(context.Context, string, string) (model.ObjectVersion, bool, error) {
+	return model.ObjectVersion{}, false, nil
+}
+
+func (c *NoopCache) SetObjectVersion(context.Context, model.ObjectVersion) error {
+	return nil
+}
+
+func (c *NoopCache) DeleteObjectVersion(context.Context, string, string) error {
+	return nil
+}
+
+func (c *NoopCache) GetDigestRef(context.Context, string) (model.DigestRef, bool, error) {
+	return model.DigestRef{}, false, nil
+}
+
+func (c *NoopCache) SetDigestRef(context.Context, model.DigestRef) error {
+	return nil
+}
+
+func (c *NoopCache) DeleteDigestRef(context.Context, string) error {
+	return nil
+}
+
 func (c *NoopCache) InvalidateBucket(context.Context, string) error {
 	return nil
 }
@@ -94,10 +125,18 @@ func cloneObjectMeta(meta object.ObjectMeta) object.ObjectMeta {
 	meta.ShardChecksums = cloneSlice(meta.ShardChecksums)
 	meta.ShardSizes = cloneSlice(meta.ShardSizes)
 	if meta.WriteIntent != nil {
-		intent := *meta.WriteIntent
-		meta.WriteIntent = &intent
+		meta.WriteIntent = new(*meta.WriteIntent)
 	}
 	return meta
+}
+
+func cloneObjectVersion(version model.ObjectVersion) model.ObjectVersion {
+	version.UserMetadata = cloneStringMap(version.UserMetadata)
+	return version
+}
+
+func cloneDigestRef(ref model.DigestRef) model.DigestRef {
+	return ref
 }
 
 func cloneStringMap(input map[string]string) map[string]string {

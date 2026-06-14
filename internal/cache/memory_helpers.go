@@ -102,6 +102,14 @@ func objectCacheKey(bucket, key string) string {
 	return objectKeyPrefix + bucket + keySeparator + key
 }
 
+func objectVersionCacheKey(bucket, key string) string {
+	return objectVersionKeyPrefix + bucket + keySeparator + key
+}
+
+func digestRefCacheKey(digest string) string {
+	return digestRefKeyPrefix + digest
+}
+
 func listCacheKey(bucket, prefix string) string {
 	return listKeyPrefix + bucket + keySeparator + prefix
 }
@@ -133,6 +141,29 @@ func estimateListCost(bucket, prefix string, items []model.ObjectMeta) int64 {
 	for index := range items {
 		cost += estimateObjectCost(items[index])
 	}
+	if cost < 1 {
+		return 1
+	}
+	return cost
+}
+
+func estimateObjectVersionCost(version model.ObjectVersion) int64 {
+	cost := int64(256)
+	cost += int64(len(version.Bucket) + len(version.Key) + len(version.VersionID))
+	cost += int64(len(version.Digest) + len(version.ETag) + len(version.ContentType))
+	cost += int64(len(version.UpstreamID) + len(version.UpstreamBucket) + len(version.UpstreamKey))
+	for key, value := range version.UserMetadata {
+		cost += int64(len(key) + len(value) + 32)
+	}
+	if cost < 1 {
+		return 1
+	}
+	return cost
+}
+
+func estimateDigestRefCost(ref model.DigestRef) int64 {
+	cost := int64(128)
+	cost += int64(len(ref.Digest) + len(ref.UpstreamID) + len(ref.UpstreamBucket) + len(ref.UpstreamKey))
 	if cost < 1 {
 		return 1
 	}

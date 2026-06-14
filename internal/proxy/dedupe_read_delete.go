@@ -25,6 +25,7 @@ func (m *dedupeMiddleware) handleDelete(next http.Handler, w http.ResponseWriter
 		m.logger.ErrorContext(r.Context(), "delete s3 object record", "bucket", bucket, "key", key, "error", err)
 		return
 	}
+	m.deleteCachedObjectVersion(r.Context(), bucket, key)
 	if err := m.releaseDigest(r.Context(), digest); err != nil {
 		writeS3ProxyInternalError(w, "failed to release object digest")
 		m.logger.ErrorContext(r.Context(), "release s3 object digest", "bucket", bucket, "key", key, "digest", digest, "error", err)

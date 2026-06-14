@@ -9,6 +9,7 @@ import (
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/vale"
 	valeconfig "github.com/arcgolabs/vale/config"
+	"github.com/lyonbrown4d/maxio/internal/cache"
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -40,7 +41,7 @@ func Module() dix.Module {
 	return dix.NewModule(
 		"proxy",
 		dix.WithModuleProviders(
-			dix.ProviderErr4(newValeGateway),
+			dix.ProviderErr5(newValeGateway),
 		),
 		dix.Hooks(
 			dix.OnStart(startValeGateway),
@@ -54,6 +55,7 @@ func newValeGateway(
 	logger *slog.Logger,
 	store metadata.MetadataStore,
 	bus eventx.BusRuntime,
+	metadataCache cache.MetadataCache,
 ) (*ValeRuntime, error) {
 	if !cfg.EnableS3Proxy {
 		return &ValeRuntime{}, nil
@@ -90,7 +92,7 @@ func newValeGateway(
 	if err != nil {
 		return nil, oops.Wrapf(err, "new vale config provider")
 	}
-	gateway, err := BuildValeGatewayFromProvider(configProvider, logger, NewDedupeMiddlewareRegistry(bus, store, logger))
+	gateway, err := BuildValeGatewayFromProvider(configProvider, logger, NewDedupeMiddlewareRegistry(bus, store, metadataCache, logger))
 	if err != nil {
 		return nil, oops.Wrapf(err, "new vale gateway")
 	}

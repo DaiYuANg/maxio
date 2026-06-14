@@ -59,6 +59,8 @@ github.com/arcgolabs/httpx/adapter/fiber v0.1.8 h1:jdwgX+CAJvuyNKjfZ8PA/g6UVBd+g
 github.com/arcgolabs/httpx/adapter/fiber v0.1.8/go.mod h1:IOYs7eVro2BgMHRuvUoF18fRhlommFbEJn9FlqI5xv8=
 github.com/arcgolabs/httpx/adapter/std v0.1.8 h1:gTTqSqBtGIAiNyAJTIqVrn/OR+K9zOSHqQmp8orNYv8=
 github.com/arcgolabs/httpx/adapter/std v0.1.8/go.mod h1:YVEoGcadIT83nmasuyyT0aE6SNHELCkY51nj9UFsLgc=
+github.com/arcgolabs/kvx v0.3.1 h1:9303whtRbwET/7KgqvZG6n3nMVDMhKdk39ormxWIS2k=
+github.com/arcgolabs/kvx v0.3.1/go.mod h1:F+3P0kYaUce1vcK7OU73i4AH0bxBHuzy2ZBWvG9j7WY=
 github.com/arcgolabs/logx v0.1.3 h1:0P4+g63hrEaW2M/MMhpwClEdYeTvg0OLuFe5M+NuqV0=
 github.com/arcgolabs/logx v0.1.3/go.mod h1:fGRpGfRx2HRlRZ/JiAZ7tD5SvteeKg75nleq+oLFvSs=
 github.com/arcgolabs/mapper v0.2.0 h1:SbaWAb1USdGNg2vAvrk5yYimPV5gQ4wf+FglFbV7RIg=

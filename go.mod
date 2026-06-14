@@ -42,6 +42,7 @@ require (
 	github.com/arcgolabs/collectionx/set v0.9.0 // indirect
 	github.com/arcgolabs/dbx/sqltmpl/validate v0.1.5 // indirect
 	github.com/arcgolabs/httpx/adapter/std v0.1.8 // indirect
+	github.com/arcgolabs/kvx v0.3.1 // indirect
 	github.com/arcgolabs/mapper v0.2.0 // indirect
 	github.com/arcgolabs/observabilityx v0.4.0 // indirect
 	github.com/arcgolabs/pkg/option v0.0.3 // indirect
