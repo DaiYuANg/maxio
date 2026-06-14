@@ -22,7 +22,8 @@ require (
 	github.com/gofiber/template/html/v3 v3.0.5
 	github.com/hashicorp/memberlist v0.5.4
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/redis/go-redis/v9 v9.20.0
+	github.com/redis/go-redis/v9 v9.20.1
+	github.com/samber/oops v1.22.0
 	modernc.org/sqlite v1.52.0
 )
 
@@ -150,7 +151,6 @@ require (
 	github.com/samber/hot v0.13.0 // indirect
 	github.com/samber/lo v1.53.0 // indirect
 	github.com/samber/mo v1.17.0 // indirect
-	github.com/samber/oops v1.22.0 // indirect
 	github.com/samber/slog-common v0.22.0 // indirect
 	github.com/samber/slog-zerolog/v2 v2.9.2 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect

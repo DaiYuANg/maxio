@@ -86,6 +86,9 @@ func (s *SQLMetadata) RetainDigestRef(ctx context.Context, ref model.DigestRef) 
 	if found {
 		ref.CreatedAt = existing.CreatedAt
 		ref.RefCount = existing.RefCount + 1
+		ref.UpstreamID = existing.UpstreamID
+		ref.UpstreamBucket = existing.UpstreamBucket
+		ref.UpstreamKey = existing.UpstreamKey
 	}
 	return s.UpsertDigestRef(ctx, ref)
 }

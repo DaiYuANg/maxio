@@ -52,6 +52,9 @@ func (m *InMemoryMetadata) RetainDigestRef(_ context.Context, ref model.DigestRe
 	if existing, ok := m.digestRefs[ref.Digest]; ok {
 		ref.CreatedAt = existing.CreatedAt
 		ref.RefCount = existing.RefCount + 1
+		ref.UpstreamID = existing.UpstreamID
+		ref.UpstreamBucket = existing.UpstreamBucket
+		ref.UpstreamKey = existing.UpstreamKey
 	}
 	m.digestRefs[ref.Digest] = ref
 	return ref, nil

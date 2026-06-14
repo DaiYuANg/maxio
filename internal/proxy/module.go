@@ -2,16 +2,17 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/vale"
 	valeconfig "github.com/arcgolabs/vale/config"
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/oops"
 )
 
 const (
@@ -39,7 +40,7 @@ func Module() dix.Module {
 	return dix.NewModule(
 		"proxy",
 		dix.WithModuleProviders(
-			dix.ProviderErr3(newValeGateway),
+			dix.ProviderErr4(newValeGateway),
 		),
 		dix.Hooks(
 			dix.OnStart(startValeGateway),
@@ -48,7 +49,12 @@ func Module() dix.Module {
 	)
 }
 
-func newValeGateway(cfg config.Config, logger *slog.Logger, store metadata.MetadataStore) (*ValeRuntime, error) {
+func newValeGateway(
+	cfg config.Config,
+	logger *slog.Logger,
+	store metadata.MetadataStore,
+	bus eventx.BusRuntime,
+) (*ValeRuntime, error) {
 	if !cfg.EnableS3Proxy {
 		return &ValeRuntime{}, nil
 	}
@@ -56,11 +62,11 @@ func newValeGateway(cfg config.Config, logger *slog.Logger, store metadata.Metad
 		logger = slog.Default()
 	}
 	if err := seedConfiguredUpstreams(context.Background(), store, cfg.S3ProxyUpstreams); err != nil {
-		return nil, fmt.Errorf("seed configured upstreams: %w", err)
+		return nil, oops.Wrapf(err, "seed configured upstreams")
 	}
 	upstreams, err := loadEnabledUpstreams(context.Background(), store)
 	if err != nil {
-		return nil, fmt.Errorf("load upstreams: %w", err)
+		return nil, oops.Wrapf(err, "load upstreams")
 	}
 	if len(upstreams) == 0 {
 		logger.Warn("s3 proxy enabled without configured upstreams")
@@ -77,16 +83,16 @@ func newValeGateway(cfg config.Config, logger *slog.Logger, store metadata.Metad
 	options = normalizeValeOptionsWithDefaults(options)
 	cfgData, err := BuildValeConfigSnapshot(upstreams, options)
 	if err != nil {
-		return nil, fmt.Errorf("build vale config: %w", err)
+		return nil, oops.Wrapf(err, "build vale config")
 	}
 
 	configProvider, err := NewValeMemoryConfigProvider(cfgData)
 	if err != nil {
-		return nil, fmt.Errorf("new vale config provider: %w", err)
+		return nil, oops.Wrapf(err, "new vale config provider")
 	}
-	gateway, err := BuildValeGatewayFromProvider(configProvider, logger)
+	gateway, err := BuildValeGatewayFromProvider(configProvider, logger, NewDedupeMiddlewareRegistry(bus, store, logger))
 	if err != nil {
-		return nil, fmt.Errorf("new vale gateway: %w", err)
+		return nil, oops.Wrapf(err, "new vale gateway")
 	}
 	return &ValeRuntime{
 		gateway:        gateway,
@@ -104,17 +110,17 @@ func (r *ValeRuntime) Reload(ctx context.Context) error {
 	}
 	upstreams, err := loadEnabledUpstreams(ctx, r.store)
 	if err != nil {
-		return fmt.Errorf("load upstreams: %w", err)
+		return oops.Wrapf(err, "load upstreams")
 	}
 	if len(upstreams) == 0 && r.logger != nil {
 		r.logger.WarnContext(ctx, "reloading s3 proxy without enabled upstreams")
 	}
 	cfgData, err := BuildValeConfigSnapshot(upstreams, r.options)
 	if err != nil {
-		return fmt.Errorf("build vale config: %w", err)
+		return oops.Wrapf(err, "build vale config")
 	}
 	if err := r.configProvider.Update(cfgData); err != nil {
-		return fmt.Errorf("update vale config provider: %w", err)
+		return oops.Wrapf(err, "update vale config provider")
 	}
 	return nil
 }
@@ -138,12 +144,12 @@ func seedConfiguredUpstream(ctx context.Context, store metadata.MetadataStore, u
 		return metadata.ErrBadRequest
 	}
 	if _, ok, err := store.GetUpstream(ctx, id); err != nil {
-		return fmt.Errorf("get upstream %q: %w", id, err)
+		return oops.Wrapf(err, "get upstream %q", id)
 	} else if ok {
 		return nil
 	}
 	if _, err := store.UpsertUpstream(ctx, upstream); err != nil {
-		return fmt.Errorf("upsert upstream %q: %w", id, err)
+		return oops.Wrapf(err, "upsert upstream %q", id)
 	}
 	return nil
 }
@@ -178,7 +184,7 @@ func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) ([]
 	}
 	upstreams, err := store.ListUpstreams(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list upstreams: %w", err)
+		return nil, oops.Wrapf(err, "list upstreams")
 	}
 	enabled := make([]model.Upstream, 0, len(upstreams))
 	for i := range upstreams {
@@ -195,7 +201,7 @@ func startValeGateway(ctx context.Context, runtime *ValeRuntime) error {
 		return nil
 	}
 	if err := runtime.gateway.Start(ctx); err != nil {
-		return fmt.Errorf("start vale gateway: %w", err)
+		return oops.Wrapf(err, "start vale gateway")
 	}
 	return nil
 }
@@ -205,7 +211,7 @@ func stopValeGateway(ctx context.Context, runtime *ValeRuntime) error {
 		return nil
 	}
 	if err := runtime.gateway.Stop(ctx); err != nil {
-		return fmt.Errorf("stop vale gateway: %w", err)
+		return oops.Wrapf(err, "stop vale gateway")
 	}
 	return nil
 }

@@ -1,8 +1,6 @@
 package proxy
 
 import (
-	"errors"
-	"fmt"
 	"log/slog"
 	"net/url"
 	"slices"
@@ -14,6 +12,7 @@ import (
 	"github.com/arcgolabs/vale/provider"
 	"github.com/arcgolabs/vale/provider/memoryconfig"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/oops"
 )
 
 const defaultValeEntrypoint = "web"
@@ -52,7 +51,8 @@ func DefaultValeProxyBuildOptions() ValeProxyBuildOptions {
 
 func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyBuildOptions) (*valeconfig.Config, error) {
 	if len(upstreams) == 0 {
-		return nil, errors.New("vale upstream list is empty")
+		err := oops.New("vale upstream list is empty")
+		return nil, oops.Wrapf(err, "validate vale upstreams")
 	}
 	return BuildValeConfigSnapshot(upstreams, options)
 }
@@ -82,25 +82,27 @@ func BuildValeConfigSnapshot(upstreams []model.Upstream, options ValeProxyBuildO
 
 	cfg, err := b.BuildValidated()
 	if err != nil {
-		return nil, fmt.Errorf("build validated vale config: %w", err)
+		return nil, oops.Wrapf(err, "build validated vale config")
 	}
 	return cfg, nil
 }
 
 func NewValeMemoryConfigProvider(cfg *valeconfig.Config) (*memoryconfig.Provider, error) {
 	if cfg == nil {
-		return nil, errors.New("vale config is nil")
+		err := oops.New("vale config is nil")
+		return nil, oops.Wrapf(err, "validate vale memory config provider")
 	}
 	configProvider, err := memoryconfig.New("maxio-s3-proxy", cfg)
 	if err != nil {
-		return nil, fmt.Errorf("initialize vale memory config provider: %w", err)
+		return nil, oops.Wrapf(err, "initialize vale memory config provider")
 	}
 	return configProvider, nil
 }
 
 func BuildValeGatewayFromConfig(cfg *valeconfig.Config, logger *slog.Logger) (*vale.Gateway, error) {
 	if cfg == nil {
-		return nil, errors.New("vale config is nil")
+		err := oops.New("vale config is nil")
+		return nil, oops.Wrapf(err, "validate vale gateway config")
 	}
 	opts := []vale.Option{
 		vale.WithStaticConfig(cfg),
@@ -110,14 +112,19 @@ func BuildValeGatewayFromConfig(cfg *valeconfig.Config, logger *slog.Logger) (*v
 	}
 	gateway, err := vale.New(opts...)
 	if err != nil {
-		return nil, fmt.Errorf("initialize vale gateway: %w", err)
+		return nil, oops.Wrapf(err, "initialize vale gateway")
 	}
 	return gateway, nil
 }
 
-func BuildValeGatewayFromProvider(configProvider provider.ConfigProvider, logger *slog.Logger) (*vale.Gateway, error) {
+func BuildValeGatewayFromProvider(
+	configProvider provider.ConfigProvider,
+	logger *slog.Logger,
+	middlewareRegistry ...*vale.MiddlewareRegistry,
+) (*vale.Gateway, error) {
 	if configProvider == nil {
-		return nil, errors.New("vale config provider is nil")
+		err := oops.New("vale config provider is nil")
+		return nil, oops.Wrapf(err, "validate vale gateway config provider")
 	}
 	opts := []vale.Option{
 		vale.WithConfigSourceProviders(configProvider),
@@ -126,9 +133,12 @@ func BuildValeGatewayFromProvider(configProvider provider.ConfigProvider, logger
 	if logger != nil {
 		opts = append(opts, vale.WithLogger(logger))
 	}
+	if len(middlewareRegistry) > 0 && middlewareRegistry[0] != nil {
+		opts = append(opts, vale.WithMiddlewareRegistry(middlewareRegistry[0]))
+	}
 	gateway, err := vale.New(opts...)
 	if err != nil {
-		return nil, fmt.Errorf("initialize vale gateway: %w", err)
+		return nil, oops.Wrapf(err, "initialize vale gateway")
 	}
 	return gateway, nil
 }
@@ -158,15 +168,16 @@ func addUpstreamToBuilder(b *provider.ConfigBuilder, upstream model.Upstream, en
 		name = strings.TrimSpace(upstream.ID)
 	}
 	if name == "" {
-		return errors.New("upstream name is required")
+		err := oops.New("upstream name is required")
+		return oops.Wrapf(err, "validate upstream")
 	}
 	endpoint := strings.TrimSpace(upstream.Endpoint)
 	if endpoint == "" {
-		return fmt.Errorf("upstream %q endpoint is required", name)
+		return oops.Errorf("upstream %q endpoint is required", name)
 	}
 	parsedEndpoint, err := url.Parse(endpoint)
 	if err != nil || parsedEndpoint.Scheme == "" || parsedEndpoint.Host == "" {
-		return fmt.Errorf("upstream %q endpoint invalid: %q", name, endpoint)
+		return oops.Errorf("upstream %q endpoint invalid: %q", name, endpoint)
 	}
 
 	buildServiceAndRoutes(b, name, parsedEndpoint.String(), upstream.Buckets, entrypointName)
@@ -180,9 +191,17 @@ func buildServiceAndRoutes(
 	entrypointName string,
 ) {
 	b.Service(serviceName, endpointURL)
+	middlewareName := dedupeMiddlewareName(serviceName)
+	b.MiddlewareNamed(middlewareName, provider.MiddlewareType(dedupeMiddlewareType))
 
 	if len(buckets) == 0 {
-		b.RouteTo(serviceName+"-default", entrypointName, serviceName, provider.RoutePathPrefix("/"))
+		b.RouteTo(
+			serviceName+"-default",
+			entrypointName,
+			serviceName,
+			provider.RoutePathPrefix("/"),
+			provider.RouteMiddlewares(middlewareName),
+		)
 		return
 	}
 
@@ -196,7 +215,7 @@ func buildServiceAndRoutes(
 		}
 		pathPrefix := "/" + cleanBucket + "/"
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
-		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix))
+		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix), provider.RouteMiddlewares(middlewareName))
 	}
 }
 
