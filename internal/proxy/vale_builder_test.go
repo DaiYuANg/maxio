@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -30,6 +31,34 @@ func TestBuildValeConfigFromUpstreamsWithBucketRoutes(t *testing.T) {
 	}
 	if len(cfg.Routes) != 3 {
 		t.Fatalf("expected 3 routes, got %d", len(cfg.Routes))
+	}
+}
+
+func TestBuildValeConfigSnapshotAllowsEmptyUpstreams(t *testing.T) {
+	cfg, err := proxy.BuildValeConfigSnapshot(nil, proxy.DefaultValeProxyBuildOptions())
+	if err != nil {
+		t.Fatalf("build vale config snapshot: %v", err)
+	}
+	if len(cfg.Entrypoints) != 1 {
+		t.Fatalf("expected 1 entrypoint, got %d", len(cfg.Entrypoints))
+	}
+	if len(cfg.Services) != 1 {
+		t.Fatalf("expected placeholder service, got %d", len(cfg.Services))
+	}
+	if len(cfg.Routes) != 1 {
+		t.Fatalf("expected placeholder route, got %d", len(cfg.Routes))
+	}
+
+	provider, err := proxy.NewValeMemoryConfigProvider(cfg)
+	if err != nil {
+		t.Fatalf("new vale memory config provider: %v", err)
+	}
+	loaded, err := provider.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load vale memory config provider: %v", err)
+	}
+	if len(loaded.Entrypoints) != 1 {
+		t.Fatalf("expected loaded entrypoint, got %d", len(loaded.Entrypoints))
 	}
 }
 

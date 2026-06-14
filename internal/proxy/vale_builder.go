@@ -12,6 +12,7 @@ import (
 	"github.com/arcgolabs/vale"
 	valeconfig "github.com/arcgolabs/vale/config"
 	"github.com/arcgolabs/vale/provider"
+	"github.com/arcgolabs/vale/provider/memoryconfig"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -20,6 +21,10 @@ const defaultValeEntrypointAddress = ":8080"
 const defaultValeAdminAddress = ":19090"
 const defaultValeHealthInterval = "5s"
 const defaultValeHealthTimeout = "2s"
+const disabledValeServiceName = "maxio-disabled"
+const disabledValeRouteName = "maxio-disabled"
+const disabledValeRoutePath = "/__maxio_s3_proxy_disabled__/"
+const disabledValeEndpoint = "http://127.0.0.1:1"
 
 type ValeProxyBuildOptions struct {
 	EntrypointName    string
@@ -46,10 +51,14 @@ func DefaultValeProxyBuildOptions() ValeProxyBuildOptions {
 }
 
 func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyBuildOptions) (*valeconfig.Config, error) {
-	options = normalizeValeOptions(options)
 	if len(upstreams) == 0 {
 		return nil, errors.New("vale upstream list is empty")
 	}
+	return BuildValeConfigSnapshot(upstreams, options)
+}
+
+func BuildValeConfigSnapshot(upstreams []model.Upstream, options ValeProxyBuildOptions) (*valeconfig.Config, error) {
+	options = normalizeValeOptions(options)
 
 	b := provider.NewConfigBuilder()
 	b.Entrypoint(options.EntrypointName, options.Entrypoint).
@@ -60,6 +69,10 @@ func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyB
 	}
 
 	bucketsByUpstream := sortUpstreamsForDeterministicBuild(upstreams)
+	if len(bucketsByUpstream) == 0 {
+		b.Service(disabledValeServiceName, disabledValeEndpoint)
+		b.RouteTo(disabledValeRouteName, options.EntrypointName, disabledValeServiceName, provider.RoutePathPrefix(disabledValeRoutePath))
+	}
 	for i := range bucketsByUpstream {
 		upstream := bucketsByUpstream[i]
 		if err := addUpstreamToBuilder(b, upstream, options.EntrypointName); err != nil {
@@ -74,12 +87,41 @@ func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyB
 	return cfg, nil
 }
 
+func NewValeMemoryConfigProvider(cfg *valeconfig.Config) (*memoryconfig.Provider, error) {
+	if cfg == nil {
+		return nil, errors.New("vale config is nil")
+	}
+	configProvider, err := memoryconfig.New("maxio-s3-proxy", cfg)
+	if err != nil {
+		return nil, fmt.Errorf("initialize vale memory config provider: %w", err)
+	}
+	return configProvider, nil
+}
+
 func BuildValeGatewayFromConfig(cfg *valeconfig.Config, logger *slog.Logger) (*vale.Gateway, error) {
 	if cfg == nil {
 		return nil, errors.New("vale config is nil")
 	}
 	opts := []vale.Option{
 		vale.WithStaticConfig(cfg),
+	}
+	if logger != nil {
+		opts = append(opts, vale.WithLogger(logger))
+	}
+	gateway, err := vale.New(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("initialize vale gateway: %w", err)
+	}
+	return gateway, nil
+}
+
+func BuildValeGatewayFromProvider(configProvider provider.ConfigProvider, logger *slog.Logger) (*vale.Gateway, error) {
+	if configProvider == nil {
+		return nil, errors.New("vale config provider is nil")
+	}
+	opts := []vale.Option{
+		vale.WithConfigSourceProviders(configProvider),
+		vale.WithWatch(true),
 	}
 	if logger != nil {
 		opts = append(opts, vale.WithLogger(logger))

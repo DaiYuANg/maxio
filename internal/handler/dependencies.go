@@ -19,19 +19,28 @@ type controlRuntime interface {
 	SyncReplicas(ctx context.Context, desired map[uint64]string) (control.SyncMembershipResult, error)
 }
 
+type proxyReloader interface {
+	Reload(ctx context.Context) error
+}
+
 // Dependencies groups handler dependencies to keep dix providers shallow.
 type Dependencies struct {
 	objects   *object.Service
 	control   controlRuntime
 	discovery *discovery.Runtime
 	metadata  metadata.MetadataStore
+	proxy     proxyReloader
 }
 
 // NewDependencies wires the handler dependency set.
-func NewDependencies(discoveryRuntime *discovery.Runtime, metadataStore ...metadata.MetadataStore) Dependencies {
-	var repo metadata.MetadataStore
-	if len(metadataStore) > 0 {
-		repo = metadataStore[0]
+func NewDependencies(
+	discoveryRuntime *discovery.Runtime,
+	metadataStore metadata.MetadataStore,
+	proxyRuntime ...proxyReloader,
+) Dependencies {
+	var reloader proxyReloader
+	if len(proxyRuntime) > 0 {
+		reloader = proxyRuntime[0]
 	}
-	return Dependencies{discovery: discoveryRuntime, metadata: repo}
+	return Dependencies{discovery: discoveryRuntime, metadata: metadataStore, proxy: reloader}
 }

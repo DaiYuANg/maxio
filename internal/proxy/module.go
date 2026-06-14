@@ -8,6 +8,7 @@ import (
 
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/vale"
+	valeconfig "github.com/arcgolabs/vale/config"
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -18,7 +19,16 @@ const (
 )
 
 type ValeRuntime struct {
-	gateway *vale.Gateway
+	gateway        *vale.Gateway
+	configProvider valeConfigUpdater
+	store          metadata.MetadataStore
+	options        ValeProxyBuildOptions
+	enabled        bool
+	logger         *slog.Logger
+}
+
+type valeConfigUpdater interface {
+	Update(cfgData *valeconfig.Config) error
 }
 
 // Module wires the Vale reverse-proxy runtime.
@@ -54,7 +64,6 @@ func newValeGateway(cfg config.Config, logger *slog.Logger, store metadata.Metad
 	}
 	if len(upstreams) == 0 {
 		logger.Warn("s3 proxy enabled without configured upstreams")
-		return &ValeRuntime{}, nil
 	}
 
 	options := ValeProxyBuildOptions{
@@ -66,16 +75,48 @@ func newValeGateway(cfg config.Config, logger *slog.Logger, store metadata.Metad
 		EnableHealthCheck: true,
 	}
 	options = normalizeValeOptionsWithDefaults(options)
-	cfgData, err := BuildValeConfigFromUpstreams(upstreams, options)
+	cfgData, err := BuildValeConfigSnapshot(upstreams, options)
 	if err != nil {
 		return nil, fmt.Errorf("build vale config: %w", err)
 	}
 
-	gateway, err := BuildValeGatewayFromConfig(cfgData, logger)
+	configProvider, err := NewValeMemoryConfigProvider(cfgData)
+	if err != nil {
+		return nil, fmt.Errorf("new vale config provider: %w", err)
+	}
+	gateway, err := BuildValeGatewayFromProvider(configProvider, logger)
 	if err != nil {
 		return nil, fmt.Errorf("new vale gateway: %w", err)
 	}
-	return &ValeRuntime{gateway: gateway}, nil
+	return &ValeRuntime{
+		gateway:        gateway,
+		configProvider: configProvider,
+		store:          store,
+		options:        options,
+		enabled:        true,
+		logger:         logger,
+	}, nil
+}
+
+func (r *ValeRuntime) Reload(ctx context.Context) error {
+	if r == nil || !r.enabled || r.configProvider == nil {
+		return nil
+	}
+	upstreams, err := loadEnabledUpstreams(ctx, r.store)
+	if err != nil {
+		return fmt.Errorf("load upstreams: %w", err)
+	}
+	if len(upstreams) == 0 && r.logger != nil {
+		r.logger.WarnContext(ctx, "reloading s3 proxy without enabled upstreams")
+	}
+	cfgData, err := BuildValeConfigSnapshot(upstreams, r.options)
+	if err != nil {
+		return fmt.Errorf("build vale config: %w", err)
+	}
+	if err := r.configProvider.Update(cfgData); err != nil {
+		return fmt.Errorf("update vale config provider: %w", err)
+	}
+	return nil
 }
 
 func seedConfiguredUpstreams(ctx context.Context, store metadata.MetadataStore, upstreams []model.Upstream) error {

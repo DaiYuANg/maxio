@@ -89,6 +89,10 @@ func (s *Service) upsertS3Upstream(w http.ResponseWriter, r *http.Request, id st
 		s.writeS3UpstreamError(w, err)
 		return
 	}
+	if err := s.reloadS3Proxy(r); err != nil {
+		s.writeError(w, err)
+		return
+	}
 	s.auditHTTP(r, "s3.upstream.upsert", "upstream_id", stored.ID, "endpoint", stored.Endpoint)
 	s.writeJSON(w, http.StatusOK, stored)
 }
@@ -103,8 +107,22 @@ func (s *Service) deleteS3Upstream(w http.ResponseWriter, r *http.Request, id st
 		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "upstream not found"})
 		return
 	}
+	if err := s.reloadS3Proxy(r); err != nil {
+		s.writeError(w, err)
+		return
+	}
 	s.auditHTTP(r, "s3.upstream.delete", "upstream_id", strings.TrimSpace(id))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Service) reloadS3Proxy(r *http.Request) error {
+	if s == nil || s.proxy == nil || !s.cfg.EnableS3Proxy {
+		return nil
+	}
+	if err := s.proxy.Reload(r.Context()); err != nil {
+		return fmt.Errorf("reload s3 proxy: %w", err)
+	}
+	return nil
 }
 
 func decodeUpstreamRequest(r *http.Request, pathID string) (model.Upstream, error) {
