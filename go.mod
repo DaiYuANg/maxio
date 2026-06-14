@@ -39,6 +39,8 @@ require (
 	github.com/arcgolabs/collectionx/prefix v0.8.0 // indirect
 	github.com/arcgolabs/collectionx/set v0.9.0 // indirect
 	github.com/arcgolabs/configx/format/hcl v0.0.0-20260517161814-12696a4be3fe // indirect
+	github.com/arcgolabs/dbx/sqltmpl v0.1.5 // indirect
+	github.com/arcgolabs/dbx/sqltmpl/validate v0.1.5 // indirect
 	github.com/arcgolabs/httpx/adapter/std v0.1.7 // indirect
 	github.com/arcgolabs/mapper v0.1.2 // indirect
 	github.com/arcgolabs/observabilityx v0.4.0 // indirect
@@ -71,6 +73,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/danielgtaylor/huma/v2 v2.38.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-chi/chi/v5 v5.3.0 // indirect
