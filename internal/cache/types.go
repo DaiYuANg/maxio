@@ -139,6 +139,17 @@ func cloneDigestRef(ref model.DigestRef) model.DigestRef {
 	return ref
 }
 
+func cloneObjectMetaSlice(items []model.ObjectMeta) []model.ObjectMeta {
+	if items == nil {
+		return nil
+	}
+	clone := make([]model.ObjectMeta, len(items))
+	for index := range items {
+		clone[index] = cloneObjectMeta(items[index])
+	}
+	return clone
+}
+
 func cloneStringMap(input map[string]string) map[string]string {
 	if len(input) == 0 {
 		return nil
