@@ -180,18 +180,25 @@ func addUpstreamToBuilder(b *provider.ConfigBuilder, upstream model.Upstream, en
 		return oops.Errorf("upstream %q endpoint invalid: %q", name, endpoint)
 	}
 
-	buildServiceAndRoutes(b, name, parsedEndpoint.String(), upstream.Buckets, entrypointName)
+	buildServiceAndRoutes(
+		b,
+		name,
+		upstreamIdentity(upstream),
+		parsedEndpoint.String(),
+		upstream.Buckets,
+		entrypointName,
+	)
 	return nil
 }
 
 func buildServiceAndRoutes(
 	b *provider.ConfigBuilder,
-	serviceName, endpointURL string,
+	serviceName, upstreamID, endpointURL string,
 	buckets []string,
 	entrypointName string,
 ) {
 	b.Service(serviceName, endpointURL)
-	middlewareName := dedupeMiddlewareName(serviceName)
+	middlewareName := dedupeMiddlewareName(upstreamID)
 	b.MiddlewareNamed(middlewareName, provider.MiddlewareType(dedupeMiddlewareType))
 
 	if len(buckets) == 0 {
@@ -217,6 +224,14 @@ func buildServiceAndRoutes(
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
 		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix), provider.RouteMiddlewares(middlewareName))
 	}
+}
+
+func upstreamIdentity(upstream model.Upstream) string {
+	id := strings.TrimSpace(upstream.ID)
+	if id != "" {
+		return id
+	}
+	return strings.TrimSpace(upstream.Name)
 }
 
 func normalizeValeOptions(options ValeProxyBuildOptions) ValeProxyBuildOptions {

@@ -34,6 +34,37 @@ func TestBuildValeConfigFromUpstreamsWithBucketRoutes(t *testing.T) {
 	}
 }
 
+func TestBuildValeConfigUsesUpstreamIDForDedupeMiddleware(t *testing.T) {
+	upstreams := []model.Upstream{
+		{
+			ID:       "stable-upstream-id",
+			Name:     "display-name",
+			Endpoint: "http://127.0.0.1:9000",
+			Buckets:  []string{"photos"},
+		},
+	}
+
+	cfg, err := proxy.BuildValeConfigFromUpstreams(upstreams, proxy.DefaultValeProxyBuildOptions())
+	if err != nil {
+		t.Fatalf("build vale config: %v", err)
+	}
+
+	hasMiddlewareNamed := func(name string) bool {
+		for _, middleware := range cfg.Middlewares {
+			if middleware.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+	if !hasMiddlewareNamed("maxio-dedupe:stable-upstream-id") {
+		t.Fatal("expected dedupe middleware to use stable upstream id")
+	}
+	if hasMiddlewareNamed("maxio-dedupe:display-name") {
+		t.Fatal("did not expect dedupe middleware to use display name")
+	}
+}
+
 func TestBuildValeConfigSnapshotAllowsEmptyUpstreams(t *testing.T) {
 	cfg, err := proxy.BuildValeConfigSnapshot(nil, proxy.DefaultValeProxyBuildOptions())
 	if err != nil {
