@@ -159,11 +159,6 @@ func (s *SQLMetadata) execContext(ctx context.Context, query string, args ...any
 	return result, nil
 }
 
-func (s *SQLMetadata) txQueryRowContext(ctx context.Context, tx *sql.Tx, query string, args ...any) *sql.Row {
-	query = s.normalizeQuery(query)
-	return tx.QueryRowContext(ensureContext(ctx), query, args...)
-}
-
 func (s *SQLMetadata) txExecContext(ctx context.Context, tx *sql.Tx, query string, args ...any) error {
 	query = s.normalizeQuery(query)
 	_, err := tx.ExecContext(ensureContext(ctx), query, args...)

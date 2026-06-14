@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/arcgolabs/dbx/querydsl"
+
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -95,15 +97,13 @@ func scanDigestRef(scanner interface{ Scan(dest ...any) error }) (model.DigestRe
 }
 
 func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *sql.Tx, digest string) (model.DigestRef, error) {
-	row := s.txQueryRowContext(
-		ctx,
-		tx,
-		`SELECT digest, size, ref_count, upstream_id, upstream_bucket, upstream_key, created_at, updated_at
-		   FROM metadata_digest_refs
-		  WHERE digest = ?
-		  LIMIT 1`,
-		digest,
-	)
+	query := querydsl.SelectFrom(metadataDigestRefs.table, metadataDigestRefs.selectItems()...).
+		Where(metadataDigestRefs.digest.Eq(digest)).
+		Limit(1)
+	row, queryErr := s.txQueryRowBuilderContext(ctx, tx, query)
+	if queryErr != nil {
+		return model.DigestRef{}, fmt.Errorf("get digest ref: %w", queryErr)
+	}
 	ref, err := scanDigestRef(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.DigestRef{}, ErrObjectNotFound

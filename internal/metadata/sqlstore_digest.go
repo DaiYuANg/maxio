@@ -108,18 +108,17 @@ func (s *SQLMetadata) ReleaseDigestRef(ctx context.Context, digest string) (mode
 		ref.UpdatedAt = time.Now().UTC()
 		if ref.RefCount <= 0 {
 			removed = true
-			return s.txExecContext(ctx, tx, `DELETE FROM metadata_digest_refs WHERE digest = ?`, digest)
+			query := querydsl.DeleteFrom(metadataDigestRefs.table).
+				Where(metadataDigestRefs.digest.Eq(digest))
+			return s.txExecBuilderContext(ctx, tx, query)
 		}
-		return s.txExecContext(
-			ctx,
-			tx,
-			`UPDATE metadata_digest_refs
-			    SET ref_count = ?, updated_at = ?
-			  WHERE digest = ?`,
-			ref.RefCount,
-			ref.UpdatedAt.UnixNano(),
-			digest,
-		)
+		query := querydsl.Update(metadataDigestRefs.table).
+			Set(
+				metadataDigestRefs.refCount.Set(ref.RefCount),
+				metadataDigestRefs.updatedAt.Set(ref.UpdatedAt.UnixNano()),
+			).
+			Where(metadataDigestRefs.digest.Eq(digest))
+		return s.txExecBuilderContext(ctx, tx, query)
 	})
 	return ref, removed, err
 }

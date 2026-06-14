@@ -173,12 +173,14 @@ func scanBlobRef(scanner interface{ Scan(dest ...any) error }) (BlobRef, error) 
 func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
 	var path string
 	var refCount int
-	err := s.txQueryRowContext(
-		ctx,
-		tx,
-		s.normalizeQuery("SELECT path, ref_count FROM metadata_blob_refs WHERE hash = ?"),
-		hash,
-	).Scan(&path, &refCount)
+	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.path, metadataBlobRefs.refCount).
+		Where(metadataBlobRefs.hash.Eq(hash)).
+		Limit(1)
+	row, queryErr := s.txQueryRowBuilderContext(ctx, tx, query)
+	if queryErr != nil {
+		return "", false, fmt.Errorf("query blob ref: %w", queryErr)
+	}
+	err := row.Scan(&path, &refCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, ErrObjectNotFound
 	}
@@ -192,12 +194,9 @@ func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash 
 }
 
 func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
-	if err := s.txExecContext(
-		ensureContext(ctx),
-		tx,
-		s.normalizeQuery("DELETE FROM metadata_blob_refs WHERE hash = ?"),
-		hash,
-	); err != nil {
+	query := querydsl.DeleteFrom(metadataBlobRefs.table).
+		Where(metadataBlobRefs.hash.Eq(hash))
+	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
 		return fmt.Errorf("delete blob ref: %w", err)
 	}
 	return nil
