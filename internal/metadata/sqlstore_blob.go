@@ -113,11 +113,7 @@ func (s *SQLMetadata) IncreaseBlobRef(ctx context.Context, hash string) error {
 	if hash == "" {
 		return ErrBadRequest
 	}
-	result, err := s.execContext(
-		ctx,
-		"UPDATE metadata_blob_refs SET ref_count = ref_count + 1 WHERE hash = ?",
-		hash,
-	)
+	result, err := s.execSQLTemplateContext(ctx, metadataSQLBlobIncreaseRefCount, metadataBlobRefHashParams{Hash: hash})
 	if err != nil {
 		return fmt.Errorf("increase blob ref: %w", err)
 	}
@@ -203,12 +199,7 @@ func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash st
 }
 
 func (s *SQLMetadata) updateBlobRefCountInTx(ctx context.Context, tx *sql.Tx, hash string) error {
-	if err := s.txExecContext(
-		ensureContext(ctx),
-		tx,
-		s.normalizeQuery("UPDATE metadata_blob_refs SET ref_count = ref_count - 1 WHERE hash = ?"),
-		hash,
-	); err != nil {
+	if err := s.txExecSQLTemplateContext(ctx, tx, metadataSQLBlobDecreaseRefCount, metadataBlobRefHashParams{Hash: hash}); err != nil {
 		return fmt.Errorf("decrease blob ref: %w", err)
 	}
 	return nil

@@ -12,23 +12,16 @@ import (
 
 	"github.com/arcgolabs/dbx"
 	sqlitedialect "github.com/arcgolabs/dbx/dialect/sqlite"
+	sqltmpl "github.com/arcgolabs/dbx/sqltmpl"
 	// Register the pure-Go SQLite database/sql driver.
 	_ "modernc.org/sqlite"
-)
-
-type metadataSQLDialect string
-
-const (
-	metadataSQLDialectSQLite   metadataSQLDialect = "sqlite"
-	metadataSQLDialectPostgres metadataSQLDialect = "postgres"
-	metadataSQLDialectMySQL    metadataSQLDialect = "mysql"
 )
 
 type SQLMetadata struct {
 	db           *sql.DB
 	dbxDB        *dbx.DB
+	sqlTemplates *sqltmpl.Registry
 	logger       *slog.Logger
-	queryDialect metadataSQLDialect
 }
 
 type SQLiteMetadata = SQLMetadata
@@ -60,8 +53,8 @@ func NewSQLiteMetadata(path string, logger *slog.Logger, migrateSchema ...bool) 
 	metadata := &SQLMetadata{
 		db:           db,
 		dbxDB:        session,
+		sqlTemplates: newMetadataSQLTemplateRegistry(session),
 		logger:       logger,
-		queryDialect: metadataSQLDialectSQLite,
 	}
 
 	if err := metadata.applyPragmas(context.Background()); err != nil {
@@ -87,14 +80,13 @@ func newSQLMetadata(
 	db *sql.DB,
 	session *dbx.DB,
 	logger *slog.Logger,
-	queryDialect metadataSQLDialect,
 	migrateSchema bool,
 ) (*SQLMetadata, error) {
 	metadata := &SQLMetadata{
 		db:           db,
 		dbxDB:        session,
+		sqlTemplates: newMetadataSQLTemplateRegistry(session),
 		logger:       logger,
-		queryDialect: queryDialect,
 	}
 	if migrateSchema {
 		if err := metadata.createSchema(context.Background()); err != nil {
@@ -127,59 +119,17 @@ func (s *SQLMetadata) Close() error {
 func (s *SQLMetadata) applyPragmas(ctx context.Context) error {
 	ctx = ensureContext(ctx)
 	stmts := []string{
-		"PRAGMA journal_mode=WAL",
-		"PRAGMA synchronous=NORMAL",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA busy_timeout=5000",
+		metadataSQLPragmaJournalMode,
+		metadataSQLPragmaSynchronous,
+		metadataSQLPragmaForeignKeys,
+		metadataSQLPragmaBusyTimeout,
 	}
 	for _, stmt := range stmts {
-		if _, err := s.execContext(ctx, stmt); err != nil {
+		if _, err := s.execSQLTemplateContext(ctx, stmt, nil); err != nil {
 			return fmt.Errorf("exec sqlite pragma: %w", err)
 		}
 	}
 	return nil
-}
-
-func (s *SQLMetadata) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	if s == nil {
-		return nil, errors.New("metadata db session is nil")
-	}
-	query = s.normalizeQuery(query)
-	if s.dbxDB != nil {
-		result, err := s.dbxDB.ExecContext(ctx, query, args...)
-		if err != nil {
-			return nil, fmt.Errorf("exec metadata query: %w", err)
-		}
-		return result, nil
-	}
-	result, err := s.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("exec metadata query: %w", err)
-	}
-	return result, nil
-}
-
-func (s *SQLMetadata) txExecContext(ctx context.Context, tx *sql.Tx, query string, args ...any) error {
-	query = s.normalizeQuery(query)
-	_, err := tx.ExecContext(ensureContext(ctx), query, args...)
-	if err != nil {
-		return fmt.Errorf("exec metadata tx query: %w", err)
-	}
-	return nil
-}
-
-func (s *SQLMetadata) normalizeQuery(query string) string {
-	if s == nil {
-		return query
-	}
-	switch s.queryDialect {
-	case metadataSQLDialectPostgres:
-		return rewriteQuestionPlaceholdersToPostgres(query)
-	case metadataSQLDialectSQLite, metadataSQLDialectMySQL:
-		return query
-	default:
-		return query
-	}
 }
 
 func (s *SQLMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx) error) error {

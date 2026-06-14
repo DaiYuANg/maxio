@@ -31,12 +31,12 @@ func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLMet
 		return nil, fmt.Errorf("initialize dbx postgres metadata session: %w", closePostgresOnInitError(db, logger, err))
 	}
 
-	store := &SQLMetadata{db: db, dbxDB: session, logger: logger, queryDialect: metadataSQLDialectPostgres}
+	store := &SQLMetadata{db: db, dbxDB: session, sqlTemplates: newMetadataSQLTemplateRegistry(session), logger: logger}
 	if pingErr := store.ping(context.Background()); pingErr != nil {
 		return nil, fmt.Errorf("connect postgres metadata database: %w", closePostgresOnInitError(db, logger, pingErr))
 	}
 	if migrate {
-		store, err = newSQLMetadata(db, session, logger, metadataSQLDialectPostgres, true)
+		store, err = newSQLMetadata(db, session, logger, true)
 		if err != nil {
 			return nil, fmt.Errorf("initialize postgres schema: %w", closePostgresOnInitError(db, logger, err))
 		}

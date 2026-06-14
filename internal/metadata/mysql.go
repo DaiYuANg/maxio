@@ -33,12 +33,12 @@ func NewMySQLMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLMetada
 		return nil, fmt.Errorf("initialize dbx mysql metadata session: %w", closeMySQLOnInitError(db, logger, err))
 	}
 
-	store := &SQLMetadata{db: db, dbxDB: session, logger: logger, queryDialect: metadataSQLDialectMySQL}
+	store := &SQLMetadata{db: db, dbxDB: session, sqlTemplates: newMetadataSQLTemplateRegistry(session), logger: logger}
 	if pingErr := store.ping(context.Background()); pingErr != nil {
 		return nil, fmt.Errorf("connect mysql metadata database: %w", closeMySQLOnInitError(db, logger, pingErr))
 	}
 	if migrate {
-		store, err = newSQLMetadata(db, session, logger, metadataSQLDialectMySQL, true)
+		store, err = newSQLMetadata(db, session, logger, true)
 		if err != nil {
 			return nil, fmt.Errorf("initialize mysql schema: %w", closeMySQLOnInitError(db, logger, err))
 		}
