@@ -56,3 +56,55 @@ func (s *SQLMetadata) execBuilderContext(ctx context.Context, query querydsl.Bui
 	}
 	return result, nil
 }
+
+func (s *SQLMetadata) txQueryBuilderContext(ctx context.Context, tx *sql.Tx, query querydsl.Builder) (*sql.Rows, error) {
+	if s == nil || s.dbxDB == nil {
+		return nil, errors.New("metadata dbx session is nil")
+	}
+	if tx == nil {
+		return nil, errors.New("metadata tx is nil")
+	}
+
+	bound, err := query.Build(s.dbxDB.Dialect())
+	if err != nil {
+		return nil, fmt.Errorf("build metadata tx query: %w", err)
+	}
+	rows, err := tx.QueryContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...)
+	if err != nil {
+		return nil, fmt.Errorf("query metadata tx rows: %w", err)
+	}
+	return rows, nil
+}
+
+func (s *SQLMetadata) txQueryRowBuilderContext(ctx context.Context, tx *sql.Tx, query querydsl.Builder) (sqlRowScanner, error) {
+	if s == nil || s.dbxDB == nil {
+		return nil, errors.New("metadata dbx session is nil")
+	}
+	if tx == nil {
+		return nil, errors.New("metadata tx is nil")
+	}
+
+	bound, err := query.Build(s.dbxDB.Dialect())
+	if err != nil {
+		return nil, fmt.Errorf("build metadata tx query: %w", err)
+	}
+	return tx.QueryRowContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...), nil
+}
+
+func (s *SQLMetadata) txExecBuilderContext(ctx context.Context, tx *sql.Tx, query querydsl.Builder) error {
+	if s == nil || s.dbxDB == nil {
+		return errors.New("metadata dbx session is nil")
+	}
+	if tx == nil {
+		return errors.New("metadata tx is nil")
+	}
+
+	bound, err := query.Build(s.dbxDB.Dialect())
+	if err != nil {
+		return fmt.Errorf("build metadata tx mutation: %w", err)
+	}
+	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...); err != nil {
+		return fmt.Errorf("exec metadata tx query: %w", err)
+	}
+	return nil
+}
