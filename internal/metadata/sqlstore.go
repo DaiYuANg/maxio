@@ -159,27 +159,6 @@ func (s *SQLMetadata) execContext(ctx context.Context, query string, args ...any
 	return result, nil
 }
 
-func (s *SQLMetadata) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	query = s.normalizeQuery(query)
-	if s != nil && s.dbxDB != nil {
-		rows, err := s.dbxDB.QueryContext(ensureContext(ctx), query, args...)
-		if err != nil {
-			return nil, fmt.Errorf("query metadata rows: %w", err)
-		}
-		return rows, nil
-	}
-	rows, err := s.db.QueryContext(ensureContext(ctx), query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("query metadata rows: %w", err)
-	}
-	return rows, nil
-}
-
-func (s *SQLMetadata) queryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	query = s.normalizeQuery(query)
-	return s.db.QueryRowContext(ensureContext(ctx), query, args...)
-}
-
 func (s *SQLMetadata) txQueryContext(ctx context.Context, tx *sql.Tx, query string, args ...any) (*sql.Rows, error) {
 	query = s.normalizeQuery(query)
 	rows, err := tx.QueryContext(ensureContext(ctx), query, args...)
