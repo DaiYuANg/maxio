@@ -3,7 +3,7 @@ package metadata
 import (
 	"context"
 
-	"github.com/samber/lo"
+	"github.com/arcgolabs/collectionx/list"
 )
 
 func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, bool, error) {
@@ -17,12 +17,12 @@ func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, 
 func (m *InMemoryMetadata) ListBlobRefs(_ context.Context) ([]BlobRef, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	refs := lo.Map(lo.Keys(m.blobs), func(hash string, _ int) BlobRef {
-		ref := m.blobs[hash]
+	refs := list.NewList[BlobRef]()
+	for hash, ref := range m.blobs {
 		ref.Hash = hash
-		return ref
-	})
-	return refs, nil
+		refs.Add(ref)
+	}
+	return refs.Values(), nil
 }
 
 func (m *InMemoryMetadata) CreateBlobRef(

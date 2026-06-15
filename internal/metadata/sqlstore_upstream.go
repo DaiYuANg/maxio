@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	collectionset "github.com/arcgolabs/collectionx/set"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 )
 
 var metadataUpstreams = newMetadataUpstreamsTable()
@@ -206,11 +206,13 @@ func normalizeUpstream(upstream model.Upstream) (model.Upstream, error) {
 }
 
 func normalizeStringList(values []string) []string {
-	return lo.Uniq(lo.FilterMap(values, func(value string, _ int) (string, bool) {
+	uniqValues := collectionset.NewOrderedSetWithCapacity[string](len(values))
+	for _, value := range values {
 		trimmed := strings.TrimSpace(value)
 		if trimmed == "" {
-			return "", false
+			continue
 		}
-		return trimmed, true
-	}))
+		uniqValues.Add(trimmed)
+	}
+	return uniqValues.Values()
 }

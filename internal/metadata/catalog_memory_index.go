@@ -2,11 +2,10 @@ package metadata
 
 import (
 	"context"
-	"sort"
 	"strings"
 
+	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) UpsertIndexDocument(_ context.Context, document model.IndexDocument) (model.IndexDocument, error) {
@@ -48,22 +47,37 @@ func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	documents := lo.Filter(lo.Values(m.indexDocuments), func(document model.IndexDocument, _ int) bool {
+	documents := list.NewList[model.IndexDocument]()
+	for _, document := range m.indexDocuments {
 		if bucket != "" && document.Bucket != bucket {
-			return false
+			continue
 		}
 		if prefix != "" && !strings.HasPrefix(document.Key, prefix) {
-			return false
+			continue
 		}
-		return true
-	})
-	sort.Slice(documents, func(i, j int) bool {
-		if documents[i].Bucket == documents[j].Bucket {
-			return documents[i].Key < documents[j].Key
+		documents.Add(document)
+	}
+	sorted := documents.Sort(func(left, right model.IndexDocument) int {
+		if left.Bucket == right.Bucket {
+			switch {
+			case left.Key < right.Key:
+				return -1
+			case left.Key > right.Key:
+				return 1
+			default:
+				return 0
+			}
 		}
-		return documents[i].Bucket < documents[j].Bucket
-	})
-	return documents, nil
+		switch {
+		case left.Bucket < right.Bucket:
+			return -1
+		case left.Bucket > right.Bucket:
+			return 1
+		default:
+			return 0
+		}
+	}).Values()
+	return sorted, nil
 }
 
 func (m *InMemoryMetadata) DeleteIndexDocument(_ context.Context, id string) (bool, error) {
@@ -121,16 +135,27 @@ func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	jobs := lo.Filter(lo.Values(m.indexJobs), func(job model.IndexJob, _ int) bool {
-		return status == "" || job.Status == status
-	})
-	if queryLimit := limit; queryLimit > 0 && len(jobs) > queryLimit {
-		jobs = lo.Take(jobs, queryLimit)
+	jobs := list.NewList[model.IndexJob]()
+	for _, job := range m.indexJobs {
+		if status != "" && job.Status != status {
+			continue
+		}
+		jobs.Add(job)
 	}
-	sort.Slice(jobs, func(i, j int) bool {
-		return jobs[i].CreatedAt.Before(jobs[j].CreatedAt)
+	if queryLimit := limit; queryLimit > 0 && jobs.Len() > queryLimit {
+		jobs = jobs.Take(queryLimit)
+	}
+	jobs = jobs.Sort(func(left, right model.IndexJob) int {
+		switch {
+		case left.CreatedAt.Before(right.CreatedAt):
+			return -1
+		case left.CreatedAt.After(right.CreatedAt):
+			return 1
+		default:
+			return 0
+		}
 	})
-	return jobs, nil
+	return jobs.Values(), nil
 }
 
 func (m *InMemoryMetadata) DeleteIndexJob(_ context.Context, id string) (bool, error) {
@@ -188,16 +213,27 @@ func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status strin
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	events := lo.Filter(lo.Values(m.indexOutbox), func(event model.IndexOutboxEvent, _ int) bool {
-		return status == "" || event.Status == status
-	})
-	if queryLimit := limit; queryLimit > 0 && len(events) > queryLimit {
-		events = lo.Take(events, queryLimit)
+	events := list.NewList[model.IndexOutboxEvent]()
+	for _, event := range m.indexOutbox {
+		if status != "" && event.Status != status {
+			continue
+		}
+		events.Add(event)
 	}
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].CreatedAt.Before(events[j].CreatedAt)
+	if queryLimit := limit; queryLimit > 0 && events.Len() > queryLimit {
+		events = events.Take(queryLimit)
+	}
+	events = events.Sort(func(left, right model.IndexOutboxEvent) int {
+		switch {
+		case left.CreatedAt.Before(right.CreatedAt):
+			return -1
+		case left.CreatedAt.After(right.CreatedAt):
+			return 1
+		default:
+			return 0
+		}
 	})
-	return events, nil
+	return events.Values(), nil
 }
 
 func (m *InMemoryMetadata) DeleteIndexOutboxEvent(_ context.Context, id string) (bool, error) {

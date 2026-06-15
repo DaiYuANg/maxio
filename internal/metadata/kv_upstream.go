@@ -7,16 +7,16 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) ListUpstreams(context.Context) ([]model.Upstream, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	upstreams := list.NewList(lo.Map(lo.Values(m.upstreams), func(upstream model.Upstream, _ int) model.Upstream {
-		return cloneUpstream(upstream)
-	})...)
+	upstreams := list.NewList[model.Upstream]()
+	for _, upstream := range m.upstreams {
+		upstreams.Add(cloneUpstream(upstream))
+	}
 	sorted := upstreams.Sort(compareUpstream)
 	return sorted.Values(), nil
 }

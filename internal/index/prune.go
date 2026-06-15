@@ -3,9 +3,9 @@ package index
 import (
 	"fmt"
 
+	"github.com/arcgolabs/collectionx/set"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 )
 
 const pruneSearchPageSize = 1000
@@ -29,22 +29,18 @@ func (s *SearchEngine) PruneExcept(valid []model.ObjectMeta) error {
 	return nil
 }
 
-func objectIDSet(objects []model.ObjectMeta) map[string]struct{} {
-	ids := lo.FilterMap(objects, func(meta model.ObjectMeta, _ int) (string, bool) {
+func objectIDSet(objects []model.ObjectMeta) *set.Set[string] {
+	validIDs := set.NewSetWithCapacity[string](len(objects))
+	for _, meta := range objects {
 		if meta.Bucket == "" || meta.Key == "" {
-			return "", false
+			continue
 		}
-		return objectID(meta.Bucket, meta.Key), true
-	})
-	ids = lo.Uniq(ids)
-	set := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		set[id] = struct{}{}
+		validIDs.Add(objectID(meta.Bucket, meta.Key))
 	}
-	return set
+	return validIDs
 }
 
-func (s *SearchEngine) indexedDocumentIDs() (map[string]struct{}, error) {
+func (s *SearchEngine) indexedDocumentIDs() (*set.Set[string], error) {
 	ids := s.memoryDocumentIDs()
 	if !s.ready {
 		return ids, nil
@@ -54,27 +50,30 @@ func (s *SearchEngine) indexedDocumentIDs() (map[string]struct{}, error) {
 		return nil, err
 	}
 	for _, id := range bleveIDs {
-		ids[id] = struct{}{}
+		ids.Add(id)
 	}
 	return ids, nil
 }
 
-func (s *SearchEngine) memoryDocumentIDs() map[string]struct{} {
+func (s *SearchEngine) memoryDocumentIDs() *set.Set[string] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	ids := make(map[string]struct{}, len(s.items))
+	ids := set.NewSetWithCapacity[string](len(s.items))
 	for id := range s.items {
-		ids[id] = struct{}{}
+		ids.Add(id)
 	}
 	return ids
 }
 
-func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs map[string]struct{}) ([]string, error) {
-	staleIDs := lo.Filter(lo.Keys(indexedIDs), func(id string, _ int) bool {
-		_, ok := validIDs[id]
-		return !ok
-	})
+func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs *set.Set[string]) ([]string, error) {
+	staleIDs := make([]string, 0, indexedIDs.Len())
+	for _, id := range indexedIDs.Values() {
+		if validIDs.Contains(id) {
+			continue
+		}
+		staleIDs = append(staleIDs, id)
+	}
 	for _, id := range staleIDs {
 		if err := s.deleteStaleDocument(id); err != nil {
 			return nil, err

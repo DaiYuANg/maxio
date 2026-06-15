@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/vale"
@@ -13,7 +14,6 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -189,10 +189,9 @@ func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) ([]
 	if err != nil {
 		return nil, oops.Wrapf(err, "list upstreams")
 	}
-	enabled := lo.Filter(upstreams, func(upstream model.Upstream, _ int) bool {
+	return list.FilterList(list.NewList(upstreams...), func(_ int, upstream model.Upstream) bool {
 		return upstream.Enabled
-	})
-	return enabled, nil
+	}).Values(), nil
 }
 
 func startValeGateway(ctx context.Context, runtime *ValeRuntime) error {

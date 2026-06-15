@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/arcgolabs/collectionx/list"
+	collectionset "github.com/arcgolabs/collectionx/set"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -83,7 +84,7 @@ type MetadataStore = Repository
 
 type InMemoryMetadata struct {
 	mu        sync.RWMutex
-	buckets   map[string]map[string]struct{}
+	buckets   map[string]*collectionset.Set[string]
 	upstreams map[string]model.Upstream
 	objects   map[string]model.ObjectMeta
 	staged    map[string]model.ObjectMeta
@@ -99,7 +100,7 @@ type InMemoryMetadata struct {
 
 func NewInMemoryMetadata() *InMemoryMetadata {
 	return &InMemoryMetadata{
-		buckets:   make(map[string]map[string]struct{}),
+		buckets:   make(map[string]*collectionset.Set[string]),
 		upstreams: make(map[string]model.Upstream),
 		objects:   make(map[string]model.ObjectMeta),
 		staged:    make(map[string]model.ObjectMeta),
@@ -161,7 +162,7 @@ func (m *InMemoryMetadata) CreateBucket(_ context.Context, bucket string) error 
 	if _, ok := m.buckets[bucket]; ok {
 		return ErrBucketExists
 	}
-	m.buckets[bucket] = make(map[string]struct{})
+	m.buckets[bucket] = collectionset.NewSet[string]()
 	return nil
 }
 
@@ -178,7 +179,7 @@ func (m *InMemoryMetadata) DeleteBucket(_ context.Context, bucket string) error 
 	if !ok {
 		return ErrBucketNotFound
 	}
-	for key := range keys {
+	for _, key := range keys.Values() {
 		id := objectID(bucket, key)
 		meta := m.objects[id]
 		delete(m.objects, id)
@@ -209,8 +210,8 @@ func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix str
 		return nil, ErrBucketNotFound
 	}
 
-	result := list.NewListWithCapacity[model.ObjectMeta](len(keys))
-	for key := range keys {
+	result := list.NewListWithCapacity[model.ObjectMeta](keys.Len())
+	for _, key := range keys.Values() {
 		if strings.HasPrefix(key, prefix) {
 			meta := m.objects[objectID(bucket, key)]
 			result.Add(meta)
@@ -258,7 +259,7 @@ func (m *InMemoryMetadata) UpsertObjectMeta(_ context.Context, meta model.Object
 	if !ok {
 		return ErrBucketNotFound
 	}
-	keys[meta.Key] = struct{}{}
+	keys.Add(meta.Key)
 	m.objects[objectID(meta.Bucket, meta.Key)] = meta
 	return nil
 }
@@ -280,7 +281,7 @@ func (m *InMemoryMetadata) DeleteObjectMeta(_ context.Context, bucket, key strin
 	}
 	delete(m.objects, id)
 	if keys, ok := m.buckets[bucket]; ok {
-		delete(keys, key)
+		keys.Remove(key)
 	}
 	return meta, true, nil
 }

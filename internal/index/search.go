@@ -12,7 +12,6 @@ import (
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 )
 
 const indexDir = "index/bleve"
@@ -203,13 +202,13 @@ func (s *SearchEngine) searchIndex(query model.SearchQuery) ([]searchHit, error)
 	if err != nil {
 		return nil, fmt.Errorf("search bleve index: %w", err)
 	}
-	hits := lo.Map(result.Hits, func(hit *search.DocumentMatch, _ int) searchHit {
+	hits := list.MapList(list.NewList(result.Hits...), func(_ int, hit *search.DocumentMatch) searchHit {
 		return searchHit{
 			ID:     hit.ID,
 			Fields: hit.Fields,
 		}
 	})
-	return hits, nil
+	return hits.Values(), nil
 }
 
 type searchHit struct {
@@ -221,7 +220,7 @@ func (s *SearchEngine) resultFromHits(query model.SearchQuery, hits []searchHit)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	items := lo.FilterMap(hits, func(hit searchHit, _ int) (model.ObjectMeta, bool) {
+	items := list.FilterMapList(list.NewList(hits...), func(_ int, hit searchHit) (model.ObjectMeta, bool) {
 		if meta, ok := s.items[hit.ID]; ok && meta != nil {
 			return *meta, true
 		}
@@ -231,15 +230,18 @@ func (s *SearchEngine) resultFromHits(query model.SearchQuery, hits []searchHit)
 		}
 		return fromIndex, true
 	})
-	itemsList := list.NewList(items...)
-	return limitedSearchResult(query, itemsList)
+	return limitedSearchResult(query, items)
 }
 
 func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	items := lo.FilterMap(lo.Values(s.items), func(meta *model.ObjectMeta, _ int) (model.ObjectMeta, bool) {
+	itemsByID := list.NewListWithCapacity[*model.ObjectMeta](len(s.items))
+	for _, meta := range s.items {
+		itemsByID.Add(meta)
+	}
+	items := list.FilterMapList(itemsByID, func(_ int, meta *model.ObjectMeta) (model.ObjectMeta, bool) {
 		if meta == nil {
 			return model.ObjectMeta{}, false
 		}
@@ -248,6 +250,5 @@ func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchRes
 		}
 		return *meta, true
 	})
-	itemsList := list.NewList(items...)
-	return limitedSearchResult(query, itemsList)
+	return limitedSearchResult(query, items)
 }

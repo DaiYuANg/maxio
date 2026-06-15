@@ -11,7 +11,6 @@ import (
 	"github.com/arcgolabs/collectionx/mapping"
 	"github.com/arcgolabs/kvx"
 	"github.com/dgraph-io/ristretto"
-	"github.com/samber/lo"
 )
 
 const memoryKVKeyRow = "keys"
@@ -128,13 +127,18 @@ func (adapter *memoryKVAdapter) scanKeys(pattern string) ([]string, error) {
 	}
 
 	row := adapter.keys.Row(memoryKVKeyRow)
-	return lo.Filter(lo.Keys(row), func(key string, _ int) bool {
+	matched := make([]string, 0, len(row))
+	for key := range row {
 		ok, err := path.Match(pattern, key)
 		if err != nil {
-			return false
+			return nil, err
 		}
-		return ok
-	}), nil
+		if !ok {
+			continue
+		}
+		matched = append(matched, key)
+	}
+	return matched, nil
 }
 
 func pageScanKeys(keys []string, cursor uint64, count int64) (*collectionlist.List[string], uint64, error) {

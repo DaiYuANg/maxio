@@ -8,7 +8,6 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/object"
-	"github.com/samber/lo"
 )
 
 type MetadataCache interface {
@@ -141,9 +140,11 @@ func cloneObjectMetaSlice(items []model.ObjectMeta) []model.ObjectMeta {
 	if items == nil {
 		return nil
 	}
-	return lo.Map(items, func(item model.ObjectMeta, _ int) model.ObjectMeta {
-		return cloneObjectMeta(item)
-	})
+	output := make([]model.ObjectMeta, 0, len(items))
+	for _, item := range items {
+		output = append(output, cloneObjectMeta(item))
+	}
+	return output
 }
 
 func cloneStringMap(input map[string]string) map[string]string {

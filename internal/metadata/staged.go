@@ -6,7 +6,6 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
@@ -19,17 +18,17 @@ func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, pref
 		return nil, err
 	}
 
-	filtered := lo.FilterMap(lo.Values(m.staged), func(meta model.ObjectMeta, _ int) (model.ObjectMeta, bool) {
+	filtered := list.NewList[model.ObjectMeta]()
+	for _, meta := range m.staged {
 		if bucket != "" && meta.Bucket != bucket {
-			return model.ObjectMeta{}, false
+			continue
 		}
 		if prefix != "" && !strings.HasPrefix(meta.Key, prefix) {
-			return model.ObjectMeta{}, false
+			continue
 		}
-		return meta, true
-	})
-	result := list.NewList(filtered...)
-	sorted := result.Sort(compareObjectLocation)
+		filtered.Add(meta)
+	}
+	sorted := filtered.Sort(compareObjectLocation)
 	return sorted.Values(), nil
 }
 
