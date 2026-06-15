@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) UpsertIndexDocument(_ context.Context, document model.IndexDocument) (model.IndexDocument, error) {
@@ -47,17 +48,15 @@ func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	documents := make([]model.IndexDocument, 0)
-	for id := range m.indexDocuments {
-		document := m.indexDocuments[id]
+	documents := lo.Filter(lo.Values(m.indexDocuments), func(document model.IndexDocument, _ int) bool {
 		if bucket != "" && document.Bucket != bucket {
-			continue
+			return false
 		}
 		if prefix != "" && !strings.HasPrefix(document.Key, prefix) {
-			continue
+			return false
 		}
-		documents = append(documents, document)
-	}
+		return true
+	})
 	sort.Slice(documents, func(i, j int) bool {
 		if documents[i].Bucket == documents[j].Bucket {
 			return documents[i].Key < documents[j].Key
@@ -122,20 +121,15 @@ func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	jobs := make([]model.IndexJob, 0)
-	for id := range m.indexJobs {
-		job := m.indexJobs[id]
-		if status != "" && job.Status != status {
-			continue
-		}
-		jobs = append(jobs, job)
+	jobs := lo.Filter(lo.Values(m.indexJobs), func(job model.IndexJob, _ int) bool {
+		return status == "" || job.Status == status
+	})
+	if queryLimit := limit; queryLimit > 0 && len(jobs) > queryLimit {
+		jobs = lo.Take(jobs, queryLimit)
 	}
 	sort.Slice(jobs, func(i, j int) bool {
 		return jobs[i].CreatedAt.Before(jobs[j].CreatedAt)
 	})
-	if len(jobs) > limit {
-		jobs = jobs[:limit]
-	}
 	return jobs, nil
 }
 
@@ -194,20 +188,15 @@ func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status strin
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	events := make([]model.IndexOutboxEvent, 0)
-	for id := range m.indexOutbox {
-		event := m.indexOutbox[id]
-		if status != "" && event.Status != status {
-			continue
-		}
-		events = append(events, event)
+	events := lo.Filter(lo.Values(m.indexOutbox), func(event model.IndexOutboxEvent, _ int) bool {
+		return status == "" || event.Status == status
+	})
+	if queryLimit := limit; queryLimit > 0 && len(events) > queryLimit {
+		events = lo.Take(events, queryLimit)
 	}
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].CreatedAt.Before(events[j].CreatedAt)
 	})
-	if len(events) > limit {
-		events = events[:limit]
-	}
 	return events, nil
 }
 

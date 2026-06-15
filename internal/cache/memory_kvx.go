@@ -123,49 +123,52 @@ func (adapter *memoryKVAdapter) Wait() {
 }
 
 func (adapter *memoryKVAdapter) scanKeys(pattern string) ([]string, error) {
+	if _, err := path.Match(pattern, ""); err != nil {
+		return nil, fmt.Errorf("match memory cache key pattern: %w", err)
+	}
+
 	row := adapter.keys.Row(memoryKVKeyRow)
-	keys := lo.Keys(row)
-	matched := make([]string, 0, len(keys))
-	for _, key := range keys {
+	return lo.Filter(lo.Keys(row), func(key string, _ int) bool {
 		ok, err := path.Match(pattern, key)
 		if err != nil {
-			return nil, fmt.Errorf("match memory cache key pattern: %w", err)
+			return false
 		}
-		if ok {
-			matched = append(matched, key)
-		}
-	}
-	return matched, nil
+		return ok
+	}), nil
 }
 
 func pageScanKeys(keys []string, cursor uint64, count int64) (*collectionlist.List[string], uint64, error) {
 	limit, limited := memoryScanLimit(count)
-	result := make([]string, 0)
-	var current uint64
-	var taken uint64
-	for _, key := range keys {
-		if current >= cursor {
-			if limited && taken >= limit {
-				return collectionlist.NewList(result...), current, nil
-			}
-			result = append(result, key)
-			taken++
-		}
-		current++
+	keyCount := uint64(len(keys))
+	if cursor >= keyCount {
+		return collectionlist.NewList[string](), 0, nil
 	}
-	return collectionlist.NewList(result...), 0, nil
+	if !limited {
+		return collectionlist.NewList(keys[cursor:]...), 0, nil
+	}
+
+	start := cursor
+	end := start + limit
+	if end > keyCount {
+		end = keyCount
+	}
+
+	result := keys[start:end]
+	next := uint64(0)
+	if end < keyCount {
+		next = end
+	}
+	return collectionlist.NewList(result...), next, nil
 }
 
 func memoryScanLimit(count int64) (uint64, bool) {
 	if count <= 0 {
 		return 0, false
 	}
-	limit := uint64(0)
-	for count > 0 && limit < maxMemoryScanPageSize {
-		limit++
-		count--
+	if count > int64(maxMemoryScanPageSize) {
+		return maxMemoryScanPageSize, true
 	}
-	return limit, true
+	return uint64(count), true
 }
 
 func cloneBytes(input []byte) []byte {

@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 const indexDir = "index/bleve"
@@ -220,35 +221,33 @@ func (s *SearchEngine) resultFromHits(query model.SearchQuery, hits []searchHit)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	items := list.NewListWithCapacity[model.ObjectMeta](len(hits))
-	for _, hit := range hits {
-		meta, ok := s.items[hit.ID]
-		if !ok {
-			fromIndex := metaFromFields(hit.Fields)
-			if fromIndex.Bucket == "" || fromIndex.Key == "" {
-				continue
-			}
-			items.Add(fromIndex)
-			continue
+	items := lo.FilterMap(hits, func(hit searchHit, _ int) (model.ObjectMeta, bool) {
+		if meta, ok := s.items[hit.ID]; ok && meta != nil {
+			return *meta, true
 		}
-		items.Add(*meta)
-	}
-
-	return limitedSearchResult(query, items)
+		fromIndex := metaFromFields(hit.Fields)
+		if fromIndex.Bucket == "" || fromIndex.Key == "" {
+			return model.ObjectMeta{}, false
+		}
+		return fromIndex, true
+	})
+	itemsList := list.NewList(items...)
+	return limitedSearchResult(query, itemsList)
 }
 
 func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	items := list.NewListWithCapacity[model.ObjectMeta](len(s.items))
-	for _, meta := range s.items {
+	items := lo.FilterMap(lo.Values(s.items), func(meta *model.ObjectMeta, _ int) (model.ObjectMeta, bool) {
 		if meta == nil {
-			continue
+			return model.ObjectMeta{}, false
 		}
-		if matchesQuery(*meta, query) {
-			items.Add(*meta)
+		if !matchesQuery(*meta, query) {
+			return model.ObjectMeta{}, false
 		}
-	}
-	return limitedSearchResult(query, items)
+		return *meta, true
+	})
+	itemsList := list.NewList(items...)
+	return limitedSearchResult(query, itemsList)
 }

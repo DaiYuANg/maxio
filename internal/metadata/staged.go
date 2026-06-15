@@ -6,6 +6,7 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
@@ -18,11 +19,16 @@ func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, pref
 		return nil, err
 	}
 
-	result := list.NewListWithCapacity[model.ObjectMeta](len(m.staged))
-	for key := range m.staged {
-		meta := m.staged[key]
-		addMatchingStagedObject(result, meta, bucket, prefix)
-	}
+	filtered := lo.FilterMap(lo.Values(m.staged), func(meta model.ObjectMeta, _ int) (model.ObjectMeta, bool) {
+		if bucket != "" && meta.Bucket != bucket {
+			return model.ObjectMeta{}, false
+		}
+		if prefix != "" && !strings.HasPrefix(meta.Key, prefix) {
+			return model.ObjectMeta{}, false
+		}
+		return meta, true
+	})
+	result := list.NewList(filtered...)
 	sorted := result.Sort(compareObjectLocation)
 	return sorted.Values(), nil
 }
@@ -35,16 +41,6 @@ func (m *InMemoryMetadata) validateOptionalBucketLocked(bucket string) error {
 		return ErrBucketNotFound
 	}
 	return nil
-}
-
-func addMatchingStagedObject(result *list.List[model.ObjectMeta], meta model.ObjectMeta, bucket, prefix string) {
-	if bucket != "" && meta.Bucket != bucket {
-		return
-	}
-	if prefix != "" && !strings.HasPrefix(meta.Key, prefix) {
-		return
-	}
-	result.Add(meta)
 }
 
 func compareObjectLocation(left, right model.ObjectMeta) int {

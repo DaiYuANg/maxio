@@ -5,6 +5,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 const pruneSearchPageSize = 1000
@@ -67,15 +68,14 @@ func (s *SearchEngine) memoryDocumentIDs() map[string]struct{} {
 }
 
 func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs map[string]struct{}) ([]string, error) {
-	staleIDs := make([]string, 0)
-	for id := range indexedIDs {
-		if _, ok := validIDs[id]; ok {
-			continue
-		}
+	staleIDs := lo.Filter(lo.Keys(indexedIDs), func(id string, _ int) bool {
+		_, ok := validIDs[id]
+		return !ok
+	})
+	for _, id := range staleIDs {
 		if err := s.deleteStaleDocument(id); err != nil {
 			return nil, err
 		}
-		staleIDs = append(staleIDs, id)
 	}
 	return staleIDs, nil
 }

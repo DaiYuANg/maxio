@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) UpsertObjectRecord(_ context.Context, record model.ObjectRecord) (model.ObjectRecord, error) {
@@ -109,13 +110,12 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	versions := make([]model.ObjectVersion, 0)
-	for id := range m.objectVersions {
-		version := m.objectVersions[id]
-		if version.Bucket == bucket && version.Key == key {
-			versions = append(versions, cloneObjectVersion(version))
+	versions := lo.FilterMap(lo.Values(m.objectVersions), func(version model.ObjectVersion, _ int) (model.ObjectVersion, bool) {
+		if version.Bucket != bucket || version.Key != key {
+			return model.ObjectVersion{}, false
 		}
-	}
+		return cloneObjectVersion(version), true
+	})
 	sort.Slice(versions, func(i, j int) bool {
 		return versions[i].CreatedAt.After(versions[j].CreatedAt)
 	})

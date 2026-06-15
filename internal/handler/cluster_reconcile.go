@@ -14,6 +14,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/discovery"
+	"github.com/samber/lo"
 )
 
 type clusterStatusResponse struct {
@@ -207,12 +208,12 @@ func reconcileMode(removeMissing bool) string {
 }
 
 func reconcileAdded(current, desired map[uint64]string) []control.Replica {
-	replicas := make([]control.Replica, 0)
-	for replicaID, target := range desired {
-		if _, ok := current[replicaID]; !ok {
-			replicas = append(replicas, control.Replica{ReplicaID: replicaID, Target: target})
-		}
-	}
+	replicas := lo.FilterMap(lo.Keys(desired), func(replicaID uint64, _ int) (control.Replica, bool) {
+		target := desired[replicaID]
+		_, exists := current[replicaID]
+		return control.Replica{ReplicaID: replicaID, Target: target}, !exists
+	})
+
 	slices.SortFunc(replicas, func(left, right control.Replica) int {
 		return cmp.Compare(left.ReplicaID, right.ReplicaID)
 	})
@@ -220,12 +221,10 @@ func reconcileAdded(current, desired map[uint64]string) []control.Replica {
 }
 
 func reconcileRemoved(current, desired map[uint64]string) []uint64 {
-	replicaIDs := make([]uint64, 0)
-	for replicaID := range current {
-		if _, ok := desired[replicaID]; !ok {
-			replicaIDs = append(replicaIDs, replicaID)
-		}
-	}
+	replicaIDs := lo.Filter(lo.Keys(current), func(replicaID uint64, _ int) bool {
+		_, ok := desired[replicaID]
+		return !ok
+	})
 	slices.Sort(replicaIDs)
 	return replicaIDs
 }

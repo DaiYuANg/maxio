@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/lyonbrown4d/maxio/internal/discovery"
+	"github.com/samber/lo"
 )
 
 func mergeDiscoveredMembers(
@@ -14,13 +15,10 @@ func mergeDiscoveredMembers(
 	removed map[uint64]struct{},
 	nodes []discovery.Node,
 ) []clusterDiscoveryConflict {
-	conflicts := make([]clusterDiscoveryConflict, 0)
-	for index := range nodes {
-		conflict, ok := mergeDiscoveredMember(desired, current, removed, nodes[index])
-		if ok {
-			conflicts = append(conflicts, conflict)
-		}
-	}
+	conflicts := lo.FilterMap(nodes, func(node discovery.Node, _ int) (clusterDiscoveryConflict, bool) {
+		conflict, ok := mergeDiscoveredMember(desired, current, removed, node)
+		return conflict, ok
+	})
 	slices.SortFunc(conflicts, compareClusterDiscoveryConflicts)
 	return conflicts
 }

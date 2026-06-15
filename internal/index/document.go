@@ -8,6 +8,7 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 type document struct {
@@ -34,7 +35,7 @@ func limitedSearchResult(query model.SearchQuery, items *list.List[model.ObjectM
 	})
 	resultItems := sorted.Values()
 	if query.Limit > 0 && len(resultItems) > query.Limit {
-		resultItems = resultItems[:query.Limit]
+		resultItems = lo.Take(resultItems, query.Limit)
 	}
 	return model.SearchResult{Items: resultItems}
 }
