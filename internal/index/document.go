@@ -9,6 +9,7 @@ import (
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/samber/lo"
+	"github.com/samber/mo"
 )
 
 type document struct {
@@ -101,19 +102,17 @@ func int64Field(fields map[string]any, name string) int64 {
 }
 
 func parseInt64Field(value string) int64 {
-	parsed, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return parsed
+	parsed := mo.Try(func() (int64, error) {
+		return strconv.ParseInt(value, 10, 64)
+	})
+	return parsed.OrElse(0)
 }
 
 func timeField(fields map[string]any, name string) time.Time {
-	parsed, err := time.Parse(time.RFC3339Nano, stringField(fields, name))
-	if err != nil {
-		return time.Time{}
-	}
-	return parsed
+	parsed := mo.Try(func() (time.Time, error) {
+		return time.Parse(time.RFC3339Nano, stringField(fields, name))
+	})
+	return parsed.OrElse(time.Time{})
 }
 
 func objectID(bucket, key string) string {

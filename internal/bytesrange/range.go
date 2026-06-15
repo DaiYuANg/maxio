@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/samber/mo"
 )
 
 var ErrInvalidRange = errors.New("invalid byte range")
@@ -112,8 +114,14 @@ func suffixBounds(value string, size int64) (int64, int64, error) {
 }
 
 func parseNonNegative(value string) (int64, error) {
-	number, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-	if err != nil || number < 0 {
+	result := mo.Try(func() (int64, error) {
+		return strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	})
+	if result.IsError() {
+		return 0, fmt.Errorf("%w: invalid number", ErrInvalidRange)
+	}
+	number := result.OrElse(0)
+	if number < 0 {
 		return 0, fmt.Errorf("%w: invalid number", ErrInvalidRange)
 	}
 	return number, nil
