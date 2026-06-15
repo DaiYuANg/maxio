@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	collectionset "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/vale"
 	valeconfig "github.com/arcgolabs/vale/config"
 	"github.com/arcgolabs/vale/provider"
@@ -215,14 +216,17 @@ func buildServiceAndRoutes(
 		return
 	}
 
-	candidates := slices.Clip(append([]string(nil), buckets...))
-	sort.Strings(candidates)
-
-	for _, bucket := range candidates {
+	uniqueBuckets := collectionset.NewOrderedSetWithCapacity[string](len(buckets))
+	for _, bucket := range buckets {
 		cleanBucket := strings.TrimSpace(prefixNormalized(strings.TrimSpace(bucket)))
 		if cleanBucket == "" {
 			continue
 		}
+		uniqueBuckets.Add(cleanBucket)
+	}
+	candidates := uniqueBuckets.Values()
+	sort.Strings(candidates)
+	for _, cleanBucket := range candidates {
 		pathPrefix := "/" + cleanBucket + "/"
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
 		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix), provider.RouteMiddlewares(middlewareName))

@@ -2,9 +2,9 @@ package metadata
 
 import (
 	"context"
-	"sort"
 	"strings"
 
+	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -109,17 +109,24 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	versions := make([]model.ObjectVersion, 0, len(m.objectVersions))
+	versions := list.NewList[model.ObjectVersion]()
 	for _, version := range m.objectVersions {
 		if version.Bucket != bucket || version.Key != key {
 			continue
 		}
-		versions = append(versions, cloneObjectVersion(version))
+		versions.Add(cloneObjectVersion(version))
 	}
-	sort.Slice(versions, func(i, j int) bool {
-		return versions[i].CreatedAt.After(versions[j].CreatedAt)
+	sorted := versions.Sort(func(left, right model.ObjectVersion) int {
+		switch {
+		case left.CreatedAt.After(right.CreatedAt):
+			return -1
+		case left.CreatedAt.Before(right.CreatedAt):
+			return 1
+		default:
+			return 0
+		}
 	})
-	return versions, nil
+	return sorted.Values(), nil
 }
 
 func (m *InMemoryMetadata) DeleteObjectVersion(_ context.Context, bucket, key, versionID string) (bool, error) {
