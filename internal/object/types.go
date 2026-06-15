@@ -92,10 +92,10 @@ type PutOptions struct {
 }
 
 type Store interface {
-	ListBuckets(ctx context.Context) ([]Bucket, error)
+	ListBuckets(ctx context.Context) (*collectionlist.List[Bucket], error)
 	CreateBucket(ctx context.Context, name string) error
 	DeleteBucket(ctx context.Context, name string) error
-	ListObjects(ctx context.Context, bucket, prefix string) ([]ObjectMeta, error)
+	ListObjects(ctx context.Context, bucket, prefix string) (*collectionlist.List[ObjectMeta], error)
 	PutObject(ctx context.Context, bucket, key string, reader io.Reader, opts PutOptions) (ObjectMeta, error)
 	GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, ObjectMeta, error)
 	StatObject(ctx context.Context, bucket, key string) (ObjectMeta, error)

@@ -12,8 +12,8 @@ import (
 )
 
 type MetadataCache interface {
-	GetBuckets(ctx context.Context) ([]object.Bucket, bool, error)
-	SetBuckets(ctx context.Context, buckets []object.Bucket) error
+	GetBuckets(ctx context.Context) (*collectionlist.List[object.Bucket], bool, error)
+	SetBuckets(ctx context.Context, buckets *collectionlist.List[object.Bucket]) error
 	GetObject(ctx context.Context, bucket, key string) (object.ObjectMeta, bool, error)
 	SetObject(ctx context.Context, meta object.ObjectMeta) error
 	DeleteObject(ctx context.Context, bucket, key string) error
@@ -47,11 +47,11 @@ func NewNoopCache() *NoopCache {
 	return &NoopCache{}
 }
 
-func (c *NoopCache) GetBuckets(context.Context) ([]object.Bucket, bool, error) {
+func (c *NoopCache) GetBuckets(context.Context) (*collectionlist.List[object.Bucket], bool, error) {
 	return nil, false, nil
 }
 
-func (c *NoopCache) SetBuckets(context.Context, []object.Bucket) error {
+func (c *NoopCache) SetBuckets(context.Context, *collectionlist.List[object.Bucket]) error {
 	return nil
 }
 
@@ -111,13 +111,13 @@ func (c *NoopCache) Close() error {
 	return nil
 }
 
-func cloneBuckets(input []object.Bucket) []object.Bucket {
-	if len(input) == 0 {
-		return nil
+func cloneBuckets(input *collectionlist.List[object.Bucket]) *collectionlist.List[object.Bucket] {
+	if input == nil || input.Len() == 0 {
+		return collectionlist.NewList[object.Bucket]()
 	}
-	output := make([]object.Bucket, len(input))
-	copy(output, input)
-	return output
+	return collectionlist.MapList(input, func(_ int, bucket object.Bucket) object.Bucket {
+		return bucket
+	})
 }
 
 func cloneObjectMeta(meta object.ObjectMeta) object.ObjectMeta {

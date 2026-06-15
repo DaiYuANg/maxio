@@ -37,22 +37,22 @@ func newMetadataJSONCache(kv kvx.KV, prefix string, ttl time.Duration, scanCount
 	}
 }
 
-func (cache *metadataJSONCache) GetBuckets(ctx context.Context) ([]model.Bucket, bool, error) {
+func (cache *metadataJSONCache) GetBuckets(ctx context.Context) (*collectionlist.List[model.Bucket], bool, error) {
 	buckets, ok, err := getCacheJSON[[]model.Bucket](ctx, cache, cache.bucketsKey())
 	if err != nil || !ok {
 		return nil, ok, err
 	}
-	return cloneBuckets(buckets), true, nil
+	return cloneBuckets(collectionlist.NewList(buckets...)), true, nil
 }
 
-func (cache *metadataJSONCache) SetBuckets(ctx context.Context, buckets []model.Bucket) error {
+func (cache *metadataJSONCache) SetBuckets(ctx context.Context, buckets *collectionlist.List[model.Bucket]) error {
 	if buckets == nil {
 		if err := cache.kv.Delete(ctx, cache.bucketsKey()); err != nil {
 			return fmt.Errorf("delete cached buckets: %w", err)
 		}
 		return nil
 	}
-	return setCacheJSON(ctx, cache, cache.bucketsKey(), cloneBuckets(buckets))
+	return setCacheJSON(ctx, cache, cache.bucketsKey(), cloneBuckets(buckets).Values())
 }
 
 func (cache *metadataJSONCache) GetObject(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error) {

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/eventx"
 )
 
@@ -30,7 +31,7 @@ func NewService(_ Store, search SearchIndex, bus eventx.BusRuntime, logger *slog
 	}
 }
 
-func (s *Service) ListBuckets(ctx context.Context) ([]Bucket, error) {
+func (s *Service) ListBuckets(ctx context.Context) (*collectionlist.List[Bucket], error) {
 	_ = ctx
 	return nil, ErrDataPlaneUnavailable
 }
@@ -45,7 +46,7 @@ func (s *Service) DeleteBucket(ctx context.Context, name string) error {
 	return ErrDataPlaneUnavailable
 }
 
-func (s *Service) ListObjects(ctx context.Context, bucket, prefix string) ([]ObjectMeta, error) {
+func (s *Service) ListObjects(ctx context.Context, bucket, prefix string) (*collectionlist.List[ObjectMeta], error) {
 	_, _, _ = ctx, bucket, prefix
 	return nil, ErrDataPlaneUnavailable
 }
