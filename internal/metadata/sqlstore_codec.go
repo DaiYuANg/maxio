@@ -9,14 +9,18 @@ import (
 	"time"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/mo"
 )
 
 func decodeJSON(raw sql.NullString, value any) error {
 	if !raw.Valid || raw.String == "" || raw.String == "null" {
 		return nil
 	}
-	if err := json.Unmarshal([]byte(raw.String), value); err != nil {
-		return fmt.Errorf("unmarshal json: %w", err)
+	unmarshal := mo.Try(func() (struct{}, error) {
+		return struct{}{}, json.Unmarshal([]byte(raw.String), value)
+	})
+	if unmarshal.IsError() {
+		return fmt.Errorf("unmarshal json: %w", unmarshal.Error())
 	}
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/arcgolabs/vale/provider"
 	"github.com/arcgolabs/vale/provider/memoryconfig"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/mo"
 	"github.com/samber/oops"
 )
 
@@ -175,8 +176,10 @@ func addUpstreamToBuilder(b *provider.ConfigBuilder, upstream model.Upstream, en
 	if endpoint == "" {
 		return oops.Errorf("upstream %q endpoint is required", name)
 	}
-	parsedEndpoint, err := url.Parse(endpoint)
-	if err != nil || parsedEndpoint.Scheme == "" || parsedEndpoint.Host == "" {
+	parsedEndpoint := mo.Try(func() (*url.URL, error) {
+		return url.Parse(endpoint)
+	}).OrElse(nil)
+	if parsedEndpoint == nil || parsedEndpoint.Scheme == "" || parsedEndpoint.Host == "" {
 		return oops.Errorf("upstream %q endpoint invalid: %q", name, endpoint)
 	}
 

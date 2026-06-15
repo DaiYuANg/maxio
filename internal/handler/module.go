@@ -12,6 +12,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/proxy"
+	"github.com/samber/mo"
 )
 
 func Module() dix.Module {
@@ -64,18 +65,16 @@ func busMiddleware(logger *slog.Logger) eventx.Middleware {
 }
 
 func newLogger(cfg config.Config) *slog.Logger {
-	level, err := logx.ParseLevel(cfg.LogLevel)
-	if err != nil {
-		level = slog.LevelInfo
-	}
+	level := mo.Try(func() (slog.Level, error) {
+		return logx.ParseLevel(cfg.LogLevel)
+	}).OrElse(slog.LevelInfo)
 
-	logger, err := logx.New(
-		logx.WithLevel(level),
-		logx.WithCaller(true),
-		logx.WithGlobalLogger(),
-	)
-	if err == nil {
-		return logger
-	}
-	return slog.Default()
+	logger := mo.Try(func() (*slog.Logger, error) {
+		return logx.New(
+			logx.WithLevel(level),
+			logx.WithCaller(true),
+			logx.WithGlobalLogger(),
+		)
+	})
+	return logger.OrElse(slog.Default())
 }
