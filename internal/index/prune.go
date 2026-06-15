@@ -31,7 +31,8 @@ func (s *SearchEngine) PruneExcept(valid []model.ObjectMeta) error {
 
 func objectIDSet(objects []model.ObjectMeta) *set.Set[string] {
 	validIDs := set.NewSetWithCapacity[string](len(objects))
-	for _, meta := range objects {
+	for i := range objects {
+		meta := objects[i]
 		if meta.Bucket == "" || meta.Key == "" {
 			continue
 		}

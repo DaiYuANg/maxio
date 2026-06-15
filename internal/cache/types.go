@@ -140,9 +140,9 @@ func cloneObjectMetaSlice(items []model.ObjectMeta) []model.ObjectMeta {
 	if items == nil {
 		return nil
 	}
-	output := make([]model.ObjectMeta, 0, len(items))
-	for _, item := range items {
-		output = append(output, cloneObjectMeta(item))
+	output := make([]model.ObjectMeta, len(items))
+	for i := range items {
+		output[i] = cloneObjectMeta(items[i])
 	}
 	return output
 }
@@ -153,14 +153,5 @@ func cloneStringMap(input map[string]string) map[string]string {
 	}
 	output := make(map[string]string, len(input))
 	maps.Copy(output, input)
-	return output
-}
-
-func cloneSlice[T any](input []T) []T {
-	if len(input) == 0 {
-		return nil
-	}
-	output := make([]T, len(input))
-	copy(output, input)
 	return output
 }

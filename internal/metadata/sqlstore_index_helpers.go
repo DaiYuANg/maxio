@@ -11,11 +11,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-type sqlScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanIndexDocument(scanner sqlScanner) (model.IndexDocument, error) {
+func scanIndexDocument(scanner interface{ Scan(dest ...any) error }) (model.IndexDocument, error) {
 	var (
 		document model.IndexDocument
 		indexed  sql.NullInt64
@@ -42,7 +38,7 @@ func scanIndexDocument(scanner sqlScanner) (model.IndexDocument, error) {
 	return document, nil
 }
 
-func scanIndexJob(scanner sqlScanner) (model.IndexJob, error) {
+func scanIndexJob(scanner interface{ Scan(dest ...any) error }) (model.IndexJob, error) {
 	var (
 		job       model.IndexJob
 		started   sql.NullInt64
@@ -76,7 +72,7 @@ func scanIndexJob(scanner sqlScanner) (model.IndexJob, error) {
 	return job, nil
 }
 
-func scanIndexOutboxEvent(scanner sqlScanner) (model.IndexOutboxEvent, error) {
+func scanIndexOutboxEvent(scanner interface{ Scan(dest ...any) error }) (model.IndexOutboxEvent, error) {
 	var (
 		event     model.IndexOutboxEvent
 		available int64
@@ -185,7 +181,7 @@ func listSQLIndexQueue[T any](
 	store *SQLMetadata,
 	query querydsl.Builder,
 	label string,
-	scan func(sqlScanner) (T, error),
+	scan func(interface{ Scan(dest ...any) error }) (T, error),
 ) ([]T, error) {
 	return listSQLRows(ctx, store, query, label, scan)
 }
@@ -195,7 +191,7 @@ func listSQLRows[T any](
 	store *SQLMetadata,
 	query querydsl.Builder,
 	label string,
-	scan func(sqlScanner) (T, error),
+	scan func(interface{ Scan(dest ...any) error }) (T, error),
 ) ([]T, error) {
 	rows, err := store.queryBuilderContext(ctx, query)
 	if err != nil {

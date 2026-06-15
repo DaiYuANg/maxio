@@ -108,7 +108,7 @@ func parseDuration(value string) (time.Duration, error) {
 		return time.ParseDuration(value)
 	})
 	if result.IsError() {
-		return 0, result.Error()
+		return 0, fmt.Errorf("parse duration %q: %w", value, result.Error())
 	}
 	return result.OrElse(0), nil
 }

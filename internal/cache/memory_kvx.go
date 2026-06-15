@@ -131,7 +131,7 @@ func (adapter *memoryKVAdapter) scanKeys(pattern string) ([]string, error) {
 	for key := range row {
 		ok, err := path.Match(pattern, key)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("match memory cache key pattern: %w", err)
 		}
 		if !ok {
 			continue
