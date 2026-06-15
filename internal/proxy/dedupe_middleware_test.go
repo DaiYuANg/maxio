@@ -20,7 +20,7 @@ func TestDedupeMiddlewarePutHitShortCircuitsUpstream(t *testing.T) {
 	store := metadata.NewInMemoryMetadata()
 	body := []byte("hello")
 	digest := testDigest(body)
-	seedDigestRef(t, ctx, store, model.DigestRef{
+	seedDigestRef(ctx, t, store, model.DigestRef{
 		Digest:         digest,
 		Size:           int64(len(body)),
 		RefCount:       1,
@@ -34,7 +34,7 @@ func TestDedupeMiddlewarePutHitShortCircuitsUpstream(t *testing.T) {
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		called = true
 	})
-	req := httptest.NewRequest(http.MethodPut, "/photos/copy.txt", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(ctx, http.MethodPut, "/photos/copy.txt", bytes.NewReader(body))
 	recorder := httptest.NewRecorder()
 
 	middleware.handlePut(next, "up", recorder, req)
@@ -48,11 +48,11 @@ func TestDedupeMiddlewarePutHitShortCircuitsUpstream(t *testing.T) {
 	if got := recorder.Header().Get("X-Maxio-Dedupe"); got != "hit" {
 		t.Fatalf("expected dedupe hit header, got %q", got)
 	}
-	version := requireCurrentVersion(t, ctx, store, "photos", "copy.txt")
+	version := requireCurrentVersion(ctx, t, store, "photos", "copy.txt")
 	if version.UpstreamKey != "existing.txt" {
 		t.Fatalf("expected canonical upstream key existing.txt, got %q", version.UpstreamKey)
 	}
-	ref := requireDigestRef(t, ctx, store, digest)
+	ref := requireDigestRef(ctx, t, store, digest)
 	if ref.RefCount != 2 {
 		t.Fatalf("expected refcount 2, got %d", ref.RefCount)
 	}
@@ -78,7 +78,7 @@ func TestDedupeMiddlewarePutMissForwardsAndCommitsMetadata(t *testing.T) {
 		w.Header().Set("ETag", `"upstream-etag"`)
 		w.WriteHeader(http.StatusOK)
 	})
-	req := httptest.NewRequest(http.MethodPut, "/photos/new.txt", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(ctx, http.MethodPut, "/photos/new.txt", bytes.NewReader(body))
 	recorder := httptest.NewRecorder()
 
 	middleware.handlePut(next, "up", recorder, req)
@@ -89,14 +89,14 @@ func TestDedupeMiddlewarePutMissForwardsAndCommitsMetadata(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
 	}
-	version := requireCurrentVersion(t, ctx, store, "photos", "new.txt")
+	version := requireCurrentVersion(ctx, t, store, "photos", "new.txt")
 	if version.Digest != digest {
 		t.Fatalf("expected digest %q, got %q", digest, version.Digest)
 	}
 	if version.UpstreamKey != "new.txt" {
 		t.Fatalf("expected upstream key new.txt, got %q", version.UpstreamKey)
 	}
-	ref := requireDigestRef(t, ctx, store, digest)
+	ref := requireDigestRef(ctx, t, store, digest)
 	if ref.RefCount != 1 {
 		t.Fatalf("expected refcount 1, got %d", ref.RefCount)
 	}
@@ -105,7 +105,7 @@ func TestDedupeMiddlewarePutMissForwardsAndCommitsMetadata(t *testing.T) {
 func TestDedupeMiddlewareReadRewritesToCanonicalObject(t *testing.T) {
 	ctx := context.Background()
 	store := metadata.NewInMemoryMetadata()
-	seedObjectVersion(t, ctx, store, model.ObjectVersion{
+	seedObjectVersion(ctx, t, store, model.ObjectVersion{
 		Bucket:         "photos",
 		Key:            "copy.txt",
 		VersionID:      "v1",
@@ -121,7 +121,7 @@ func TestDedupeMiddlewareReadRewritesToCanonicalObject(t *testing.T) {
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		rewrittenPath = r.URL.Path
 	})
-	req := httptest.NewRequest(http.MethodGet, "/photos/copy.txt", http.NoBody)
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/photos/copy.txt", http.NoBody)
 	recorder := httptest.NewRecorder()
 
 	middleware.handleRead(next, "up", recorder, req)
@@ -136,14 +136,14 @@ func testDigest(body []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func seedDigestRef(t *testing.T, ctx context.Context, store metadata.MetadataStore, ref model.DigestRef) {
+func seedDigestRef(ctx context.Context, t *testing.T, store metadata.MetadataStore, ref model.DigestRef) {
 	t.Helper()
 	if _, err := store.RetainDigestRef(ctx, ref); err != nil {
 		t.Fatalf("retain digest ref: %v", err)
 	}
 }
 
-func seedObjectVersion(t *testing.T, ctx context.Context, store metadata.MetadataStore, version model.ObjectVersion) {
+func seedObjectVersion(ctx context.Context, t *testing.T, store metadata.MetadataStore, version model.ObjectVersion) {
 	t.Helper()
 	if err := store.CreateBucket(ctx, version.Bucket); err != nil {
 		t.Fatalf("create bucket: %v", err)
@@ -162,8 +162,8 @@ func seedObjectVersion(t *testing.T, ctx context.Context, store metadata.Metadat
 }
 
 func requireCurrentVersion(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	store metadata.MetadataStore,
 	bucket string,
 	key string,
@@ -186,7 +186,7 @@ func requireCurrentVersion(
 	return version
 }
 
-func requireDigestRef(t *testing.T, ctx context.Context, store metadata.MetadataStore, digest string) model.DigestRef {
+func requireDigestRef(ctx context.Context, t *testing.T, store metadata.MetadataStore, digest string) model.DigestRef {
 	t.Helper()
 	ref, found, err := store.GetDigestRef(ctx, digest)
 	if err != nil {

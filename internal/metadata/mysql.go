@@ -10,7 +10,7 @@ import (
 
 	"github.com/arcgolabs/dbx"
 	mysqldialect "github.com/arcgolabs/dbx/dialect/mysql"
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // Register MySQL driver for database/sql.
 )
 
 const metadataSQLDriverMySQL = "mysql"

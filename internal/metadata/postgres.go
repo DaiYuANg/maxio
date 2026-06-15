@@ -10,7 +10,7 @@ import (
 
 	"github.com/arcgolabs/dbx"
 	postgresdialect "github.com/arcgolabs/dbx/dialect/postgres"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib" // Register pgx driver for database/sql.
 )
 
 func NewPostgresMetadata(dsn string, logger *slog.Logger, migrate bool) (*SQLMetadata, error) {

@@ -12,11 +12,11 @@ func TestInMemoryLeaseRepositoryAcquireBlocksSecondOwner(t *testing.T) {
 	first := testLease("replica-a", now)
 	second := testLease("replica-b", now)
 
-	acquired := mustAcquireLease(t, ctx, repository, first)
+	acquired := mustAcquireLease(ctx, t, repository, first)
 	if acquired.Owner != first.Owner {
 		t.Fatalf("lease owner = %q, want %q", acquired.Owner, first.Owner)
 	}
-	blocked := mustBlockLease(t, ctx, repository, second)
+	blocked := mustBlockLease(ctx, t, repository, second)
 	if blocked.Owner != first.Owner {
 		t.Fatalf("blocking owner = %q, want %q", blocked.Owner, first.Owner)
 	}
@@ -28,11 +28,11 @@ func TestInMemoryLeaseRepositoryHeartbeatAndRelease(t *testing.T) {
 	first := testLease("replica-a", now)
 	second := testLease("replica-b", now)
 
-	mustAcquireLease(t, ctx, repository, first)
-	assertHeartbeatLease(t, ctx, repository, first, now.Add(2*time.Minute))
-	assertWrongOwnerReleaseIgnored(t, ctx, repository, second)
-	assertOwnerRelease(t, ctx, repository, first)
-	mustAcquireLease(t, ctx, repository, second)
+	mustAcquireLease(ctx, t, repository, first)
+	assertHeartbeatLease(ctx, t, repository, first, now.Add(2*time.Minute))
+	assertWrongOwnerReleaseIgnored(ctx, t, repository, second)
+	assertOwnerRelease(ctx, t, repository, first)
+	mustAcquireLease(ctx, t, repository, second)
 }
 
 func TestInMemoryLeaseRepositoryAcquireExpiredLease(t *testing.T) {
@@ -47,7 +47,7 @@ func TestInMemoryLeaseRepositoryAcquireExpiredLease(t *testing.T) {
 		Owner:     "replica-a",
 		ExpiresAt: now.Add(time.Minute),
 	}
-	mustAcquireLease(t, ctx, repository, first)
+	mustAcquireLease(ctx, t, repository, first)
 
 	now = now.Add(time.Minute + time.Nanosecond)
 	second := Lease{
@@ -56,7 +56,7 @@ func TestInMemoryLeaseRepositoryAcquireExpiredLease(t *testing.T) {
 		Owner:     "replica-b",
 		ExpiresAt: now.Add(time.Minute),
 	}
-	acquired := mustAcquireLease(t, ctx, repository, second)
+	acquired := mustAcquireLease(ctx, t, repository, second)
 	if acquired.Owner != second.Owner {
 		t.Fatalf("acquired owner = %q, want %q", acquired.Owner, second.Owner)
 	}
@@ -79,7 +79,7 @@ func testLease(owner string, now time.Time) Lease {
 	}
 }
 
-func mustAcquireLease(t *testing.T, ctx context.Context, repository *InMemoryLeaseRepository, lease Lease) Lease {
+func mustAcquireLease(ctx context.Context, t *testing.T, repository *InMemoryLeaseRepository, lease Lease) Lease {
 	t.Helper()
 	acquired, ok, err := repository.Acquire(ctx, lease)
 	if err != nil {
@@ -91,7 +91,7 @@ func mustAcquireLease(t *testing.T, ctx context.Context, repository *InMemoryLea
 	return acquired
 }
 
-func mustBlockLease(t *testing.T, ctx context.Context, repository *InMemoryLeaseRepository, lease Lease) Lease {
+func mustBlockLease(ctx context.Context, t *testing.T, repository *InMemoryLeaseRepository, lease Lease) Lease {
 	t.Helper()
 	blocked, ok, err := repository.Acquire(ctx, lease)
 	if err != nil {
@@ -104,8 +104,8 @@ func mustBlockLease(t *testing.T, ctx context.Context, repository *InMemoryLease
 }
 
 func assertHeartbeatLease(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	repository *InMemoryLeaseRepository,
 	lease Lease,
 	expiresAt time.Time,
@@ -125,7 +125,7 @@ func assertHeartbeatLease(
 	}
 }
 
-func assertWrongOwnerReleaseIgnored(t *testing.T, ctx context.Context, repository *InMemoryLeaseRepository, lease Lease) {
+func assertWrongOwnerReleaseIgnored(ctx context.Context, t *testing.T, repository *InMemoryLeaseRepository, lease Lease) {
 	t.Helper()
 	released, err := repository.Release(ctx, lease)
 	if err != nil {
@@ -136,7 +136,7 @@ func assertWrongOwnerReleaseIgnored(t *testing.T, ctx context.Context, repositor
 	}
 }
 
-func assertOwnerRelease(t *testing.T, ctx context.Context, repository *InMemoryLeaseRepository, lease Lease) {
+func assertOwnerRelease(ctx context.Context, t *testing.T, repository *InMemoryLeaseRepository, lease Lease) {
 	t.Helper()
 	released, err := repository.Release(ctx, lease)
 	if err != nil {

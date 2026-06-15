@@ -12,16 +12,16 @@ import (
 func TestSQLMetadataCatalogLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store := newTestSQLiteCatalogStore(t)
-	createTestBucket(t, ctx, store, "photos")
+	createTestBucket(ctx, t, store, "photos")
 
-	digest := retainTestDigestRef(t, ctx, store)
-	version := upsertTestObjectVersion(t, ctx, store, digest)
-	upsertTestObjectRecord(t, ctx, store, version)
-	assertTestObjectVersions(t, ctx, store)
-	upsertTestIndexDocument(t, ctx, store)
-	upsertTestIndexJob(t, ctx, store)
-	upsertTestIndexOutboxEvent(t, ctx, store)
-	deleteTestCatalogEntries(t, ctx, store)
+	digest := retainTestDigestRef(ctx, t, store)
+	version := upsertTestObjectVersion(ctx, t, store, digest)
+	upsertTestObjectRecord(ctx, t, store, version)
+	assertTestObjectVersions(ctx, t, store)
+	upsertTestIndexDocument(ctx, t, store)
+	upsertTestIndexJob(ctx, t, store)
+	upsertTestIndexOutboxEvent(ctx, t, store)
+	deleteTestCatalogEntries(ctx, t, store)
 }
 
 func newTestSQLiteCatalogStore(t *testing.T) *SQLMetadata {
@@ -38,14 +38,14 @@ func newTestSQLiteCatalogStore(t *testing.T) *SQLMetadata {
 	return store
 }
 
-func createTestBucket(t *testing.T, ctx context.Context, store *SQLMetadata, bucket string) {
+func createTestBucket(ctx context.Context, t *testing.T, store *SQLMetadata, bucket string) {
 	t.Helper()
 	if createErr := store.CreateBucket(ctx, bucket); createErr != nil {
 		t.Fatalf("create bucket: %v", createErr)
 	}
 }
 
-func retainTestDigestRef(t *testing.T, ctx context.Context, store *SQLMetadata) model.DigestRef {
+func retainTestDigestRef(ctx context.Context, t *testing.T, store *SQLMetadata) model.DigestRef {
 	t.Helper()
 	digest, retainErr := store.RetainDigestRef(ctx, model.DigestRef{
 		Digest:         "sha256:abc",
@@ -64,8 +64,8 @@ func retainTestDigestRef(t *testing.T, ctx context.Context, store *SQLMetadata) 
 }
 
 func upsertTestObjectVersion(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	store *SQLMetadata,
 	digest model.DigestRef,
 ) model.ObjectVersion {
@@ -92,7 +92,7 @@ func upsertTestObjectVersion(
 	return version
 }
 
-func upsertTestObjectRecord(t *testing.T, ctx context.Context, store *SQLMetadata, version model.ObjectVersion) {
+func upsertTestObjectRecord(ctx context.Context, t *testing.T, store *SQLMetadata, version model.ObjectVersion) {
 	t.Helper()
 	record, upsertErr := store.UpsertObjectRecord(ctx, model.ObjectRecord{
 		Bucket:           version.Bucket,
@@ -107,7 +107,7 @@ func upsertTestObjectRecord(t *testing.T, ctx context.Context, store *SQLMetadat
 	}
 }
 
-func assertTestObjectVersions(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func assertTestObjectVersions(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	versions, listErr := store.ListObjectVersions(ctx, "photos", "cat.jpg")
 	if listErr != nil {
@@ -118,7 +118,7 @@ func assertTestObjectVersions(t *testing.T, ctx context.Context, store *SQLMetad
 	}
 }
 
-func upsertTestIndexDocument(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func upsertTestIndexDocument(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	document, upsertErr := store.UpsertIndexDocument(ctx, model.IndexDocument{
 		ID:        "doc-1",
@@ -136,7 +136,7 @@ func upsertTestIndexDocument(t *testing.T, ctx context.Context, store *SQLMetada
 	}
 }
 
-func upsertTestIndexJob(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func upsertTestIndexJob(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	job, upsertErr := store.UpsertIndexJob(ctx, model.IndexJob{
 		ID:        "job-1",
@@ -151,10 +151,10 @@ func upsertTestIndexJob(t *testing.T, ctx context.Context, store *SQLMetadata) {
 	if job.Status != model.IndexJobStatusQueued {
 		t.Fatalf("index job status = %q", job.Status)
 	}
-	assertQueuedIndexJobs(t, ctx, store)
+	assertQueuedIndexJobs(ctx, t, store)
 }
 
-func assertQueuedIndexJobs(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func assertQueuedIndexJobs(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	jobs, listErr := store.ListIndexJobs(ctx, model.IndexJobStatusQueued, 10)
 	if listErr != nil {
@@ -165,7 +165,7 @@ func assertQueuedIndexJobs(t *testing.T, ctx context.Context, store *SQLMetadata
 	}
 }
 
-func upsertTestIndexOutboxEvent(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func upsertTestIndexOutboxEvent(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	event, upsertErr := store.UpsertIndexOutboxEvent(ctx, model.IndexOutboxEvent{
 		ID:        "event-1",
@@ -183,14 +183,14 @@ func upsertTestIndexOutboxEvent(t *testing.T, ctx context.Context, store *SQLMet
 	}
 }
 
-func deleteTestCatalogEntries(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func deleteTestCatalogEntries(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
-	assertDeleteObjectVersion(t, ctx, store)
-	assertDeleteObjectRecord(t, ctx, store)
-	assertReleaseDigestRef(t, ctx, store)
+	assertDeleteObjectVersion(ctx, t, store)
+	assertDeleteObjectRecord(ctx, t, store)
+	assertReleaseDigestRef(ctx, t, store)
 }
 
-func assertDeleteObjectVersion(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func assertDeleteObjectVersion(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	removed, deleteErr := store.DeleteObjectVersion(ctx, "photos", "cat.jpg", "v1")
 	if deleteErr != nil {
@@ -201,7 +201,7 @@ func assertDeleteObjectVersion(t *testing.T, ctx context.Context, store *SQLMeta
 	}
 }
 
-func assertDeleteObjectRecord(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func assertDeleteObjectRecord(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	removed, deleteErr := store.DeleteObjectRecord(ctx, "photos", "cat.jpg")
 	if deleteErr != nil {
@@ -212,7 +212,7 @@ func assertDeleteObjectRecord(t *testing.T, ctx context.Context, store *SQLMetad
 	}
 }
 
-func assertReleaseDigestRef(t *testing.T, ctx context.Context, store *SQLMetadata) {
+func assertReleaseDigestRef(ctx context.Context, t *testing.T, store *SQLMetadata) {
 	t.Helper()
 	_, removed, releaseErr := store.ReleaseDigestRef(ctx, "sha256:abc")
 	if releaseErr != nil {
