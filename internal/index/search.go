@@ -192,7 +192,7 @@ func (s *SearchEngine) Close() error {
 	return nil
 }
 
-func (s *SearchEngine) searchIndex(query model.SearchQuery) ([]searchHit, error) {
+func (s *SearchEngine) searchIndex(query model.SearchQuery) (*list.List[searchHit], error) {
 	req := bleve.NewSearchRequest(s.buildQuery(query))
 	if query.Limit > 0 {
 		req.Size = query.Limit
@@ -208,7 +208,7 @@ func (s *SearchEngine) searchIndex(query model.SearchQuery) ([]searchHit, error)
 			Fields: hit.Fields,
 		}
 	})
-	return hits.Values(), nil
+	return hits, nil
 }
 
 type searchHit struct {
@@ -216,11 +216,11 @@ type searchHit struct {
 	Fields map[string]any
 }
 
-func (s *SearchEngine) resultFromHits(query model.SearchQuery, hits []searchHit) model.SearchResult {
+func (s *SearchEngine) resultFromHits(query model.SearchQuery, hits *list.List[searchHit]) model.SearchResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	items := list.FilterMapList(list.NewList(hits...), func(_ int, hit searchHit) (model.ObjectMeta, bool) {
+	items := list.FilterMapList(hits, func(_ int, hit searchHit) (model.ObjectMeta, bool) {
 		if meta, ok := s.items[hit.ID]; ok && meta != nil {
 			return *meta, true
 		}
