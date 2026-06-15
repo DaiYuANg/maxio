@@ -1,3 +1,4 @@
+// Package proxy contains HTTP request body helpers and S3 dedupe middleware utilities.
 package proxy
 
 import (
@@ -9,6 +10,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/samber/oops"
 )
@@ -105,7 +108,7 @@ func (s *requestBodySpooler) write(data []byte) error {
 }
 
 func (s *requestBodySpooler) createTempFile() error {
-	file, err := os.CreateTemp("", "maxio-s3-put-*")
+	file, err := os.CreateTemp("", "maxio-s3-put-")
 	if err != nil {
 		return oops.Wrapf(err, "create request body spool file")
 	}
@@ -160,7 +163,7 @@ func (b *capturedRequestBody) Open() (io.ReadCloser, error) {
 	if b.tempPath == "" {
 		return io.NopCloser(bytes.NewReader(b.memory)), nil
 	}
-	file, err := os.Open(b.tempPath)
+	file, err := openSpoolFile(b.tempPath)
 	if err != nil {
 		return nil, oops.Wrapf(err, "open request body spool file")
 	}
@@ -185,8 +188,11 @@ func cleanupCapturedBody(ctx context.Context, logger *slog.Logger, body *capture
 	if body == nil || body.tempPath == "" {
 		return
 	}
-	if err := os.Remove(body.tempPath); err != nil && logger != nil {
-		logger.WarnContext(ctx, "remove s3 put request body spool file", "path", body.tempPath, "error", err)
+	if err := removeSpoolFile(body.tempPath); err != nil {
+		if logger != nil {
+			logger.WarnContext(ctx, "remove s3 put request body spool file", "path", body.tempPath, "error", err)
+		}
+		return
 	}
 }
 
@@ -197,4 +203,49 @@ func closeReplayedPutBody(ctx context.Context, logger *slog.Logger, body io.Clos
 	if err := body.Close(); err != nil && logger != nil {
 		logger.DebugContext(ctx, "close replayed s3 put request body", "error", err)
 	}
+}
+
+func openSpoolFile(path string) (*os.File, error) {
+	tempPath, err := secureTempPath(path)
+	if err != nil {
+		return nil, oops.Wrapf(err, "resolve request body spool file path")
+	}
+	file, err := os.Open(filepath.Join(os.TempDir(), filepath.Base(tempPath)))
+	if err != nil {
+		return nil, oops.Wrapf(err, "open request body spool file")
+	}
+	return file, nil
+}
+
+func removeSpoolFile(path string) error {
+	tempPath, err := secureTempPath(path)
+	if err != nil {
+		return oops.Wrapf(err, "resolve request body spool file path")
+	}
+	spoolPath := filepath.Join(os.TempDir(), filepath.Base(tempPath))
+	if err := os.Remove(spoolPath); err != nil {
+		return oops.Wrapf(err, "remove request body spool file")
+	}
+	return nil
+}
+
+func secureTempPath(path string) (string, error) {
+	cleaned := filepath.Clean(path)
+	if !filepath.IsAbs(cleaned) {
+		return "", errors.New("request body temp path is not absolute")
+	}
+	relative, err := filepath.Rel(filepath.Clean(os.TempDir()), cleaned)
+	if err != nil {
+		return "", oops.Wrapf(err, "resolve request body temp path")
+	}
+	if relative == "." || relative == "" {
+		return "", errors.New("request body temp path is temp dir root")
+	}
+	if strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
+		return "", errors.New("request body temp path escapes temp directory")
+	}
+	if !strings.HasPrefix(filepath.Base(cleaned), "maxio-s3-put-") {
+		return "", errors.New("request body temp path has unexpected prefix")
+	}
+	return filepath.Join(filepath.Clean(os.TempDir()), filepath.Base(cleaned)), nil
 }
