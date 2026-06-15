@@ -64,7 +64,11 @@ func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
 func (s *SQLMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, error) {
 	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
 		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
-	return listSQLRows(ctx, s, query, "upstreams", scanUpstream)
+	upstreams, err := listSQLRows(ctx, s, query, "upstreams", scanUpstream)
+	if err != nil {
+		return nil, err
+	}
+	return upstreams.Values(), nil
 }
 
 func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error) {

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -38,13 +39,17 @@ func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
 	ctx = ensureContext(ctx)
 	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.selectItems()...).
 		OrderBy(metadataBuckets.name.Asc())
-	return listSQLRows(
+	buckets, err := listSQLRows(
 		ctx,
 		s,
 		query,
 		"buckets",
 		scanBucket,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return buckets.Values(), nil
 }
 
 func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, error) {
@@ -130,7 +135,7 @@ func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx
 	if err != nil {
 		return err
 	}
-	for _, hash := range hashes {
+	for _, hash := range hashes.Values() {
 		if _, _, err := s.decreaseBlobRefInTx(ctx, tx, hash); err != nil && !errors.Is(err, ErrObjectNotFound) {
 			return fmt.Errorf("decrease blob ref: %w", err)
 		}
@@ -138,7 +143,7 @@ func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) ([]string, error) {
+func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) (*collectionlist.List[string], error) {
 	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.hash).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.state.Eq(model.ObjectStateCommitted)))
 	rows, err := s.txQueryBuilderContext(ctx, tx, query)
@@ -151,13 +156,13 @@ func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sq
 		}
 	}()
 
-	hashes := make([]string, 0)
+	hashes := collectionlist.NewList[string]()
 	for rows.Next() {
 		var hash string
 		if err := rows.Scan(&hash); err != nil {
 			return nil, fmt.Errorf("scan object hash: %w", err)
 		}
-		hashes = append(hashes, hash)
+		hashes.Add(hash)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate bucket object hashes: %w", err)

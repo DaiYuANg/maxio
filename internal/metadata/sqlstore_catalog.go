@@ -187,13 +187,17 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 	query := querydsl.SelectFrom(metadataObjectVersions.table, metadataObjectVersions.selectItems()...).
 		Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))).
 		OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc())
-	return listSQLRows(
+	versions, err := listSQLRows(
 		ctx,
 		s,
 		query,
 		"object versions",
 		scanObjectVersion,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return versions.Values(), nil
 }
 
 func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error) {

@@ -12,13 +12,17 @@ import (
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
 	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...)
-	return listSQLRows(
+	refs, err := listSQLRows(
 		ctx,
 		s,
 		query,
 		"blob refs",
 		scanBlobRef,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return refs.Values(), nil
 }
 
 func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error) {

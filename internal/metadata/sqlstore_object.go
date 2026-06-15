@@ -74,13 +74,17 @@ func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) 
 }
 
 func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) ([]model.ObjectMeta, error) {
-	return listSQLRows(
+	metas, err := listSQLRows(
 		ctx,
 		s,
 		query,
 		"object metas",
 		scanObjectMeta,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return metas.Values(), nil
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {

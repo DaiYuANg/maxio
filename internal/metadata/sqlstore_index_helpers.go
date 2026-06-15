@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -183,7 +184,11 @@ func listSQLIndexQueue[T any](
 	label string,
 	scan func(interface{ Scan(dest ...any) error }) (T, error),
 ) ([]T, error) {
-	return listSQLRows(ctx, store, query, label, scan)
+	items, err := listSQLRows(ctx, store, query, label, scan)
+	if err != nil {
+		return nil, err
+	}
+	return items.Values(), nil
 }
 
 func listSQLRows[T any](
@@ -192,7 +197,7 @@ func listSQLRows[T any](
 	query querydsl.Builder,
 	label string,
 	scan func(interface{ Scan(dest ...any) error }) (T, error),
-) ([]T, error) {
+) (*collectionlist.List[T], error) {
 	rows, err := store.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query %s: %w", label, err)
@@ -203,13 +208,13 @@ func listSQLRows[T any](
 		}
 	}()
 
-	items := make([]T, 0)
+	items := collectionlist.NewList[T]()
 	for rows.Next() {
 		item, scanErr := scan(rows)
 		if scanErr != nil {
 			return nil, scanErr
 		}
-		items = append(items, item)
+		items.Add(item)
 	}
 	if rowsErr := rows.Err(); rowsErr != nil {
 		return nil, fmt.Errorf("iterate %s: %w", label, rowsErr)

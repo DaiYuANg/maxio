@@ -84,13 +84,17 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
 		query.Where(predicate)
 	}
-	return listSQLRows(
+	documents, err := listSQLRows(
 		ctx,
 		s,
 		query,
 		"index documents",
 		scanIndexDocument,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return documents.Values(), nil
 }
 
 func indexDocumentFilter(bucket, prefix string) querydsl.Predicate {
