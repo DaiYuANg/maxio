@@ -1,65 +1,63 @@
 package metadata
 
 import (
-	"context"
 	"database/sql"
-	"encoding/json"
+	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
-	"time"
 
-	"github.com/lyonbrown4d/maxio/internal/model"
+	codecx "github.com/arcgolabs/dbx/codec"
 )
 
-func marshalStrings(values []string) string {
-	return marshalJSON(values, "[]")
-}
+var metadataBoolIntCodec = codecx.New[bool]("bool_int", decodeBoolInt, encodeBoolInt)
 
-func marshalUserMetadata(value map[string]string) string {
-	if len(value) == 0 {
-		return "null"
+func decodeBoolInt(src any) (bool, error) {
+	switch value := src.(type) {
+	case nil:
+		return false, nil
+	case bool:
+		return value, nil
+	case []byte:
+		return parseBoolInt(string(value))
+	case sql.RawBytes:
+		return parseBoolInt(string(value))
+	case string:
+		return parseBoolInt(value)
+	default:
+		return decodeNumericBoolInt(src)
 	}
-	return marshalJSON(value, "null")
 }
 
-func marshalJSON(value any, fallback string) string {
-	raw, err := json.Marshal(value)
+func decodeNumericBoolInt(src any) (bool, error) {
+	value := reflect.ValueOf(src)
+	if value.CanInt() {
+		return value.Int() != 0, nil
+	}
+	if value.CanUint() {
+		return value.Uint() != 0, nil
+	}
+	return false, fmt.Errorf("unsupported bool_int source %T", src)
+}
+
+func encodeBoolInt(value bool) (any, error) {
+	if value {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+func parseBoolInt(raw string) (bool, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return false, nil
+	}
+	if value, err := strconv.ParseBool(trimmed); err == nil {
+		return value, nil
+	}
+	value, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil {
-		return fallback
+		return false, fmt.Errorf("parse bool_int: %w", err)
 	}
-	return string(raw)
-}
-
-func extractWriteIntentValues(intent *model.WriteIntent) (any, any, any, any) {
-	if intent == nil {
-		return nil, nil, nil, nil
-	}
-	return emptyStringOrNil(intent.ID), emptyStringOrNil(intent.Stage), unixNanoOrNil(intent.StartedAt), unixNanoOrNil(intent.UpdatedAt)
-}
-
-func emptyStringOrNil(value string) any {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-	return value
-}
-
-func emptyStringOrDefault(value sql.NullString) string {
-	if !value.Valid {
-		return ""
-	}
-	return value.String
-}
-
-func unixNanoOrNil(t time.Time) any {
-	if t.IsZero() {
-		return nil
-	}
-	return t.UTC().UnixNano()
-}
-
-func ensureContext(ctx context.Context) context.Context {
-	if ctx == nil {
-		return context.Background()
-	}
-	return ctx
+	return value != 0, nil
 }

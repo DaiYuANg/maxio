@@ -10,39 +10,57 @@ import (
 	collectionset "github.com/arcgolabs/collectionx/set"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-var metadataUpstreams = newMetadataUpstreamsTable()
+var (
+	metadataUpstreams      = newMetadataUpstreamsTable()
+	metadataUpstreamMapper = newMetadataEntityMapper[model.Upstream](metadataUpstreams.schema)
+)
 
 type metadataUpstreamsTable struct {
-	table     querydsl.Table
-	id        columnx.Column[struct{}, string]
-	name      columnx.Column[struct{}, string]
-	endpoint  columnx.Column[struct{}, string]
-	region    columnx.Column[struct{}, string]
-	weight    columnx.Column[struct{}, int]
-	priority  columnx.Column[struct{}, int]
-	buckets   columnx.Column[struct{}, string]
-	enabled   columnx.Column[struct{}, int]
-	createdAt columnx.Column[struct{}, int64]
-	updatedAt columnx.Column[struct{}, int64]
+	schema    metadataUpstreamsSchema
+	id        columnx.Column[model.Upstream, string]
+	name      columnx.Column[model.Upstream, string]
+	endpoint  columnx.Column[model.Upstream, string]
+	region    columnx.Column[model.Upstream, string]
+	weight    columnx.Column[model.Upstream, int]
+	priority  columnx.Column[model.Upstream, int]
+	buckets   columnx.Column[model.Upstream, string]
+	enabled   columnx.Column[model.Upstream, int]
+	createdAt columnx.Column[model.Upstream, int64]
+	updatedAt columnx.Column[model.Upstream, int64]
+}
+
+type metadataUpstreamsSchema struct {
+	schemax.Schema[model.Upstream]
+	ID        columnx.Column[model.Upstream, string] `dbx:"id,pk"`
+	Name      columnx.Column[model.Upstream, string] `dbx:"name"`
+	Endpoint  columnx.Column[model.Upstream, string] `dbx:"endpoint"`
+	Region    columnx.Column[model.Upstream, string] `dbx:"region"`
+	Weight    columnx.Column[model.Upstream, int]    `dbx:"weight"`
+	Priority  columnx.Column[model.Upstream, int]    `dbx:"priority"`
+	Buckets   columnx.Column[model.Upstream, string] `dbx:"buckets"`
+	Enabled   columnx.Column[model.Upstream, int]    `dbx:"enabled"`
+	CreatedAt columnx.Column[model.Upstream, int64]  `dbx:"created_at"`
+	UpdatedAt columnx.Column[model.Upstream, int64]  `dbx:"updated_at"`
 }
 
 func newMetadataUpstreamsTable() metadataUpstreamsTable {
-	table := querydsl.NewTable("metadata_upstreams")
+	schema := schemax.MustSchema("metadata_upstreams", metadataUpstreamsSchema{})
 	return metadataUpstreamsTable{
-		table:     table,
-		id:        columnx.Named[string](table, "id"),
-		name:      columnx.Named[string](table, "name"),
-		endpoint:  columnx.Named[string](table, "endpoint"),
-		region:    columnx.Named[string](table, "region"),
-		weight:    columnx.Named[int](table, "weight"),
-		priority:  columnx.Named[int](table, "priority"),
-		buckets:   columnx.Named[string](table, "buckets"),
-		enabled:   columnx.Named[int](table, "enabled"),
-		createdAt: columnx.Named[int64](table, "created_at"),
-		updatedAt: columnx.Named[int64](table, "updated_at"),
+		schema:    schema,
+		id:        schema.ID,
+		name:      schema.Name,
+		endpoint:  schema.Endpoint,
+		region:    schema.Region,
+		weight:    schema.Weight,
+		priority:  schema.Priority,
+		buckets:   schema.Buckets,
+		enabled:   schema.Enabled,
+		createdAt: schema.CreatedAt,
+		updatedAt: schema.UpdatedAt,
 	}
 }
 
@@ -62,7 +80,7 @@ func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
 }
 
 func (s *SQLMetadata) ListUpstreams(ctx context.Context) (*collectionlist.List[model.Upstream], error) {
-	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
+	query := querydsl.SelectFrom(metadataUpstreams.schema, metadataUpstreams.selectItems()...).
 		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
 	upstreams, err := querySQLRows(ctx, s, query, "upstreams", metadataUpstreamMapper)
 	if err != nil {
@@ -77,7 +95,7 @@ func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstrea
 		return model.Upstream{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
+	query := querydsl.SelectFrom(metadataUpstreams.schema, metadataUpstreams.selectItems()...).
 		Where(metadataUpstreams.id.Eq(id)).
 		Limit(1)
 	upstream, found, err := querySQLOne(ctx, s, query, "upstream", metadataUpstreamMapper)
@@ -99,7 +117,7 @@ func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstrea
 	}
 	upstream.UpdatedAt = now
 
-	query := querydsl.InsertInto(metadataUpstreams.table).
+	query := querydsl.InsertInto(metadataUpstreams.schema).
 		Values(
 			metadataUpstreams.id.Set(upstream.ID),
 			metadataUpstreams.name.Set(upstream.Name),
@@ -141,7 +159,7 @@ func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, erro
 		return false, ErrBadRequest
 	}
 
-	query := querydsl.DeleteFrom(metadataUpstreams.table).Where(metadataUpstreams.id.Eq(id))
+	query := querydsl.DeleteFrom(metadataUpstreams.schema).Where(metadataUpstreams.id.Eq(id))
 	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete upstream: %w", err)

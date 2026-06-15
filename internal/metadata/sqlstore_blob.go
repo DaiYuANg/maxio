@@ -11,7 +11,7 @@ import (
 )
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) (*collectionlist.List[BlobRef], error) {
-	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...)
+	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.selectItems()...)
 	refs, err := querySQLRows(
 		ctx,
 		s,
@@ -31,7 +31,7 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 		return BlobRef{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...).
+	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.selectItems()...).
 		Where(metadataBlobRefs.hash.Eq(hash)).
 		Limit(1)
 	ref, found, err := querySQLOne(ctx, s, query, "blob ref", metadataBlobRefMapper)
@@ -53,7 +53,7 @@ func (s *SQLMetadata) CreateBlobRef(
 		return ErrBadRequest
 	}
 
-	query := querydsl.InsertInto(metadataBlobRefs.table).
+	query := querydsl.InsertInto(metadataBlobRefs.schema).
 		Values(
 			metadataBlobRefs.hash.Set(hash),
 			metadataBlobRefs.path.Set(path),
@@ -97,7 +97,7 @@ func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string,
 }
 
 func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
-	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.path, metadataBlobRefs.refCount).
+	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.path, metadataBlobRefs.refCount).
 		Where(metadataBlobRefs.hash.Eq(hash)).
 		Limit(1)
 	ref, found, err := querySQLOneInTx(ctx, s, tx, query, "blob ref", metadataBlobRefCounterMapper)
@@ -114,7 +114,7 @@ func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash 
 }
 
 func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
-	query := querydsl.DeleteFrom(metadataBlobRefs.table).
+	query := querydsl.DeleteFrom(metadataBlobRefs.schema).
 		Where(metadataBlobRefs.hash.Eq(hash))
 	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
 		return fmt.Errorf("delete blob ref: %w", err)

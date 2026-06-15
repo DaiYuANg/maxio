@@ -3,52 +3,75 @@ package metadata
 import (
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 var metadataObjects = newMetadataObjectsTable()
 
 type metadataObjectsTable struct {
-	table                querydsl.Table
-	bucket               columnx.Column[struct{}, string]
-	key                  columnx.Column[struct{}, string]
-	hash                 columnx.Column[struct{}, string]
-	etag                 columnx.Column[struct{}, string]
-	size                 columnx.Column[struct{}, int64]
-	contentType          columnx.Column[struct{}, string]
-	cacheControl         columnx.Column[struct{}, string]
-	contentDisposition   columnx.Column[struct{}, string]
-	contentEncoding      columnx.Column[struct{}, string]
-	contentLanguage      columnx.Column[struct{}, string]
-	userMetadata         columnx.Column[struct{}, string]
-	updatedAt            columnx.Column[struct{}, int64]
-	state                columnx.Column[struct{}, string]
-	writeIntentID        columnx.Column[struct{}, any]
-	writeIntentStage     columnx.Column[struct{}, any]
-	writeIntentStartedAt columnx.Column[struct{}, any]
-	writeIntentUpdatedAt columnx.Column[struct{}, any]
+	schema               metadataObjectsSchema
+	bucket               columnx.Column[model.ObjectMeta, string]
+	key                  columnx.Column[model.ObjectMeta, string]
+	hash                 columnx.Column[model.ObjectMeta, string]
+	etag                 columnx.Column[model.ObjectMeta, string]
+	size                 columnx.Column[model.ObjectMeta, int64]
+	contentType          columnx.Column[model.ObjectMeta, string]
+	cacheControl         columnx.Column[model.ObjectMeta, string]
+	contentDisposition   columnx.Column[model.ObjectMeta, string]
+	contentEncoding      columnx.Column[model.ObjectMeta, string]
+	contentLanguage      columnx.Column[model.ObjectMeta, string]
+	userMetadata         columnx.Column[model.ObjectMeta, string]
+	updatedAt            columnx.Column[model.ObjectMeta, int64]
+	state                columnx.Column[model.ObjectMeta, string]
+	writeIntentID        columnx.Column[model.ObjectMeta, any]
+	writeIntentStage     columnx.Column[model.ObjectMeta, any]
+	writeIntentStartedAt columnx.Column[model.ObjectMeta, any]
+	writeIntentUpdatedAt columnx.Column[model.ObjectMeta, any]
+}
+
+type metadataObjectsSchema struct {
+	schemax.Schema[model.ObjectMeta]
+	Bucket               columnx.Column[model.ObjectMeta, string] `dbx:"bucket"`
+	Key                  columnx.Column[model.ObjectMeta, string] `dbx:"object_key"`
+	Hash                 columnx.Column[model.ObjectMeta, string] `dbx:"hash"`
+	ETag                 columnx.Column[model.ObjectMeta, string] `dbx:"etag"`
+	Size                 columnx.Column[model.ObjectMeta, int64]  `dbx:"size"`
+	ContentType          columnx.Column[model.ObjectMeta, string] `dbx:"content_type"`
+	CacheControl         columnx.Column[model.ObjectMeta, string] `dbx:"cache_control"`
+	ContentDisposition   columnx.Column[model.ObjectMeta, string] `dbx:"content_disposition"`
+	ContentEncoding      columnx.Column[model.ObjectMeta, string] `dbx:"content_encoding"`
+	ContentLanguage      columnx.Column[model.ObjectMeta, string] `dbx:"content_language"`
+	UserMetadata         columnx.Column[model.ObjectMeta, string] `dbx:"user_metadata"`
+	UpdatedAt            columnx.Column[model.ObjectMeta, int64]  `dbx:"updated_at"`
+	State                columnx.Column[model.ObjectMeta, string] `dbx:"state"`
+	WriteIntentID        columnx.Column[model.ObjectMeta, any]    `dbx:"write_intent_id"`
+	WriteIntentStage     columnx.Column[model.ObjectMeta, any]    `dbx:"write_intent_stage"`
+	WriteIntentStartedAt columnx.Column[model.ObjectMeta, any]    `dbx:"write_intent_started_at"`
+	WriteIntentUpdatedAt columnx.Column[model.ObjectMeta, any]    `dbx:"write_intent_updated_at"`
 }
 
 func newMetadataObjectsTable() metadataObjectsTable {
-	table := querydsl.NewTable("metadata_objects")
+	schema := schemax.MustSchema("metadata_objects", metadataObjectsSchema{})
 	return metadataObjectsTable{
-		table:                table,
-		bucket:               columnx.Named[string](table, "bucket"),
-		key:                  columnx.Named[string](table, "object_key"),
-		hash:                 columnx.Named[string](table, "hash"),
-		etag:                 columnx.Named[string](table, "etag"),
-		size:                 columnx.Named[int64](table, "size"),
-		contentType:          columnx.Named[string](table, "content_type"),
-		cacheControl:         columnx.Named[string](table, "cache_control"),
-		contentDisposition:   columnx.Named[string](table, "content_disposition"),
-		contentEncoding:      columnx.Named[string](table, "content_encoding"),
-		contentLanguage:      columnx.Named[string](table, "content_language"),
-		userMetadata:         columnx.Named[string](table, "user_metadata"),
-		updatedAt:            columnx.Named[int64](table, "updated_at"),
-		state:                columnx.Named[string](table, "state"),
-		writeIntentID:        columnx.Named[any](table, "write_intent_id"),
-		writeIntentStage:     columnx.Named[any](table, "write_intent_stage"),
-		writeIntentStartedAt: columnx.Named[any](table, "write_intent_started_at"),
-		writeIntentUpdatedAt: columnx.Named[any](table, "write_intent_updated_at"),
+		schema:               schema,
+		bucket:               schema.Bucket,
+		key:                  schema.Key,
+		hash:                 schema.Hash,
+		etag:                 schema.ETag,
+		size:                 schema.Size,
+		contentType:          schema.ContentType,
+		cacheControl:         schema.CacheControl,
+		contentDisposition:   schema.ContentDisposition,
+		contentEncoding:      schema.ContentEncoding,
+		contentLanguage:      schema.ContentLanguage,
+		userMetadata:         schema.UserMetadata,
+		updatedAt:            schema.UpdatedAt,
+		state:                schema.State,
+		writeIntentID:        schema.WriteIntentID,
+		writeIntentStage:     schema.WriteIntentStage,
+		writeIntentStartedAt: schema.WriteIntentStartedAt,
+		writeIntentUpdatedAt: schema.WriteIntentUpdatedAt,
 	}
 }
 

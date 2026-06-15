@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 )
 
@@ -15,11 +15,7 @@ func (s *SQLMetadata) execBuilderContext(ctx context.Context, query querydsl.Bui
 		return nil, errors.New("metadata dbx session is nil")
 	}
 
-	bound, err := query.Build(s.dbxDB.Dialect())
-	if err != nil {
-		return nil, fmt.Errorf("build metadata mutation: %w", err)
-	}
-	result, err := s.dbxDB.ExecBoundContext(ensureContext(ctx), bound)
+	result, err := dbx.Exec(ensureContext(ctx), s.dbxDB, query)
 	if err != nil {
 		return nil, fmt.Errorf("exec metadata query: %w", err)
 	}
@@ -38,7 +34,7 @@ func (s *SQLMetadata) txQueryBuilderContext(ctx context.Context, tx *sql.Tx, que
 	if err != nil {
 		return nil, fmt.Errorf("build metadata tx query: %w", err)
 	}
-	rows, err := tx.QueryContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...)
+	rows, err := s.dbxDB.WithTx(tx).QueryBoundContext(ensureContext(ctx), bound)
 	if err != nil {
 		return nil, fmt.Errorf("query metadata tx rows: %w", err)
 	}
@@ -57,19 +53,8 @@ func (s *SQLMetadata) txExecBuilderContext(ctx context.Context, tx *sql.Tx, quer
 	if err != nil {
 		return fmt.Errorf("build metadata tx mutation: %w", err)
 	}
-	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...); err != nil {
+	if _, err := s.dbxDB.WithTx(tx).ExecBoundContext(ensureContext(ctx), bound); err != nil {
 		return fmt.Errorf("exec metadata tx query: %w", err)
 	}
 	return nil
-}
-
-func boundArgs(queryArgs *collectionlist.List[any]) []any {
-	if queryArgs == nil {
-		return nil
-	}
-	var result []any
-	queryArgs.ViewValues(func(values []any) {
-		result = values
-	})
-	return result
 }

@@ -15,7 +15,7 @@ func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.In
 	if err != nil {
 		return model.IndexDocument{}, err
 	}
-	query := querydsl.InsertInto(metadataIndexDocuments.table).
+	query := querydsl.InsertInto(metadataIndexDocuments.schema).
 		Values(
 			metadataIndexDocuments.id.Set(document.ID),
 			metadataIndexDocuments.bucket.Set(document.Bucket),
@@ -58,7 +58,7 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 		return model.IndexDocument{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataIndexDocuments.table, metadataIndexDocuments.selectItems()...).
+	query := querydsl.SelectFrom(metadataIndexDocuments.schema, metadataIndexDocuments.selectItems()...).
 		Where(metadataIndexDocuments.id.Eq(id)).
 		Limit(1)
 	document, found, err := querySQLOne(ctx, s, query, "index document", metadataIndexDocumentMapper)
@@ -71,7 +71,7 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.IndexDocument], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
-	query := querydsl.SelectFrom(metadataIndexDocuments.table, metadataIndexDocuments.selectItems()...).
+	query := querydsl.SelectFrom(metadataIndexDocuments.schema, metadataIndexDocuments.selectItems()...).
 		OrderBy(metadataIndexDocuments.bucket.Asc(), metadataIndexDocuments.key.Asc(), metadataIndexDocuments.versionID.Asc())
 	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
 		query.Where(predicate)
@@ -109,7 +109,7 @@ func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool,
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataIndexDocuments.table).Where(metadataIndexDocuments.id.Eq(id))
+	query := querydsl.DeleteFrom(metadataIndexDocuments.schema).Where(metadataIndexDocuments.id.Eq(id))
 	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete index document: %w", err)

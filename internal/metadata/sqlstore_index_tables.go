@@ -3,114 +3,166 @@ package metadata
 import (
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 var (
-	metadataIndexDocuments = newMetadataIndexDocumentsTable()
-	metadataIndexJobs      = newMetadataIndexJobsTable()
-	metadataIndexOutbox    = newMetadataIndexOutboxTable()
+	metadataIndexDocuments         = newMetadataIndexDocumentsTable()
+	metadataIndexJobs              = newMetadataIndexJobsTable()
+	metadataIndexOutbox            = newMetadataIndexOutboxTable()
+	metadataIndexDocumentMapper    = newMetadataEntityMapper[model.IndexDocument](metadataIndexDocuments.schema)
+	metadataIndexJobMapper         = newMetadataEntityMapper[model.IndexJob](metadataIndexJobs.schema)
+	metadataIndexOutboxEventMapper = newMetadataEntityMapper[model.IndexOutboxEvent](metadataIndexOutbox.schema)
 )
 
 type metadataIndexDocumentsTable struct {
-	table     querydsl.Table
-	id        columnx.Column[struct{}, string]
-	bucket    columnx.Column[struct{}, string]
-	key       columnx.Column[struct{}, string]
-	versionID columnx.Column[struct{}, string]
-	digest    columnx.Column[struct{}, string]
-	state     columnx.Column[struct{}, string]
-	errorText columnx.Column[struct{}, string]
-	indexedAt columnx.Column[struct{}, any]
-	createdAt columnx.Column[struct{}, int64]
-	updatedAt columnx.Column[struct{}, int64]
+	schema    metadataIndexDocumentsSchema
+	id        columnx.Column[model.IndexDocument, string]
+	bucket    columnx.Column[model.IndexDocument, string]
+	key       columnx.Column[model.IndexDocument, string]
+	versionID columnx.Column[model.IndexDocument, string]
+	digest    columnx.Column[model.IndexDocument, string]
+	state     columnx.Column[model.IndexDocument, string]
+	errorText columnx.Column[model.IndexDocument, string]
+	indexedAt columnx.Column[model.IndexDocument, any]
+	createdAt columnx.Column[model.IndexDocument, int64]
+	updatedAt columnx.Column[model.IndexDocument, int64]
 }
 
 type metadataIndexJobsTable struct {
-	table       querydsl.Table
-	id          columnx.Column[struct{}, string]
-	kind        columnx.Column[struct{}, string]
-	bucket      columnx.Column[struct{}, string]
-	key         columnx.Column[struct{}, string]
-	versionID   columnx.Column[struct{}, string]
-	status      columnx.Column[struct{}, string]
-	attempts    columnx.Column[struct{}, int]
-	errorText   columnx.Column[struct{}, string]
-	availableAt columnx.Column[struct{}, int64]
-	startedAt   columnx.Column[struct{}, any]
-	finishedAt  columnx.Column[struct{}, any]
-	createdAt   columnx.Column[struct{}, int64]
-	updatedAt   columnx.Column[struct{}, int64]
+	schema      metadataIndexJobsSchema
+	id          columnx.Column[model.IndexJob, string]
+	kind        columnx.Column[model.IndexJob, string]
+	bucket      columnx.Column[model.IndexJob, string]
+	key         columnx.Column[model.IndexJob, string]
+	versionID   columnx.Column[model.IndexJob, string]
+	status      columnx.Column[model.IndexJob, string]
+	attempts    columnx.Column[model.IndexJob, int]
+	errorText   columnx.Column[model.IndexJob, string]
+	availableAt columnx.Column[model.IndexJob, int64]
+	startedAt   columnx.Column[model.IndexJob, any]
+	finishedAt  columnx.Column[model.IndexJob, any]
+	createdAt   columnx.Column[model.IndexJob, int64]
+	updatedAt   columnx.Column[model.IndexJob, int64]
 }
 
 type metadataIndexOutboxTable struct {
-	table       querydsl.Table
-	id          columnx.Column[struct{}, string]
-	eventType   columnx.Column[struct{}, string]
-	bucket      columnx.Column[struct{}, string]
-	key         columnx.Column[struct{}, string]
-	versionID   columnx.Column[struct{}, string]
-	payload     columnx.Column[struct{}, string]
-	status      columnx.Column[struct{}, string]
-	attempts    columnx.Column[struct{}, int]
-	errorText   columnx.Column[struct{}, string]
-	availableAt columnx.Column[struct{}, int64]
-	createdAt   columnx.Column[struct{}, int64]
-	updatedAt   columnx.Column[struct{}, int64]
+	schema      metadataIndexOutboxSchema
+	id          columnx.Column[model.IndexOutboxEvent, string]
+	eventType   columnx.Column[model.IndexOutboxEvent, string]
+	bucket      columnx.Column[model.IndexOutboxEvent, string]
+	key         columnx.Column[model.IndexOutboxEvent, string]
+	versionID   columnx.Column[model.IndexOutboxEvent, string]
+	payload     columnx.Column[model.IndexOutboxEvent, string]
+	status      columnx.Column[model.IndexOutboxEvent, string]
+	attempts    columnx.Column[model.IndexOutboxEvent, int]
+	errorText   columnx.Column[model.IndexOutboxEvent, string]
+	availableAt columnx.Column[model.IndexOutboxEvent, int64]
+	createdAt   columnx.Column[model.IndexOutboxEvent, int64]
+	updatedAt   columnx.Column[model.IndexOutboxEvent, int64]
+}
+
+type metadataIndexDocumentsSchema struct {
+	schemax.Schema[model.IndexDocument]
+	ID        columnx.Column[model.IndexDocument, string] `dbx:"document_id,pk"`
+	Bucket    columnx.Column[model.IndexDocument, string] `dbx:"bucket"`
+	Key       columnx.Column[model.IndexDocument, string] `dbx:"object_key"`
+	VersionID columnx.Column[model.IndexDocument, string] `dbx:"version_id"`
+	Digest    columnx.Column[model.IndexDocument, string] `dbx:"digest"`
+	State     columnx.Column[model.IndexDocument, string] `dbx:"state"`
+	Error     columnx.Column[model.IndexDocument, string] `dbx:"error"`
+	IndexedAt columnx.Column[model.IndexDocument, any]    `dbx:"indexed_at"`
+	CreatedAt columnx.Column[model.IndexDocument, int64]  `dbx:"created_at"`
+	UpdatedAt columnx.Column[model.IndexDocument, int64]  `dbx:"updated_at"`
+}
+
+type metadataIndexJobsSchema struct {
+	schemax.Schema[model.IndexJob]
+	ID          columnx.Column[model.IndexJob, string] `dbx:"job_id,pk"`
+	Kind        columnx.Column[model.IndexJob, string] `dbx:"kind"`
+	Bucket      columnx.Column[model.IndexJob, string] `dbx:"bucket"`
+	Key         columnx.Column[model.IndexJob, string] `dbx:"object_key"`
+	VersionID   columnx.Column[model.IndexJob, string] `dbx:"version_id"`
+	Status      columnx.Column[model.IndexJob, string] `dbx:"status"`
+	Attempts    columnx.Column[model.IndexJob, int]    `dbx:"attempts"`
+	Error       columnx.Column[model.IndexJob, string] `dbx:"error"`
+	AvailableAt columnx.Column[model.IndexJob, int64]  `dbx:"available_at"`
+	StartedAt   columnx.Column[model.IndexJob, any]    `dbx:"started_at"`
+	FinishedAt  columnx.Column[model.IndexJob, any]    `dbx:"finished_at"`
+	CreatedAt   columnx.Column[model.IndexJob, int64]  `dbx:"created_at"`
+	UpdatedAt   columnx.Column[model.IndexJob, int64]  `dbx:"updated_at"`
+}
+
+type metadataIndexOutboxSchema struct {
+	schemax.Schema[model.IndexOutboxEvent]
+	ID          columnx.Column[model.IndexOutboxEvent, string] `dbx:"event_id,pk"`
+	EventType   columnx.Column[model.IndexOutboxEvent, string] `dbx:"event_type"`
+	Bucket      columnx.Column[model.IndexOutboxEvent, string] `dbx:"bucket"`
+	Key         columnx.Column[model.IndexOutboxEvent, string] `dbx:"object_key"`
+	VersionID   columnx.Column[model.IndexOutboxEvent, string] `dbx:"version_id"`
+	Payload     columnx.Column[model.IndexOutboxEvent, string] `dbx:"payload"`
+	Status      columnx.Column[model.IndexOutboxEvent, string] `dbx:"status"`
+	Attempts    columnx.Column[model.IndexOutboxEvent, int]    `dbx:"attempts"`
+	Error       columnx.Column[model.IndexOutboxEvent, string] `dbx:"error"`
+	AvailableAt columnx.Column[model.IndexOutboxEvent, int64]  `dbx:"available_at"`
+	CreatedAt   columnx.Column[model.IndexOutboxEvent, int64]  `dbx:"created_at"`
+	UpdatedAt   columnx.Column[model.IndexOutboxEvent, int64]  `dbx:"updated_at"`
 }
 
 func newMetadataIndexDocumentsTable() metadataIndexDocumentsTable {
-	table := querydsl.NewTable("metadata_index_documents")
+	schema := schemax.MustSchema("metadata_index_documents", metadataIndexDocumentsSchema{})
 	return metadataIndexDocumentsTable{
-		table:     table,
-		id:        columnx.Named[string](table, "document_id"),
-		bucket:    columnx.Named[string](table, "bucket"),
-		key:       columnx.Named[string](table, "object_key"),
-		versionID: columnx.Named[string](table, "version_id"),
-		digest:    columnx.Named[string](table, "digest"),
-		state:     columnx.Named[string](table, "state"),
-		errorText: columnx.Named[string](table, "error"),
-		indexedAt: columnx.Named[any](table, "indexed_at"),
-		createdAt: columnx.Named[int64](table, "created_at"),
-		updatedAt: columnx.Named[int64](table, "updated_at"),
+		schema:    schema,
+		id:        schema.ID,
+		bucket:    schema.Bucket,
+		key:       schema.Key,
+		versionID: schema.VersionID,
+		digest:    schema.Digest,
+		state:     schema.State,
+		errorText: schema.Error,
+		indexedAt: schema.IndexedAt,
+		createdAt: schema.CreatedAt,
+		updatedAt: schema.UpdatedAt,
 	}
 }
 
 func newMetadataIndexJobsTable() metadataIndexJobsTable {
-	table := querydsl.NewTable("metadata_index_jobs")
+	schema := schemax.MustSchema("metadata_index_jobs", metadataIndexJobsSchema{})
 	return metadataIndexJobsTable{
-		table:       table,
-		id:          columnx.Named[string](table, "job_id"),
-		kind:        columnx.Named[string](table, "kind"),
-		bucket:      columnx.Named[string](table, "bucket"),
-		key:         columnx.Named[string](table, "object_key"),
-		versionID:   columnx.Named[string](table, "version_id"),
-		status:      columnx.Named[string](table, "status"),
-		attempts:    columnx.Named[int](table, "attempts"),
-		errorText:   columnx.Named[string](table, "error"),
-		availableAt: columnx.Named[int64](table, "available_at"),
-		startedAt:   columnx.Named[any](table, "started_at"),
-		finishedAt:  columnx.Named[any](table, "finished_at"),
-		createdAt:   columnx.Named[int64](table, "created_at"),
-		updatedAt:   columnx.Named[int64](table, "updated_at"),
+		schema:      schema,
+		id:          schema.ID,
+		kind:        schema.Kind,
+		bucket:      schema.Bucket,
+		key:         schema.Key,
+		versionID:   schema.VersionID,
+		status:      schema.Status,
+		attempts:    schema.Attempts,
+		errorText:   schema.Error,
+		availableAt: schema.AvailableAt,
+		startedAt:   schema.StartedAt,
+		finishedAt:  schema.FinishedAt,
+		createdAt:   schema.CreatedAt,
+		updatedAt:   schema.UpdatedAt,
 	}
 }
 
 func newMetadataIndexOutboxTable() metadataIndexOutboxTable {
-	table := querydsl.NewTable("metadata_index_outbox")
+	schema := schemax.MustSchema("metadata_index_outbox", metadataIndexOutboxSchema{})
 	return metadataIndexOutboxTable{
-		table:       table,
-		id:          columnx.Named[string](table, "event_id"),
-		eventType:   columnx.Named[string](table, "event_type"),
-		bucket:      columnx.Named[string](table, "bucket"),
-		key:         columnx.Named[string](table, "object_key"),
-		versionID:   columnx.Named[string](table, "version_id"),
-		payload:     columnx.Named[string](table, "payload"),
-		status:      columnx.Named[string](table, "status"),
-		attempts:    columnx.Named[int](table, "attempts"),
-		errorText:   columnx.Named[string](table, "error"),
-		availableAt: columnx.Named[int64](table, "available_at"),
-		createdAt:   columnx.Named[int64](table, "created_at"),
-		updatedAt:   columnx.Named[int64](table, "updated_at"),
+		schema:      schema,
+		id:          schema.ID,
+		eventType:   schema.EventType,
+		bucket:      schema.Bucket,
+		key:         schema.Key,
+		versionID:   schema.VersionID,
+		payload:     schema.Payload,
+		status:      schema.Status,
+		attempts:    schema.Attempts,
+		errorText:   schema.Error,
+		availableAt: schema.AvailableAt,
+		createdAt:   schema.CreatedAt,
+		updatedAt:   schema.UpdatedAt,
 	}
 }
 

@@ -19,7 +19,7 @@ func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.Objec
 	if ensureErr := s.ensureBucket(ctx, record.Bucket); ensureErr != nil {
 		return model.ObjectRecord{}, ensureErr
 	}
-	query := querydsl.InsertInto(metadataObjectRecords.table).
+	query := querydsl.InsertInto(metadataObjectRecords.schema).
 		Values(
 			metadataObjectRecords.bucket.Set(record.Bucket),
 			metadataObjectRecords.key.Set(record.Key),
@@ -54,7 +54,7 @@ func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (
 		return model.ObjectRecord{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataObjectRecords.table, metadataObjectRecords.selectItems()...).
+	query := querydsl.SelectFrom(metadataObjectRecords.schema, metadataObjectRecords.selectItems()...).
 		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key))).
 		Limit(1)
 	record, found, err := querySQLOne(ctx, s, query, "object record", metadataObjectRecordMapper)
@@ -70,7 +70,7 @@ func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string
 	if bucket == "" || key == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataObjectRecords.table).
+	query := querydsl.DeleteFrom(metadataObjectRecords.schema).
 		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key)))
 	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
@@ -91,7 +91,7 @@ func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.Obj
 	if ensureErr := s.ensureBucket(ctx, version.Bucket); ensureErr != nil {
 		return model.ObjectVersion{}, ensureErr
 	}
-	query := querydsl.InsertInto(metadataObjectVersions.table).
+	query := querydsl.InsertInto(metadataObjectVersions.schema).
 		Values(
 			metadataObjectVersions.bucket.Set(version.Bucket),
 			metadataObjectVersions.key.Set(version.Key),
@@ -148,7 +148,7 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 		return model.ObjectVersion{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataObjectVersions.table, metadataObjectVersions.selectItems()...).
+	query := querydsl.SelectFrom(metadataObjectVersions.schema, metadataObjectVersions.selectItems()...).
 		Where(querydsl.And(
 			metadataObjectVersions.bucket.Eq(bucket),
 			metadataObjectVersions.key.Eq(key),
@@ -169,7 +169,7 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 		return nil, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataObjectVersions.table, metadataObjectVersions.selectItems()...).
+	query := querydsl.SelectFrom(metadataObjectVersions.schema, metadataObjectVersions.selectItems()...).
 		Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))).
 		OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc())
 	versions, err := querySQLRows(
@@ -190,7 +190,7 @@ func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, vers
 	if bucket == "" || key == "" || versionID == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataObjectVersions.table).
+	query := querydsl.DeleteFrom(metadataObjectVersions.schema).
 		Where(querydsl.And(
 			metadataObjectVersions.bucket.Eq(bucket),
 			metadataObjectVersions.key.Eq(key),

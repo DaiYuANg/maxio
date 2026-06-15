@@ -3,34 +3,54 @@ package metadata
 import (
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
+
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-var metadataDigestRefs = newMetadataDigestRefsTable()
+const metadataDigestRefsTableName = "metadata_digest_refs"
+
+var (
+	metadataDigestRefs      = newMetadataDigestRefsTable()
+	metadataDigestRefMapper = newMetadataEntityMapper[model.DigestRef](metadataDigestRefs.schema)
+)
 
 type metadataDigestRefsTable struct {
-	table          querydsl.Table
-	digest         columnx.Column[struct{}, string]
-	size           columnx.Column[struct{}, int64]
-	refCount       columnx.Column[struct{}, int]
-	upstreamID     columnx.Column[struct{}, string]
-	upstreamBucket columnx.Column[struct{}, string]
-	upstreamKey    columnx.Column[struct{}, string]
-	createdAt      columnx.Column[struct{}, int64]
-	updatedAt      columnx.Column[struct{}, int64]
+	schema         metadataDigestRefsSchema
+	digest         columnx.Column[model.DigestRef, string]
+	size           columnx.Column[model.DigestRef, int64]
+	refCount       columnx.Column[model.DigestRef, int]
+	upstreamID     columnx.Column[model.DigestRef, string]
+	upstreamBucket columnx.Column[model.DigestRef, string]
+	upstreamKey    columnx.Column[model.DigestRef, string]
+	createdAt      columnx.Column[model.DigestRef, int64]
+	updatedAt      columnx.Column[model.DigestRef, int64]
+}
+
+type metadataDigestRefsSchema struct {
+	schemax.Schema[model.DigestRef]
+	Digest         columnx.Column[model.DigestRef, string] `dbx:"digest,pk"`
+	Size           columnx.Column[model.DigestRef, int64]  `dbx:"size"`
+	RefCount       columnx.Column[model.DigestRef, int]    `dbx:"ref_count"`
+	UpstreamID     columnx.Column[model.DigestRef, string] `dbx:"upstream_id"`
+	UpstreamBucket columnx.Column[model.DigestRef, string] `dbx:"upstream_bucket"`
+	UpstreamKey    columnx.Column[model.DigestRef, string] `dbx:"upstream_key"`
+	CreatedAt      columnx.Column[model.DigestRef, int64]  `dbx:"created_at"`
+	UpdatedAt      columnx.Column[model.DigestRef, int64]  `dbx:"updated_at"`
 }
 
 func newMetadataDigestRefsTable() metadataDigestRefsTable {
-	table := querydsl.NewTable("metadata_digest_refs")
+	schema := schemax.MustSchema(metadataDigestRefsTableName, metadataDigestRefsSchema{})
 	return metadataDigestRefsTable{
-		table:          table,
-		digest:         columnx.Named[string](table, "digest"),
-		size:           columnx.Named[int64](table, "size"),
-		refCount:       columnx.Named[int](table, "ref_count"),
-		upstreamID:     columnx.Named[string](table, "upstream_id"),
-		upstreamBucket: columnx.Named[string](table, "upstream_bucket"),
-		upstreamKey:    columnx.Named[string](table, "upstream_key"),
-		createdAt:      columnx.Named[int64](table, "created_at"),
-		updatedAt:      columnx.Named[int64](table, "updated_at"),
+		schema:         schema,
+		digest:         schema.Digest,
+		size:           schema.Size,
+		refCount:       schema.RefCount,
+		upstreamID:     schema.UpstreamID,
+		upstreamBucket: schema.UpstreamBucket,
+		upstreamKey:    schema.UpstreamKey,
+		createdAt:      schema.CreatedAt,
+		updatedAt:      schema.UpdatedAt,
 	}
 }
 

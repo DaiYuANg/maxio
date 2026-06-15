@@ -17,17 +17,12 @@ func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) 
 	if err != nil {
 		return model.DigestRef{}, err
 	}
-	query := querydsl.InsertInto(metadataDigestRefs.table).
-		Values(
-			metadataDigestRefs.digest.Set(ref.Digest),
-			metadataDigestRefs.size.Set(ref.Size),
-			metadataDigestRefs.refCount.Set(ref.RefCount),
-			metadataDigestRefs.upstreamID.Set(ref.UpstreamID),
-			metadataDigestRefs.upstreamBucket.Set(ref.UpstreamBucket),
-			metadataDigestRefs.upstreamKey.Set(ref.UpstreamKey),
-			metadataDigestRefs.createdAt.Set(ref.CreatedAt.UnixNano()),
-			metadataDigestRefs.updatedAt.Set(ref.UpdatedAt.UnixNano()),
-		).
+	assignments, err := metadataDigestRefMapper.InsertAssignmentsWithID(ctx, metadataDigestRefs.schema, &ref, nil)
+	if err != nil {
+		return model.DigestRef{}, fmt.Errorf("map digest ref insert assignments: %w", err)
+	}
+	query := querydsl.InsertInto(metadataDigestRefs.schema).
+		ValuesList(assignments).
 		OnConflict(metadataDigestRefs.digest).
 		DoUpdateSet(
 			metadataDigestRefs.size.SetExcluded(),
@@ -56,7 +51,7 @@ func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.Di
 		return model.DigestRef{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataDigestRefs.table, metadataDigestRefs.selectItems()...).
+	query := querydsl.SelectFrom(metadataDigestRefs.schema, metadataDigestRefs.selectItems()...).
 		Where(metadataDigestRefs.digest.Eq(digest)).
 		Limit(1)
 	ref, found, err := querySQLOne(ctx, s, query, "digest ref", metadataDigestRefMapper)
@@ -103,16 +98,21 @@ func (s *SQLMetadata) ReleaseDigestRef(ctx context.Context, digest string) (mode
 		ref.UpdatedAt = time.Now().UTC()
 		if ref.RefCount <= 0 {
 			removed = true
-			query := querydsl.DeleteFrom(metadataDigestRefs.table).
+			query := querydsl.DeleteFrom(metadataDigestRefs.schema).
 				Where(metadataDigestRefs.digest.Eq(digest))
 			return s.txExecBuilderContext(ctx, tx, query)
 		}
-		query := querydsl.Update(metadataDigestRefs.table).
-			Set(
-				metadataDigestRefs.refCount.Set(ref.RefCount),
-				metadataDigestRefs.updatedAt.Set(ref.UpdatedAt.UnixNano()),
-			).
-			Where(metadataDigestRefs.digest.Eq(digest))
+		assignments, err := metadataDigestRefMapper.UpdateAssignments(metadataDigestRefs.schema, &ref)
+		if err != nil {
+			return fmt.Errorf("map digest ref update assignments: %w", err)
+		}
+		predicate, err := metadataDigestRefMapper.PrimaryPredicate(metadataDigestRefs.schema, &ref)
+		if err != nil {
+			return fmt.Errorf("map digest ref primary predicate: %w", err)
+		}
+		query := querydsl.Update(metadataDigestRefs.schema).
+			SetList(assignments).
+			Where(predicate)
 		return s.txExecBuilderContext(ctx, tx, query)
 	})
 	return ref, removed, err
@@ -123,7 +123,7 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 	if digest == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataDigestRefs.table).
+	query := querydsl.DeleteFrom(metadataDigestRefs.schema).
 		Where(metadataDigestRefs.digest.Eq(digest))
 	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
@@ -137,7 +137,7 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 }
 
 func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *sql.Tx, digest string) (model.DigestRef, error) {
-	query := querydsl.SelectFrom(metadataDigestRefs.table, metadataDigestRefs.selectItems()...).
+	query := querydsl.SelectFrom(metadataDigestRefs.schema, metadataDigestRefs.selectItems()...).
 		Where(metadataDigestRefs.digest.Eq(digest)).
 		Limit(1)
 	ref, found, err := querySQLOneInTx(ctx, s, tx, query, "digest ref", metadataDigestRefMapper)

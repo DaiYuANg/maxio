@@ -15,7 +15,7 @@ func (s *SQLMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (m
 	if err != nil {
 		return model.IndexJob{}, err
 	}
-	query := querydsl.InsertInto(metadataIndexJobs.table).
+	query := querydsl.InsertInto(metadataIndexJobs.schema).
 		Values(
 			metadataIndexJobs.id.Set(job.ID),
 			metadataIndexJobs.kind.Set(job.Kind),
@@ -64,7 +64,7 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 		return model.IndexJob{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataIndexJobs.table, metadataIndexJobs.selectItems()...).
+	query := querydsl.SelectFrom(metadataIndexJobs.schema, metadataIndexJobs.selectItems()...).
 		Where(metadataIndexJobs.id.Eq(id)).
 		Limit(1)
 	job, found, err := querySQLOne(ctx, s, query, "index job", metadataIndexJobMapper)
@@ -76,7 +76,7 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 
 func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexJob], error) {
 	status = strings.TrimSpace(status)
-	query := querydsl.SelectFrom(metadataIndexJobs.table, metadataIndexJobs.selectItems()...).
+	query := querydsl.SelectFrom(metadataIndexJobs.schema, metadataIndexJobs.selectItems()...).
 		OrderBy(metadataIndexJobs.availableAt.Asc(), metadataIndexJobs.createdAt.Asc()).
 		Limit(normalizeListLimit(limit))
 	if status != "" {
@@ -96,7 +96,7 @@ func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, erro
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataIndexJobs.table).Where(metadataIndexJobs.id.Eq(id))
+	query := querydsl.DeleteFrom(metadataIndexJobs.schema).Where(metadataIndexJobs.id.Eq(id))
 	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete index job: %w", err)

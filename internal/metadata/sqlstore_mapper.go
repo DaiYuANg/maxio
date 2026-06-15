@@ -5,44 +5,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"reflect"
-	"strconv"
-	"strings"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
-	codecx "github.com/arcgolabs/dbx/codec"
 	dbxmapper "github.com/arcgolabs/dbx/mapper"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 var (
-	metadataBoolIntCodec = codecx.New[bool]("bool_int", decodeBoolInt, encodeBoolInt)
-
-	metadataBucketMapper           = newMetadataStructMapper[model.Bucket]()
-	metadataNameMapper             = newMetadataStructMapper[metadataNameRow]()
-	metadataUpstreamMapper         = newMetadataStructMapper[model.Upstream]()
-	metadataObjectMetaMapper       = newMetadataStructMapper[objectMetaRow]()
-	metadataObjectRecordMapper     = newMetadataStructMapper[model.ObjectRecord]()
-	metadataObjectVersionMapper    = newMetadataStructMapper[model.ObjectVersion]()
-	metadataDigestRefMapper        = newMetadataStructMapper[model.DigestRef]()
-	metadataBlobRefMapper          = newMetadataStructMapper[BlobRef]()
-	metadataBlobRefCounterMapper   = newMetadataStructMapper[blobRefCounterRow]()
-	metadataHashMapper             = newMetadataStructMapper[metadataHashRow]()
-	metadataIndexDocumentMapper    = newMetadataStructMapper[model.IndexDocument]()
-	metadataIndexJobMapper         = newMetadataStructMapper[model.IndexJob]()
-	metadataIndexOutboxEventMapper = newMetadataStructMapper[model.IndexOutboxEvent]()
+	metadataObjectMetaMapper     = newMetadataProjectionMapper[objectMetaRow]()
+	metadataBlobRefCounterMapper = newMetadataProjectionMapper[blobRefCounterRow]()
 )
-
-type metadataNameRow struct {
-	Name string `dbx:"name"`
-}
-
-type metadataHashRow struct {
-	Hash string `dbx:"hash"`
-}
 
 type blobRefCounterRow struct {
 	Path     string `dbx:"path"`
@@ -58,7 +34,14 @@ type objectMetaRow struct {
 	WriteIntentUpdatedAt time.Time      `dbx:"write_intent_updated_at,codec=unix_nano_time"`
 }
 
-func newMetadataStructMapper[T any]() dbxmapper.StructMapper[T] {
+func newMetadataEntityMapper[T any](schema schemax.Resource) dbxmapper.Mapper[T] {
+	return dbxmapper.MustMapperWithOptions[T](
+		schema,
+		dbxmapper.WithMapperCodecs(metadataBoolIntCodec),
+	)
+}
+
+func newMetadataProjectionMapper[T any]() dbxmapper.StructMapper[T] {
 	return dbxmapper.MustStructMapperWithOptions[T](
 		dbxmapper.WithMapperCodecs(metadataBoolIntCodec),
 	)
@@ -94,38 +77,31 @@ func querySQLOne[E any](
 	if err != nil {
 		return zero, false, fmt.Errorf("query %s: %w", label, err)
 	}
-	item, err := dbx.QueryOne(ensureContext(ctx), session, query, rowMapper)
-	if errors.Is(err, sql.ErrNoRows) {
-		return zero, false, nil
-	}
+	item, err := dbx.QueryOption(ensureContext(ctx), session, query, rowMapper)
 	if err != nil {
 		return zero, false, fmt.Errorf("query %s: %w", label, err)
 	}
-	return item, true, nil
+	value, found := item.Get()
+	return value, found, nil
 }
 
-func querySQLRowsInTx[E any](
+func querySQLScalarOption[T any](
 	ctx context.Context,
 	store *SQLMetadata,
-	tx *sql.Tx,
-	query querydsl.Builder,
+	query querydsl.SelectResult[T],
 	label string,
-	rowMapper dbxmapper.RowsScanner[E],
-) (*collectionlist.List[E], error) {
-	rows, err := store.txQueryBuilderContext(ctx, tx, query)
+) (T, bool, error) {
+	var zero T
+	session, err := metadataDBSession(store)
 	if err != nil {
-		return nil, fmt.Errorf("query %s: %w", label, err)
+		return zero, false, fmt.Errorf("query %s: %w", label, err)
 	}
-	defer closeSQLRows(store, rows, label)
-
-	items, err := rowMapper.ScanRows(rows)
+	item, err := dbx.QueryScalarOption(ensureContext(ctx), session, query)
 	if err != nil {
-		return nil, fmt.Errorf("query %s: %w", label, err)
+		return zero, false, fmt.Errorf("query %s: %w", label, err)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate %s: %w", label, err)
-	}
-	return items, nil
+	value, found := item.Get()
+	return value, found, nil
 }
 
 func querySQLOneInTx[E any](
@@ -159,6 +135,78 @@ func querySQLOneInTx[E any](
 	default:
 		return zero, false, fmt.Errorf("query %s: expected one row, got %d", label, items.Len())
 	}
+}
+
+func querySQLScalarsInTx[T any](
+	ctx context.Context,
+	store *SQLMetadata,
+	tx *sql.Tx,
+	query querydsl.SelectResult[T],
+	label string,
+) (*collectionlist.List[T], error) {
+	return querySQLScalarsLimitInTx(ctx, store, tx, query, label, 0)
+}
+
+func querySQLScalarOptionInTx[T any](
+	ctx context.Context,
+	store *SQLMetadata,
+	tx *sql.Tx,
+	query querydsl.SelectResult[T],
+	label string,
+) (T, bool, error) {
+	var zero T
+	items, err := querySQLScalarsLimitInTx(ctx, store, tx, query, label, 2)
+	if err != nil {
+		return zero, false, err
+	}
+	switch items.Len() {
+	case 0:
+		return zero, false, nil
+	case 1:
+		item, _ := items.Get(0)
+		return item, true, nil
+	default:
+		return zero, false, fmt.Errorf("query %s: expected one row, got %d", label, items.Len())
+	}
+}
+
+func querySQLScalarsLimitInTx[T any](
+	ctx context.Context,
+	store *SQLMetadata,
+	tx *sql.Tx,
+	query querydsl.SelectResult[T],
+	label string,
+	limit int,
+) (*collectionlist.List[T], error) {
+	rows, err := store.txQueryBuilderContext(ctx, tx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", label, err)
+	}
+	defer closeSQLRows(store, rows, label)
+
+	items, err := scanSQLScalarRowsLimit[T](rows, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", label, err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate %s: %w", label, err)
+	}
+	return items, nil
+}
+
+func scanSQLScalarRowsLimit[T any](rows *sql.Rows, limit int) (*collectionlist.List[T], error) {
+	items := collectionlist.NewList[T]()
+	for rows.Next() {
+		var item T
+		if err := rows.Scan(&item); err != nil {
+			return nil, fmt.Errorf("scan sql scalar row: %w", err)
+		}
+		items.Add(item)
+		if limit > 0 && items.Len() >= limit {
+			break
+		}
+	}
+	return items, nil
 }
 
 func mapSQLRowsLimit[E any](
@@ -206,15 +254,6 @@ func objectMetaRowsToList(rows *collectionlist.List[objectMetaRow]) *collectionl
 	})
 }
 
-func metadataHashRowsToList(rows *collectionlist.List[metadataHashRow]) *collectionlist.List[string] {
-	if rows == nil {
-		return collectionlist.NewList[string]()
-	}
-	return collectionlist.MapList(rows, func(_ int, row metadataHashRow) string {
-		return row.Hash
-	})
-}
-
 func (row objectMetaRow) objectMeta() model.ObjectMeta {
 	meta := row.ObjectMeta
 	if row.WriteIntentID.Valid {
@@ -226,54 +265,4 @@ func (row objectMetaRow) objectMeta() model.ObjectMeta {
 		}
 	}
 	return meta
-}
-
-func decodeBoolInt(src any) (bool, error) {
-	switch value := src.(type) {
-	case nil:
-		return false, nil
-	case bool:
-		return value, nil
-	case []byte:
-		return parseBoolInt(string(value))
-	case sql.RawBytes:
-		return parseBoolInt(string(value))
-	case string:
-		return parseBoolInt(value)
-	default:
-		return decodeNumericBoolInt(src)
-	}
-}
-
-func decodeNumericBoolInt(src any) (bool, error) {
-	value := reflect.ValueOf(src)
-	if value.CanInt() {
-		return value.Int() != 0, nil
-	}
-	if value.CanUint() {
-		return value.Uint() != 0, nil
-	}
-	return false, fmt.Errorf("unsupported bool_int source %T", src)
-}
-
-func encodeBoolInt(value bool) (any, error) {
-	if value {
-		return 1, nil
-	}
-	return 0, nil
-}
-
-func parseBoolInt(raw string) (bool, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return false, nil
-	}
-	if value, err := strconv.ParseBool(trimmed); err == nil {
-		return value, nil
-	}
-	value, err := strconv.ParseInt(trimmed, 10, 64)
-	if err != nil {
-		return false, fmt.Errorf("parse bool_int: %w", err)
-	}
-	return value != 0, nil
 }

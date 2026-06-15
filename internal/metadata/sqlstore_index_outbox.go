@@ -15,7 +15,7 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 	if err != nil {
 		return model.IndexOutboxEvent{}, err
 	}
-	query := querydsl.InsertInto(metadataIndexOutbox.table).
+	query := querydsl.InsertInto(metadataIndexOutbox.schema).
 		Values(
 			metadataIndexOutbox.id.Set(event.ID),
 			metadataIndexOutbox.eventType.Set(event.EventType),
@@ -62,7 +62,7 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 		return model.IndexOutboxEvent{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataIndexOutbox.table, metadataIndexOutbox.selectItems()...).
+	query := querydsl.SelectFrom(metadataIndexOutbox.schema, metadataIndexOutbox.selectItems()...).
 		Where(metadataIndexOutbox.id.Eq(id)).
 		Limit(1)
 	event, found, err := querySQLOne(ctx, s, query, "index outbox event", metadataIndexOutboxEventMapper)
@@ -74,7 +74,7 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 
 func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexOutboxEvent], error) {
 	status = strings.TrimSpace(status)
-	query := querydsl.SelectFrom(metadataIndexOutbox.table, metadataIndexOutbox.selectItems()...).
+	query := querydsl.SelectFrom(metadataIndexOutbox.schema, metadataIndexOutbox.selectItems()...).
 		OrderBy(metadataIndexOutbox.availableAt.Asc(), metadataIndexOutbox.createdAt.Asc()).
 		Limit(normalizeListLimit(limit))
 	if status != "" {
@@ -94,7 +94,7 @@ func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bo
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataIndexOutbox.table).Where(metadataIndexOutbox.id.Eq(id))
+	query := querydsl.DeleteFrom(metadataIndexOutbox.schema).Where(metadataIndexOutbox.id.Eq(id))
 	result, err := s.execBuilderContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete index outbox event: %w", err)

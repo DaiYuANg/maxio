@@ -11,23 +11,33 @@ import (
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-var metadataBuckets = newMetadataBucketsTable()
+var (
+	metadataBuckets      = newMetadataBucketsTable()
+	metadataBucketMapper = newMetadataEntityMapper[model.Bucket](metadataBuckets.schema)
+)
 
 type metadataBucketsTable struct {
-	table     querydsl.Table
-	name      columnx.Column[struct{}, string]
-	createdAt columnx.Column[struct{}, int64]
+	schema    metadataBucketsSchema
+	name      columnx.Column[model.Bucket, string]
+	createdAt columnx.Column[model.Bucket, int64]
+}
+
+type metadataBucketsSchema struct {
+	schemax.Schema[model.Bucket]
+	Name      columnx.Column[model.Bucket, string] `dbx:"name,pk"`
+	CreatedAt columnx.Column[model.Bucket, int64]  `dbx:"created_at"`
 }
 
 func newMetadataBucketsTable() metadataBucketsTable {
-	table := querydsl.NewTable("metadata_buckets")
+	schema := schemax.MustSchema("metadata_buckets", metadataBucketsSchema{})
 	return metadataBucketsTable{
-		table:     table,
-		name:      columnx.Named[string](table, "name"),
-		createdAt: columnx.Named[int64](table, "created_at"),
+		schema:    schema,
+		name:      schema.Name,
+		createdAt: schema.CreatedAt,
 	}
 }
 
@@ -37,7 +47,7 @@ func (t metadataBucketsTable) selectItems() []querydsl.SelectItem {
 
 func (s *SQLMetadata) ListBuckets(ctx context.Context) (*collectionlist.List[model.Bucket], error) {
 	ctx = ensureContext(ctx)
-	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.selectItems()...).
+	query := querydsl.SelectFrom(metadataBuckets.schema, metadataBuckets.selectItems()...).
 		OrderBy(metadataBuckets.name.Asc())
 	buckets, err := querySQLRows(
 		ctx,
@@ -58,10 +68,11 @@ func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, er
 		return false, ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.name).
+	query := querydsl.SelectValue(metadataBuckets.name).
+		From(metadataBuckets.schema).
 		Where(metadataBuckets.name.Eq(bucket)).
 		Limit(1)
-	_, found, err := querySQLOne(ctx, s, query, "bucket exists", metadataNameMapper)
+	_, found, err := querySQLScalarOption(ctx, s, query, "bucket exists")
 	if err != nil {
 		return false, err
 	}
@@ -74,7 +85,7 @@ func (s *SQLMetadata) CreateBucket(ctx context.Context, bucket string) error {
 		return ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	query := querydsl.InsertInto(metadataBuckets.table).
+	query := querydsl.InsertInto(metadataBuckets.schema).
 		Values(
 			metadataBuckets.name.Set(bucket),
 			metadataBuckets.createdAt.Set(time.Now().UTC().UnixNano()),
@@ -142,13 +153,14 @@ func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx
 }
 
 func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) (*collectionlist.List[string], error) {
-	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.hash).
+	query := querydsl.SelectValue(metadataObjects.hash).
+		From(metadataObjects.schema).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.state.Eq(model.ObjectStateCommitted)))
-	hashes, err := querySQLRowsInTx(ctx, s, tx, query, "bucket object hashes", metadataHashMapper)
+	hashes, err := querySQLScalarsInTx(ctx, s, tx, query, "bucket object hashes")
 	if err != nil {
 		return nil, err
 	}
-	return metadataHashRowsToList(hashes), nil
+	return hashes, nil
 }
 
 func (s *SQLMetadata) ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
@@ -163,10 +175,11 @@ func (s *SQLMetadata) ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket s
 }
 
 func (s *SQLMetadata) bucketExistsInTx(ctx context.Context, tx *sql.Tx, bucket string) (bool, error) {
-	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.name).
+	query := querydsl.SelectValue(metadataBuckets.name).
+		From(metadataBuckets.schema).
 		Where(metadataBuckets.name.Eq(bucket)).
 		Limit(1)
-	_, found, err := querySQLOneInTx(ctx, s, tx, query, "bucket exists", metadataNameMapper)
+	_, found, err := querySQLScalarOptionInTx(ctx, s, tx, query, "bucket exists")
 	if err != nil {
 		return false, err
 	}
@@ -174,7 +187,7 @@ func (s *SQLMetadata) bucketExistsInTx(ctx context.Context, tx *sql.Tx, bucket s
 }
 
 func (s *SQLMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, bucket, state string) error {
-	query := querydsl.DeleteFrom(metadataObjects.table).
+	query := querydsl.DeleteFrom(metadataObjects.schema).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.state.Eq(state)))
 	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
 		return fmt.Errorf("delete bucket objects: %w", err)
@@ -183,7 +196,7 @@ func (s *SQLMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, b
 }
 
 func (s *SQLMetadata) deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
-	query := querydsl.DeleteFrom(metadataBuckets.table).
+	query := querydsl.DeleteFrom(metadataBuckets.schema).
 		Where(metadataBuckets.name.Eq(bucket))
 	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
 		return fmt.Errorf("delete bucket: %w", err)

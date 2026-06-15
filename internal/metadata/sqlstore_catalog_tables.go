@@ -3,80 +3,116 @@ package metadata
 import (
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	schemax "github.com/arcgolabs/dbx/schema"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 var (
-	metadataObjectRecords  = newMetadataObjectRecordsTable()
-	metadataObjectVersions = newMetadataObjectVersionsTable()
+	metadataObjectRecords       = newMetadataObjectRecordsTable()
+	metadataObjectVersions      = newMetadataObjectVersionsTable()
+	metadataObjectRecordMapper  = newMetadataEntityMapper[model.ObjectRecord](metadataObjectRecords.schema)
+	metadataObjectVersionMapper = newMetadataEntityMapper[model.ObjectVersion](metadataObjectVersions.schema)
 )
 
 type metadataObjectRecordsTable struct {
-	table            querydsl.Table
-	bucket           columnx.Column[struct{}, string]
-	key              columnx.Column[struct{}, string]
-	currentVersionID columnx.Column[struct{}, string]
-	deleted          columnx.Column[struct{}, int]
-	createdAt        columnx.Column[struct{}, int64]
-	updatedAt        columnx.Column[struct{}, int64]
+	schema           metadataObjectRecordsSchema
+	bucket           columnx.Column[model.ObjectRecord, string]
+	key              columnx.Column[model.ObjectRecord, string]
+	currentVersionID columnx.Column[model.ObjectRecord, string]
+	deleted          columnx.Column[model.ObjectRecord, int]
+	createdAt        columnx.Column[model.ObjectRecord, int64]
+	updatedAt        columnx.Column[model.ObjectRecord, int64]
 }
 
 type metadataObjectVersionsTable struct {
-	table              querydsl.Table
-	bucket             columnx.Column[struct{}, string]
-	key                columnx.Column[struct{}, string]
-	versionID          columnx.Column[struct{}, string]
-	digest             columnx.Column[struct{}, string]
-	etag               columnx.Column[struct{}, string]
-	size               columnx.Column[struct{}, int64]
-	contentType        columnx.Column[struct{}, string]
-	cacheControl       columnx.Column[struct{}, string]
-	contentDisposition columnx.Column[struct{}, string]
-	contentEncoding    columnx.Column[struct{}, string]
-	contentLanguage    columnx.Column[struct{}, string]
-	userMetadata       columnx.Column[struct{}, string]
-	upstreamID         columnx.Column[struct{}, string]
-	upstreamBucket     columnx.Column[struct{}, string]
-	upstreamKey        columnx.Column[struct{}, string]
-	deleteMarker       columnx.Column[struct{}, int]
-	createdAt          columnx.Column[struct{}, int64]
-	updatedAt          columnx.Column[struct{}, int64]
+	schema             metadataObjectVersionsSchema
+	bucket             columnx.Column[model.ObjectVersion, string]
+	key                columnx.Column[model.ObjectVersion, string]
+	versionID          columnx.Column[model.ObjectVersion, string]
+	digest             columnx.Column[model.ObjectVersion, string]
+	etag               columnx.Column[model.ObjectVersion, string]
+	size               columnx.Column[model.ObjectVersion, int64]
+	contentType        columnx.Column[model.ObjectVersion, string]
+	cacheControl       columnx.Column[model.ObjectVersion, string]
+	contentDisposition columnx.Column[model.ObjectVersion, string]
+	contentEncoding    columnx.Column[model.ObjectVersion, string]
+	contentLanguage    columnx.Column[model.ObjectVersion, string]
+	userMetadata       columnx.Column[model.ObjectVersion, string]
+	upstreamID         columnx.Column[model.ObjectVersion, string]
+	upstreamBucket     columnx.Column[model.ObjectVersion, string]
+	upstreamKey        columnx.Column[model.ObjectVersion, string]
+	deleteMarker       columnx.Column[model.ObjectVersion, int]
+	createdAt          columnx.Column[model.ObjectVersion, int64]
+	updatedAt          columnx.Column[model.ObjectVersion, int64]
+}
+
+type metadataObjectRecordsSchema struct {
+	schemax.Schema[model.ObjectRecord]
+	Bucket           columnx.Column[model.ObjectRecord, string] `dbx:"bucket"`
+	Key              columnx.Column[model.ObjectRecord, string] `dbx:"object_key"`
+	CurrentVersionID columnx.Column[model.ObjectRecord, string] `dbx:"current_version_id"`
+	Deleted          columnx.Column[model.ObjectRecord, int]    `dbx:"deleted"`
+	CreatedAt        columnx.Column[model.ObjectRecord, int64]  `dbx:"created_at"`
+	UpdatedAt        columnx.Column[model.ObjectRecord, int64]  `dbx:"updated_at"`
+}
+
+type metadataObjectVersionsSchema struct {
+	schemax.Schema[model.ObjectVersion]
+	Bucket             columnx.Column[model.ObjectVersion, string] `dbx:"bucket"`
+	Key                columnx.Column[model.ObjectVersion, string] `dbx:"object_key"`
+	VersionID          columnx.Column[model.ObjectVersion, string] `dbx:"version_id"`
+	Digest             columnx.Column[model.ObjectVersion, string] `dbx:"digest"`
+	ETag               columnx.Column[model.ObjectVersion, string] `dbx:"etag"`
+	Size               columnx.Column[model.ObjectVersion, int64]  `dbx:"size"`
+	ContentType        columnx.Column[model.ObjectVersion, string] `dbx:"content_type"`
+	CacheControl       columnx.Column[model.ObjectVersion, string] `dbx:"cache_control"`
+	ContentDisposition columnx.Column[model.ObjectVersion, string] `dbx:"content_disposition"`
+	ContentEncoding    columnx.Column[model.ObjectVersion, string] `dbx:"content_encoding"`
+	ContentLanguage    columnx.Column[model.ObjectVersion, string] `dbx:"content_language"`
+	UserMetadata       columnx.Column[model.ObjectVersion, string] `dbx:"user_metadata"`
+	UpstreamID         columnx.Column[model.ObjectVersion, string] `dbx:"upstream_id"`
+	UpstreamBucket     columnx.Column[model.ObjectVersion, string] `dbx:"upstream_bucket"`
+	UpstreamKey        columnx.Column[model.ObjectVersion, string] `dbx:"upstream_key"`
+	DeleteMarker       columnx.Column[model.ObjectVersion, int]    `dbx:"delete_marker"`
+	CreatedAt          columnx.Column[model.ObjectVersion, int64]  `dbx:"created_at"`
+	UpdatedAt          columnx.Column[model.ObjectVersion, int64]  `dbx:"updated_at"`
 }
 
 func newMetadataObjectRecordsTable() metadataObjectRecordsTable {
-	table := querydsl.NewTable("metadata_object_records")
+	schema := schemax.MustSchema("metadata_object_records", metadataObjectRecordsSchema{})
 	return metadataObjectRecordsTable{
-		table:            table,
-		bucket:           columnx.Named[string](table, "bucket"),
-		key:              columnx.Named[string](table, "object_key"),
-		currentVersionID: columnx.Named[string](table, "current_version_id"),
-		deleted:          columnx.Named[int](table, "deleted"),
-		createdAt:        columnx.Named[int64](table, "created_at"),
-		updatedAt:        columnx.Named[int64](table, "updated_at"),
+		schema:           schema,
+		bucket:           schema.Bucket,
+		key:              schema.Key,
+		currentVersionID: schema.CurrentVersionID,
+		deleted:          schema.Deleted,
+		createdAt:        schema.CreatedAt,
+		updatedAt:        schema.UpdatedAt,
 	}
 }
 
 func newMetadataObjectVersionsTable() metadataObjectVersionsTable {
-	table := querydsl.NewTable("metadata_object_versions")
+	schema := schemax.MustSchema("metadata_object_versions", metadataObjectVersionsSchema{})
 	return metadataObjectVersionsTable{
-		table:              table,
-		bucket:             columnx.Named[string](table, "bucket"),
-		key:                columnx.Named[string](table, "object_key"),
-		versionID:          columnx.Named[string](table, "version_id"),
-		digest:             columnx.Named[string](table, "digest"),
-		etag:               columnx.Named[string](table, "etag"),
-		size:               columnx.Named[int64](table, "size"),
-		contentType:        columnx.Named[string](table, "content_type"),
-		cacheControl:       columnx.Named[string](table, "cache_control"),
-		contentDisposition: columnx.Named[string](table, "content_disposition"),
-		contentEncoding:    columnx.Named[string](table, "content_encoding"),
-		contentLanguage:    columnx.Named[string](table, "content_language"),
-		userMetadata:       columnx.Named[string](table, "user_metadata"),
-		upstreamID:         columnx.Named[string](table, "upstream_id"),
-		upstreamBucket:     columnx.Named[string](table, "upstream_bucket"),
-		upstreamKey:        columnx.Named[string](table, "upstream_key"),
-		deleteMarker:       columnx.Named[int](table, "delete_marker"),
-		createdAt:          columnx.Named[int64](table, "created_at"),
-		updatedAt:          columnx.Named[int64](table, "updated_at"),
+		schema:             schema,
+		bucket:             schema.Bucket,
+		key:                schema.Key,
+		versionID:          schema.VersionID,
+		digest:             schema.Digest,
+		etag:               schema.ETag,
+		size:               schema.Size,
+		contentType:        schema.ContentType,
+		cacheControl:       schema.CacheControl,
+		contentDisposition: schema.ContentDisposition,
+		contentEncoding:    schema.ContentEncoding,
+		contentLanguage:    schema.ContentLanguage,
+		userMetadata:       schema.UserMetadata,
+		upstreamID:         schema.UpstreamID,
+		upstreamBucket:     schema.UpstreamBucket,
+		upstreamKey:        schema.UpstreamKey,
+		deleteMarker:       schema.DeleteMarker,
+		createdAt:          schema.CreatedAt,
+		updatedAt:          schema.UpdatedAt,
 	}
 }
 

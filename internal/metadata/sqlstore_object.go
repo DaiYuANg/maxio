@@ -21,7 +21,7 @@ func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string
 		return nil, err
 	}
 
-	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
+	query := querydsl.SelectFrom(metadataObjects.schema, metadataObjects.selectItems()...).
 		Where(objectMetaFilter(bucket, prefix, model.ObjectStateCommitted)).
 		OrderBy(metadataObjects.key.Asc())
 	return s.queryObjectMetas(ctx, query)
@@ -36,7 +36,7 @@ func (s *SQLMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix 
 		}
 	}
 
-	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
+	query := querydsl.SelectFrom(metadataObjects.schema, metadataObjects.selectItems()...).
 		Where(objectMetaFilter(bucket, prefix, model.ObjectStatePending)).
 		OrderBy(metadataObjects.bucket.Asc(), metadataObjects.key.Asc())
 	return s.queryObjectMetas(ctx, query)
@@ -87,7 +87,7 @@ func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Build
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
-	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
+	query := querydsl.SelectFrom(metadataObjects.schema, metadataObjects.selectItems()...).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state))).
 		Limit(1)
 	row, found, err := querySQLOne(ctx, s, query, "object meta", metadataObjectMetaMapper)
@@ -110,7 +110,7 @@ func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta
 	}
 
 	intentID, intentStage, intentStartedAt, intentUpdatedAt := extractWriteIntentValues(meta.WriteIntent)
-	query := querydsl.InsertInto(metadataObjects.table).
+	query := querydsl.InsertInto(metadataObjects.schema).
 		Values(
 			metadataObjects.bucket.Set(meta.Bucket),
 			metadataObjects.key.Set(meta.Key),
@@ -182,7 +182,7 @@ func (s *SQLMetadata) deleteObjectMeta(
 }
 
 func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, state string) (bool, error) {
-	query := querydsl.DeleteFrom(metadataObjects.table).
+	query := querydsl.DeleteFrom(metadataObjects.schema).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state)))
 	result, err := s.execBuilderContext(ensureContext(ctx), query)
 	if err != nil {

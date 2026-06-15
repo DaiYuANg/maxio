@@ -55,11 +55,14 @@ func (s *SQLMetadata) txExecSQLTemplateContext(ctx context.Context, tx *sql.Tx, 
 	if tx == nil {
 		return errors.New("metadata tx is nil")
 	}
+	if s == nil || s.dbxDB == nil {
+		return errors.New("metadata dbx session is nil")
+	}
 	bound, err := s.bindSQLTemplate(name, params)
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...); err != nil {
+	if _, err := s.dbxDB.WithTx(tx).ExecBoundContext(ensureContext(ctx), bound); err != nil {
 		return fmt.Errorf("exec metadata tx sql template %q: %w", name, err)
 	}
 	return nil
