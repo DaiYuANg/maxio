@@ -40,7 +40,7 @@ func (m *InMemoryMetadata) GetIndexDocument(_ context.Context, id string) (model
 	return document, true, nil
 }
 
-func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix string) ([]model.IndexDocument, error) {
+func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix string) (*list.List[model.IndexDocument], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 
@@ -76,7 +76,7 @@ func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix 
 		default:
 			return 0
 		}
-	}).Values()
+	})
 	return sorted, nil
 }
 
@@ -128,7 +128,7 @@ func (m *InMemoryMetadata) GetIndexJob(_ context.Context, id string) (model.Inde
 	return job, true, nil
 }
 
-func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit int) ([]model.IndexJob, error) {
+func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit int) (*list.List[model.IndexJob], error) {
 	status = strings.TrimSpace(status)
 	limit = normalizeListLimit(limit)
 
@@ -155,7 +155,7 @@ func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit
 			return 0
 		}
 	})
-	return jobs.Values(), nil
+	return jobs, nil
 }
 
 func (m *InMemoryMetadata) DeleteIndexJob(_ context.Context, id string) (bool, error) {
@@ -206,7 +206,7 @@ func (m *InMemoryMetadata) GetIndexOutboxEvent(_ context.Context, id string) (mo
 	return event, true, nil
 }
 
-func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status string, limit int) ([]model.IndexOutboxEvent, error) {
+func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status string, limit int) (*list.List[model.IndexOutboxEvent], error) {
 	status = strings.TrimSpace(status)
 	limit = normalizeListLimit(limit)
 
@@ -233,7 +233,7 @@ func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status strin
 			return 0
 		}
 	})
-	return events.Values(), nil
+	return events, nil
 }
 
 func (m *InMemoryMetadata) DeleteIndexOutboxEvent(_ context.Context, id string) (bool, error) {

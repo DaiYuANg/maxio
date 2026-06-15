@@ -30,18 +30,18 @@ type BlobRef struct {
 }
 
 type Repository interface {
-	ListUpstreams(ctx context.Context) ([]model.Upstream, error)
+	ListUpstreams(ctx context.Context) (*list.List[model.Upstream], error)
 	GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error)
 	UpsertUpstream(ctx context.Context, upstream model.Upstream) (model.Upstream, error)
 	DeleteUpstream(ctx context.Context, id string) (bool, error)
 
-	ListBuckets(ctx context.Context) ([]model.Bucket, error)
+	ListBuckets(ctx context.Context) (*list.List[model.Bucket], error)
 	BucketExists(ctx context.Context, bucket string) (bool, error)
 	CreateBucket(ctx context.Context, bucket string) error
 	DeleteBucket(ctx context.Context, bucket string) error
 
-	ListObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error)
-	ListStagedObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error)
+	ListObjectMetas(ctx context.Context, bucket, prefix string) (*list.List[model.ObjectMeta], error)
+	ListStagedObjectMetas(ctx context.Context, bucket, prefix string) (*list.List[model.ObjectMeta], error)
 	GetObjectMeta(ctx context.Context, bucket, key string) (model.ObjectMeta, bool, error)
 	StageObjectMeta(ctx context.Context, meta model.ObjectMeta) error
 	UpsertObjectMeta(ctx context.Context, meta model.ObjectMeta) error
@@ -53,7 +53,7 @@ type Repository interface {
 	DeleteObjectRecord(ctx context.Context, bucket, key string) (bool, error)
 	UpsertObjectVersion(ctx context.Context, version model.ObjectVersion) (model.ObjectVersion, error)
 	GetObjectVersion(ctx context.Context, bucket, key, versionID string) (model.ObjectVersion, bool, error)
-	ListObjectVersions(ctx context.Context, bucket, key string) ([]model.ObjectVersion, error)
+	ListObjectVersions(ctx context.Context, bucket, key string) (*list.List[model.ObjectVersion], error)
 	DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error)
 	UpsertDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error)
 	GetDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error)
@@ -62,18 +62,18 @@ type Repository interface {
 	DeleteDigestRef(ctx context.Context, digest string) (bool, error)
 	UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error)
 	GetIndexDocument(ctx context.Context, id string) (model.IndexDocument, bool, error)
-	ListIndexDocuments(ctx context.Context, bucket, prefix string) ([]model.IndexDocument, error)
+	ListIndexDocuments(ctx context.Context, bucket, prefix string) (*list.List[model.IndexDocument], error)
 	DeleteIndexDocument(ctx context.Context, id string) (bool, error)
 	UpsertIndexJob(ctx context.Context, job model.IndexJob) (model.IndexJob, error)
 	GetIndexJob(ctx context.Context, id string) (model.IndexJob, bool, error)
-	ListIndexJobs(ctx context.Context, status string, limit int) ([]model.IndexJob, error)
+	ListIndexJobs(ctx context.Context, status string, limit int) (*list.List[model.IndexJob], error)
 	DeleteIndexJob(ctx context.Context, id string) (bool, error)
 	UpsertIndexOutboxEvent(ctx context.Context, event model.IndexOutboxEvent) (model.IndexOutboxEvent, error)
 	GetIndexOutboxEvent(ctx context.Context, id string) (model.IndexOutboxEvent, bool, error)
-	ListIndexOutboxEvents(ctx context.Context, status string, limit int) ([]model.IndexOutboxEvent, error)
+	ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*list.List[model.IndexOutboxEvent], error)
 	DeleteIndexOutboxEvent(ctx context.Context, id string) (bool, error)
 
-	ListBlobRefs(ctx context.Context) ([]BlobRef, error)
+	ListBlobRefs(ctx context.Context) (*list.List[BlobRef], error)
 	GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error)
 	CreateBlobRef(ctx context.Context, hash, path string, size int64) error
 	IncreaseBlobRef(ctx context.Context, hash string) error
@@ -115,7 +115,7 @@ func NewInMemoryMetadata() *InMemoryMetadata {
 	}
 }
 
-func (m *InMemoryMetadata) ListBuckets(context.Context) ([]model.Bucket, error) {
+func (m *InMemoryMetadata) ListBuckets(context.Context) (*list.List[model.Bucket], error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -136,7 +136,7 @@ func (m *InMemoryMetadata) ListBuckets(context.Context) ([]model.Bucket, error) 
 		}
 		return 0
 	})
-	return sorted.Values(), nil
+	return &sorted, nil
 }
 
 func (m *InMemoryMetadata) BucketExists(_ context.Context, bucket string) (bool, error) {
@@ -197,7 +197,7 @@ func (m *InMemoryMetadata) DeleteBucket(_ context.Context, bucket string) error 
 	return nil
 }
 
-func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
+func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix string) (*list.List[model.ObjectMeta], error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -226,7 +226,7 @@ func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix str
 		}
 		return 0
 	})
-	return sorted.Values(), nil
+	return &sorted, nil
 }
 
 func (m *InMemoryMetadata) GetObjectMeta(_ context.Context, bucket, key string) (model.ObjectMeta, bool, error) {

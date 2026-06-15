@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 type metricsCollector struct {
@@ -58,16 +60,23 @@ func (collector *metricsCollector) addObjectCounts(ctx context.Context, s *Servi
 		collector.gauge("maxio_objects", "Committed objects known to metadata.", 0)
 		return
 	}
+	if buckets == nil {
+		collector.gauge("maxio_buckets", "Buckets known to metadata.", 0)
+		collector.gauge("maxio_objects", "Committed objects known to metadata.", 0)
+		return
+	}
 	objects := 0
-	for _, bucket := range buckets {
+	buckets.Each(func(_ int, bucket model.Bucket) {
 		items, err := s.metadata.ListObjectMetas(ctx, bucket.Name, "")
 		if err != nil {
 			collector.collectionErrors++
-			continue
+			return
 		}
-		objects += len(items)
-	}
-	collector.gauge("maxio_buckets", "Buckets known to metadata.", len(buckets))
+		if items != nil {
+			objects += items.Len()
+		}
+	})
+	collector.gauge("maxio_buckets", "Buckets known to metadata.", buckets.Len())
 	collector.gauge("maxio_objects", "Committed objects known to metadata.", objects)
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -80,7 +81,7 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 	return event, true, nil
 }
 
-func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) ([]model.IndexOutboxEvent, error) {
+func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexOutboxEvent], error) {
 	status = strings.TrimSpace(status)
 	query := querydsl.SelectFrom(metadataIndexOutbox.table, metadataIndexOutbox.selectItems()...).
 		OrderBy(metadataIndexOutbox.availableAt.Asc(), metadataIndexOutbox.createdAt.Asc()).

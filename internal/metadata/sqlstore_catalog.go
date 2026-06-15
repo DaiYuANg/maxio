@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -177,7 +178,7 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 	return version, true, nil
 }
 
-func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string) ([]model.ObjectVersion, error) {
+func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string) (*collectionlist.List[model.ObjectVersion], error) {
 	bucket = strings.TrimSpace(bucket)
 	key = strings.TrimSpace(key)
 	if bucket == "" || key == "" {
@@ -197,7 +198,7 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 	if err != nil {
 		return nil, err
 	}
-	return versions.Values(), nil
+	return versions, nil
 }
 
 func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error) {

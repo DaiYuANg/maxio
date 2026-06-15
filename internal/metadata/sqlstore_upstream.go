@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
@@ -61,14 +62,14 @@ func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
 	}
 }
 
-func (s *SQLMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, error) {
+func (s *SQLMetadata) ListUpstreams(ctx context.Context) (*collectionlist.List[model.Upstream], error) {
 	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
 		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
 	upstreams, err := listSQLRows(ctx, s, query, "upstreams", scanUpstream)
 	if err != nil {
 		return nil, err
 	}
-	return upstreams.Values(), nil
+	return upstreams, nil
 }
 
 func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error) {

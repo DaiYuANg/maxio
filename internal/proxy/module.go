@@ -71,7 +71,7 @@ func newValeGateway(
 	if err != nil {
 		return nil, oops.Wrapf(err, "load upstreams")
 	}
-	if len(upstreams) == 0 {
+	if upstreams == nil || upstreams.Len() == 0 {
 		logger.Warn("s3 proxy enabled without configured upstreams")
 	}
 
@@ -115,7 +115,7 @@ func (r *ValeRuntime) Reload(ctx context.Context) error {
 	if err != nil {
 		return oops.Wrapf(err, "load upstreams")
 	}
-	if len(upstreams) == 0 && r.logger != nil {
+	if (upstreams == nil || upstreams.Len() == 0) && r.logger != nil {
 		r.logger.WarnContext(ctx, "reloading s3 proxy without enabled upstreams")
 	}
 	cfgData, err := BuildValeConfigSnapshot(upstreams, r.options)
@@ -181,17 +181,20 @@ func seedUpstreamDefaults(upstream model.Upstream) model.Upstream {
 	return upstream
 }
 
-func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) ([]model.Upstream, error) {
+func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) (*list.List[model.Upstream], error) {
 	if store == nil {
-		return nil, nil
+		return list.NewList[model.Upstream](), nil
 	}
 	upstreams, err := store.ListUpstreams(ctx)
 	if err != nil {
 		return nil, oops.Wrapf(err, "list upstreams")
 	}
-	return list.FilterList(list.NewList(upstreams...), func(_ int, upstream model.Upstream) bool {
+	if upstreams == nil {
+		return list.NewList[model.Upstream](), nil
+	}
+	return list.Where(upstreams, func(_ int, upstream model.Upstream) bool {
 		return upstream.Enabled
-	}).Values(), nil
+	}), nil
 }
 
 func startValeGateway(ctx context.Context, runtime *ValeRuntime) error {

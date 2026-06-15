@@ -117,8 +117,8 @@ func mustListTestUpstream(t *testing.T, store *SQLMetadata) {
 	if err != nil {
 		t.Fatalf("list upstreams: %v", err)
 	}
-	if len(upstreams) != 1 {
-		t.Fatalf("upstreams count = %d, want 1", len(upstreams))
+	if upstreams.Len() != 1 {
+		t.Fatalf("upstreams count = %d, want 1", upstreams.Len())
 	}
 }
 

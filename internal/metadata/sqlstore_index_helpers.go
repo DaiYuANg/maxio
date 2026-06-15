@@ -183,12 +183,12 @@ func listSQLIndexQueue[T any](
 	query querydsl.Builder,
 	label string,
 	scan func(interface{ Scan(dest ...any) error }) (T, error),
-) ([]T, error) {
+) (*collectionlist.List[T], error) {
 	items, err := listSQLRows(ctx, store, query, label, scan)
 	if err != nil {
 		return nil, err
 	}
-	return items.Values(), nil
+	return items, nil
 }
 
 func listSQLRows[T any](

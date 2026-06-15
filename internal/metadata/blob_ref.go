@@ -14,7 +14,7 @@ func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, 
 	return ref, ok, nil
 }
 
-func (m *InMemoryMetadata) ListBlobRefs(_ context.Context) ([]BlobRef, error) {
+func (m *InMemoryMetadata) ListBlobRefs(_ context.Context) (*list.List[BlobRef], error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	refs := list.NewList[BlobRef]()
@@ -22,7 +22,7 @@ func (m *InMemoryMetadata) ListBlobRefs(_ context.Context) ([]BlobRef, error) {
 		ref.Hash = hash
 		refs.Add(ref)
 	}
-	return refs.Values(), nil
+	return &refs, nil
 }
 
 func (m *InMemoryMetadata) CreateBlobRef(

@@ -9,7 +9,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-func (m *InMemoryMetadata) ListUpstreams(context.Context) ([]model.Upstream, error) {
+func (m *InMemoryMetadata) ListUpstreams(context.Context) (*list.List[model.Upstream], error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -18,7 +18,7 @@ func (m *InMemoryMetadata) ListUpstreams(context.Context) ([]model.Upstream, err
 		upstreams.Add(cloneUpstream(upstream))
 	}
 	sorted := upstreams.Sort(compareUpstream)
-	return sorted.Values(), nil
+	return &sorted, nil
 }
 
 func (m *InMemoryMetadata) GetUpstream(_ context.Context, id string) (model.Upstream, bool, error) {

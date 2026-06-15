@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
+func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.ObjectMeta], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 	if bucket == "" {
@@ -28,7 +29,7 @@ func (s *SQLMetadata) ListObjectMetas(ctx context.Context, bucket, prefix string
 	return s.queryObjectMetas(ctx, query)
 }
 
-func (s *SQLMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
+func (s *SQLMetadata) ListStagedObjectMetas(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.ObjectMeta], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 	if bucket != "" {
@@ -73,7 +74,7 @@ func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) 
 	return s.deleteObjectMeta(ctx, bucket, key, model.ObjectStateCommitted, "committed")
 }
 
-func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) ([]model.ObjectMeta, error) {
+func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) (*collectionlist.List[model.ObjectMeta], error) {
 	metas, err := listSQLRows(
 		ctx,
 		s,
@@ -84,7 +85,7 @@ func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Build
 	if err != nil {
 		return nil, err
 	}
-	return metas.Values(), nil
+	return metas, nil
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {

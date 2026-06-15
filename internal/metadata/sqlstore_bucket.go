@@ -35,7 +35,7 @@ func (t metadataBucketsTable) selectItems() []querydsl.SelectItem {
 	return []querydsl.SelectItem{t.name, t.createdAt}
 }
 
-func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
+func (s *SQLMetadata) ListBuckets(ctx context.Context) (*collectionlist.List[model.Bucket], error) {
 	ctx = ensureContext(ctx)
 	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.selectItems()...).
 		OrderBy(metadataBuckets.name.Asc())
@@ -49,7 +49,7 @@ func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
 	if err != nil {
 		return nil, err
 	}
-	return buckets.Values(), nil
+	return buckets, nil
 }
 
 func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, error) {

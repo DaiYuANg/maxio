@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -82,7 +83,7 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 	return job, true, nil
 }
 
-func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) ([]model.IndexJob, error) {
+func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexJob], error) {
 	status = strings.TrimSpace(status)
 	query := querydsl.SelectFrom(metadataIndexJobs.table, metadataIndexJobs.selectItems()...).
 		OrderBy(metadataIndexJobs.availableAt.Asc(), metadataIndexJobs.createdAt.Asc()).

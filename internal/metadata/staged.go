@@ -8,7 +8,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, prefix string) ([]model.ObjectMeta, error) {
+func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, prefix string) (*list.List[model.ObjectMeta], error) {
 	bucket = strings.TrimSpace(bucket)
 
 	m.mu.RLock()
@@ -29,7 +29,7 @@ func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, pref
 		filtered.Add(meta)
 	}
 	sorted := filtered.Sort(compareObjectLocation)
-	return sorted.Values(), nil
+	return &sorted, nil
 }
 
 func (m *InMemoryMetadata) validateOptionalBucketLocked(bucket string) error {

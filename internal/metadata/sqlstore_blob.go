@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 )
 
-func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
+func (s *SQLMetadata) ListBlobRefs(ctx context.Context) (*collectionlist.List[BlobRef], error) {
 	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...)
 	refs, err := listSQLRows(
 		ctx,
@@ -22,7 +23,7 @@ func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
 	if err != nil {
 		return nil, err
 	}
-	return refs.Values(), nil
+	return refs, nil
 }
 
 func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error) {

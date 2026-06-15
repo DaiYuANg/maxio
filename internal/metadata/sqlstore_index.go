@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -76,7 +77,7 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 	return document, true, nil
 }
 
-func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) ([]model.IndexDocument, error) {
+func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.IndexDocument], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
 	query := querydsl.SelectFrom(metadataIndexDocuments.table, metadataIndexDocuments.selectItems()...).
@@ -94,7 +95,7 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 	if err != nil {
 		return nil, err
 	}
-	return documents.Values(), nil
+	return documents, nil
 }
 
 func indexDocumentFilter(bucket, prefix string) querydsl.Predicate {

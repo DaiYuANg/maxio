@@ -113,8 +113,8 @@ func assertTestObjectVersions(ctx context.Context, t *testing.T, store *SQLMetad
 	if listErr != nil {
 		t.Fatalf("list object versions: %v", listErr)
 	}
-	if len(versions) != 1 {
-		t.Fatalf("version count = %d, want 1", len(versions))
+	if versions.Len() != 1 {
+		t.Fatalf("version count = %d, want 1", versions.Len())
 	}
 }
 
@@ -160,8 +160,8 @@ func assertQueuedIndexJobs(ctx context.Context, t *testing.T, store *SQLMetadata
 	if listErr != nil {
 		t.Fatalf("list index jobs: %v", listErr)
 	}
-	if len(jobs) != 1 {
-		t.Fatalf("queued job count = %d, want 1", len(jobs))
+	if jobs.Len() != 1 {
+		t.Fatalf("queued job count = %d, want 1", jobs.Len())
 	}
 }
 

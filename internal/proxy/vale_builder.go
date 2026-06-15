@@ -50,15 +50,15 @@ func DefaultValeProxyBuildOptions() ValeProxyBuildOptions {
 	}
 }
 
-func BuildValeConfigFromUpstreams(upstreams []model.Upstream, options ValeProxyBuildOptions) (*valeconfig.Config, error) {
-	if len(upstreams) == 0 {
+func BuildValeConfigFromUpstreams(upstreams *collectionlist.List[model.Upstream], options ValeProxyBuildOptions) (*valeconfig.Config, error) {
+	if upstreams == nil || upstreams.Len() == 0 {
 		err := oops.New("vale upstream list is empty")
 		return nil, oops.Wrapf(err, "validate vale upstreams")
 	}
 	return BuildValeConfigSnapshot(upstreams, options)
 }
 
-func BuildValeConfigSnapshot(upstreams []model.Upstream, options ValeProxyBuildOptions) (*valeconfig.Config, error) {
+func BuildValeConfigSnapshot(upstreams *collectionlist.List[model.Upstream], options ValeProxyBuildOptions) (*valeconfig.Config, error) {
 	options = normalizeValeOptions(options)
 
 	b := provider.NewConfigBuilder()
@@ -70,15 +70,20 @@ func BuildValeConfigSnapshot(upstreams []model.Upstream, options ValeProxyBuildO
 	}
 
 	bucketsByUpstream := sortUpstreamsForDeterministicBuild(upstreams)
-	if len(bucketsByUpstream) == 0 {
+	if bucketsByUpstream == nil || bucketsByUpstream.Len() == 0 {
 		b.Service(disabledValeServiceName, disabledValeEndpoint)
 		b.RouteTo(disabledValeRouteName, options.EntrypointName, disabledValeServiceName, provider.RoutePathPrefix(disabledValeRoutePath))
 	}
-	for i := range bucketsByUpstream {
-		upstream := bucketsByUpstream[i]
-		if err := addUpstreamToBuilder(b, upstream, options.EntrypointName); err != nil {
-			return nil, err
+	var buildErr error
+	bucketsByUpstream.Range(func(_ int, upstream model.Upstream) bool {
+		if buildErr != nil {
+			return false
 		}
+		buildErr = addUpstreamToBuilder(b, upstream, options.EntrypointName)
+		return buildErr == nil
+	})
+	if buildErr != nil {
+		return nil, buildErr
 	}
 
 	cfg, err := b.BuildValidated()
@@ -144,8 +149,11 @@ func BuildValeGatewayFromProvider(
 	return gateway, nil
 }
 
-func sortUpstreamsForDeterministicBuild(upstreams []model.Upstream) []model.Upstream {
-	sorted := collectionlist.NewList(upstreams...).Sort(func(left, right model.Upstream) int {
+func sortUpstreamsForDeterministicBuild(upstreams *collectionlist.List[model.Upstream]) *collectionlist.List[model.Upstream] {
+	if upstreams == nil || upstreams.Len() == 0 {
+		return collectionlist.NewList[model.Upstream]()
+	}
+	sorted := upstreams.Sort(func(left, right model.Upstream) int {
 		leftID := strings.TrimSpace(left.ID)
 		if leftID == "" {
 			leftID = strings.TrimSpace(left.Name)
@@ -158,7 +166,7 @@ func sortUpstreamsForDeterministicBuild(upstreams []model.Upstream) []model.Upst
 			return strings.Compare(strings.TrimSpace(left.Name), strings.TrimSpace(right.Name))
 		}
 		return strings.Compare(leftID, rightID)
-	}).Values()
+	})
 	return sorted
 }
 
@@ -222,14 +230,20 @@ func buildServiceAndRoutes(
 		}
 		uniqueBuckets.Add(cleanBucket)
 	}
-	candidates := collectionlist.NewList(uniqueBuckets.Values()...).Sort(func(left, right string) int {
+	candidates := collectionlist.NewList[string]()
+	uniqueBuckets.Range(func(bucket string) bool {
+		candidates.Add(bucket)
+		return true
+	})
+	candidates = candidates.Sort(func(left, right string) int {
 		return strings.Compare(left, right)
 	})
-	for _, cleanBucket := range candidates.Values() {
+	candidates.Range(func(_ int, cleanBucket string) bool {
 		pathPrefix := "/" + cleanBucket + "/"
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
 		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix), provider.RouteMiddlewares(middlewareName))
-	}
+		return true
+	})
 }
 
 func upstreamIdentity(upstream model.Upstream) string {

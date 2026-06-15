@@ -99,7 +99,7 @@ func (m *InMemoryMetadata) GetObjectVersion(_ context.Context, bucket, key, vers
 	return cloneObjectVersion(version), true, nil
 }
 
-func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key string) ([]model.ObjectVersion, error) {
+func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key string) (*list.List[model.ObjectVersion], error) {
 	bucket = strings.TrimSpace(bucket)
 	key = strings.TrimSpace(key)
 	if bucket == "" || key == "" {
@@ -126,7 +126,7 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 			return 0
 		}
 	})
-	return sorted.Values(), nil
+	return &sorted, nil
 }
 
 func (m *InMemoryMetadata) DeleteObjectVersion(_ context.Context, bucket, key, versionID string) (bool, error) {

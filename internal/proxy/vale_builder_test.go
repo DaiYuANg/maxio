@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/proxy"
 )
@@ -18,7 +19,7 @@ func TestBuildValeConfigFromUpstreamsWithBucketRoutes(t *testing.T) {
 		},
 	}
 
-	cfg, err := proxy.BuildValeConfigFromUpstreams(upstreams, proxy.DefaultValeProxyBuildOptions())
+	cfg, err := proxy.BuildValeConfigFromUpstreams(collectionlist.NewList(upstreams...), proxy.DefaultValeProxyBuildOptions())
 	if err != nil {
 		t.Fatalf("build vale config: %v", err)
 	}
@@ -44,7 +45,7 @@ func TestBuildValeConfigUsesUpstreamIDForDedupeMiddleware(t *testing.T) {
 		},
 	}
 
-	cfg, err := proxy.BuildValeConfigFromUpstreams(upstreams, proxy.DefaultValeProxyBuildOptions())
+	cfg, err := proxy.BuildValeConfigFromUpstreams(collectionlist.NewList(upstreams...), proxy.DefaultValeProxyBuildOptions())
 	if err != nil {
 		t.Fatalf("build vale config: %v", err)
 	}
@@ -66,7 +67,7 @@ func TestBuildValeConfigUsesUpstreamIDForDedupeMiddleware(t *testing.T) {
 }
 
 func TestBuildValeConfigSnapshotAllowsEmptyUpstreams(t *testing.T) {
-	cfg, err := proxy.BuildValeConfigSnapshot(nil, proxy.DefaultValeProxyBuildOptions())
+	cfg, err := proxy.BuildValeConfigSnapshot(collectionlist.NewList[model.Upstream](), proxy.DefaultValeProxyBuildOptions())
 	if err != nil {
 		t.Fatalf("build vale config snapshot: %v", err)
 	}
@@ -102,7 +103,7 @@ func TestBuildValeConfigFromUpstreamsRejectsInvalidEndpoint(t *testing.T) {
 		},
 	}
 
-	_, err := proxy.BuildValeConfigFromUpstreams(upstreams, proxy.DefaultValeProxyBuildOptions())
+	_, err := proxy.BuildValeConfigFromUpstreams(collectionlist.NewList(upstreams...), proxy.DefaultValeProxyBuildOptions())
 	if err == nil {
 		t.Fatal("expected error for invalid upstream endpoint")
 	}
