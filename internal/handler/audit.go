@@ -31,8 +31,7 @@ func auditCategory(action string) string {
 	switch {
 	case strings.HasPrefix(action, "bucket."), strings.HasPrefix(action, "object."):
 		return "object_mutation"
-	case strings.HasPrefix(action, "cluster."),
-		strings.HasPrefix(action, "dedupe."),
+	case strings.HasPrefix(action, "dedupe."),
 		strings.HasPrefix(action, "index."):
 		return "admin_mutation"
 	default:

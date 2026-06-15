@@ -171,7 +171,6 @@ Set these credentials for non-local deployments:
 ```text
 MAXIO_ADMIN_TOKEN
 MAXIO_API_TOKEN
-MAXIO_CLUSTER_TOKEN, if internal routes remain enabled
 ```
 
 Admin requests can use:
@@ -182,7 +181,7 @@ X-Maxio-Control: <token>
 ```
 
 S3/object API requests should use the configured S3 auth path or the API token
-compatibility path while the auth model is being completed.
+path while the API token is enabled.
 
 `/healthz` and `/readyz` should remain unauthenticated for load balancers.
 
@@ -199,7 +198,6 @@ Forward credential headers unchanged:
 ```text
 Authorization
 X-Maxio-Control
-X-Maxio-Cluster
 X-Maxio-API
 ```
 

@@ -3,7 +3,6 @@
   "http_body_limit": 1073741824,
   "storage_address": "127.0.0.1:8080",
   "admin_token": "",
-  "cluster_token": "",
   "api_token": "",
   "metadata_backend": "sqlite",
   "metadata_dsn": "./data/maxio.db",

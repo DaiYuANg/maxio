@@ -8,19 +8,12 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "maxio-1:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_RAFT_NODE_ID: "1"
-      MAXIO_RAFT_ADDRESS: "maxio-1:63000"
-      MAXIO_RAFT_INITIAL_MEMBERS: "1=maxio-1:63000,2=maxio-2:63000,3=maxio-3:63000"
-      MAXIO_RAFT_BOOTSTRAP: "true"
-      MAXIO_RAFT_JOIN: "false"
       MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
       MAXIO_GOSSIP_ADVERTISE_ADDRESS: "maxio-1:7946"
       MAXIO_GOSSIP_SEEDS: "maxio-1:7946,maxio-2:7946,maxio-3:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
-      MAXIO_CLUSTER_TOKEN: "${MAXIO_CLUSTER_TOKEN:-dev-cluster-token}"
     ports:
       - "8081:8080"
-      - "63001:63000"
       - "7941:7946"
     volumes:
       - maxio-1-data:/app/data
@@ -33,19 +26,12 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "maxio-2:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_RAFT_NODE_ID: "2"
-      MAXIO_RAFT_ADDRESS: "maxio-2:63000"
-      MAXIO_RAFT_INITIAL_MEMBERS: "1=maxio-1:63000,2=maxio-2:63000,3=maxio-3:63000"
-      MAXIO_RAFT_BOOTSTRAP: "true"
-      MAXIO_RAFT_JOIN: "false"
       MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
       MAXIO_GOSSIP_ADVERTISE_ADDRESS: "maxio-2:7946"
       MAXIO_GOSSIP_SEEDS: "maxio-1:7946,maxio-2:7946,maxio-3:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
-      MAXIO_CLUSTER_TOKEN: "${MAXIO_CLUSTER_TOKEN:-dev-cluster-token}"
     ports:
       - "8082:8080"
-      - "63002:63000"
       - "7942:7946"
     volumes:
       - maxio-2-data:/app/data
@@ -58,19 +44,12 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "maxio-3:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_RAFT_NODE_ID: "3"
-      MAXIO_RAFT_ADDRESS: "maxio-3:63000"
-      MAXIO_RAFT_INITIAL_MEMBERS: "1=maxio-1:63000,2=maxio-2:63000,3=maxio-3:63000"
-      MAXIO_RAFT_BOOTSTRAP: "true"
-      MAXIO_RAFT_JOIN: "false"
       MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
       MAXIO_GOSSIP_ADVERTISE_ADDRESS: "maxio-3:7946"
       MAXIO_GOSSIP_SEEDS: "maxio-1:7946,maxio-2:7946,maxio-3:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
-      MAXIO_CLUSTER_TOKEN: "${MAXIO_CLUSTER_TOKEN:-dev-cluster-token}"
     ports:
       - "8083:8080"
-      - "63003:63000"
       - "7943:7946"
     volumes:
       - maxio-3-data:/app/data
