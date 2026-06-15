@@ -181,8 +181,14 @@ func (cache *metadataJSONCache) invalidatePattern(ctx context.Context, pattern s
 		if err != nil {
 			return fmt.Errorf("scan metadata cache: %w", err)
 		}
-		if values := keys.Values(); len(values) > 0 {
-			if err := cache.kv.DeleteMulti(ctx, values); err != nil {
+		var cacheKeys []string
+		if keys != nil {
+			keys.ViewValues(func(values []string) {
+				cacheKeys = values
+			})
+		}
+		if len(cacheKeys) > 0 {
+			if err := cache.kv.DeleteMulti(ctx, cacheKeys); err != nil {
 				return fmt.Errorf("delete metadata cache keys: %w", err)
 			}
 		}
