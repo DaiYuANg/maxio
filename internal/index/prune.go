@@ -31,15 +31,13 @@ func (s *SearchEngine) PruneExcept(valid []model.ObjectMeta) error {
 }
 
 func objectIDSet(objects []model.ObjectMeta) *set.Set[string] {
-	validIDs := set.NewSetWithCapacity[string](len(objects))
-	for i := range objects {
-		meta := objects[i]
+	ids := list.FilterMapList(list.NewList(objects...), func(_ int, meta model.ObjectMeta) (string, bool) {
 		if meta.Bucket == "" || meta.Key == "" {
-			continue
+			return "", false
 		}
-		validIDs.Add(objectID(meta.Bucket, meta.Key))
-	}
-	return validIDs
+		return objectID(meta.Bucket, meta.Key), true
+	})
+	return set.NewSetWithCapacity[string](ids.Len(), ids.Values()...)
 }
 
 func (s *SearchEngine) indexedDocumentIDs() (*set.Set[string], error) {
@@ -51,9 +49,7 @@ func (s *SearchEngine) indexedDocumentIDs() (*set.Set[string], error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, id := range bleveIDs {
-		ids.Add(id)
-	}
+	ids.MergeSlice(bleveIDs)
 	return ids, nil
 }
 
@@ -61,11 +57,8 @@ func (s *SearchEngine) memoryDocumentIDs() *set.Set[string] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	ids := set.NewSetWithCapacity[string](len(s.items))
-	for id := range s.items {
-		ids.Add(id)
-	}
-	return ids
+	itemIDs := listKeysFromMap(s.items)
+	return set.NewSetWithCapacity[string](itemIDs.Len(), itemIDs.Values()...)
 }
 
 func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs *set.Set[string]) (*collectionlist.List[string], error) {

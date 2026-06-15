@@ -237,18 +237,33 @@ func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchRes
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	itemsByID := list.NewListWithCapacity[*model.ObjectMeta](len(s.items))
-	for _, meta := range s.items {
-		itemsByID.Add(meta)
-	}
-	items := list.FilterMapList(itemsByID, func(_ int, meta *model.ObjectMeta) (model.ObjectMeta, bool) {
-		if meta == nil {
-			return model.ObjectMeta{}, false
-		}
-		if !matchesQuery(*meta, query) {
-			return model.ObjectMeta{}, false
-		}
-		return *meta, true
-	})
+	items := list.FilterMapList(
+		listValuesFromMap(s.items),
+		func(_ int, meta *model.ObjectMeta) (model.ObjectMeta, bool) {
+			if meta == nil {
+				return model.ObjectMeta{}, false
+			}
+			if !matchesQuery(*meta, query) {
+				return model.ObjectMeta{}, false
+			}
+			return *meta, true
+		},
+	)
 	return limitedSearchResult(query, items)
+}
+
+func listValuesFromMap[K comparable, V any](values map[K]V) *list.List[V] {
+	items := list.NewListWithCapacity[V](len(values))
+	for _, value := range values {
+		items.Add(value)
+	}
+	return items
+}
+
+func listKeysFromMap[K comparable, V any](values map[K]V) *list.List[K] {
+	keys := list.NewListWithCapacity[K](len(values))
+	for key := range values {
+		keys.Add(key)
+	}
+	return keys
 }
