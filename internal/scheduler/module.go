@@ -12,7 +12,7 @@ import (
 	gocron "github.com/go-co-op/gocron/v2"
 )
 
-// Runtime wraps gocron with MaxIO lifecycle and optional leader-aware scheduling.
+// Runtime wraps gocron with MaxIO lifecycle and lease-based task scheduling.
 type Runtime struct {
 	scheduler       gocron.Scheduler
 	logger          *slog.Logger
@@ -93,10 +93,6 @@ func (runtime *Runtime) NewJob(definition gocron.JobDefinition, task gocron.Task
 		return nil, fmt.Errorf("create scheduled job: %w", err)
 	}
 	return job, nil
-}
-
-func (runtime *Runtime) RequireLeader(ctx context.Context) error {
-	return nil
 }
 
 type slogCronLogger struct {

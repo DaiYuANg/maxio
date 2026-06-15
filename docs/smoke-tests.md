@@ -1,6 +1,6 @@
 # MaxIO smoke tests
 
-These checks verify that a freshly started MaxIO node or local Compose cluster
+These checks verify that a freshly started MaxIO process or Compose deployment
 can accept traffic, persist objects, expose operational state, and run the main
 maintenance entry points.
 
@@ -13,7 +13,7 @@ export MAXIO_BUCKET="${MAXIO_BUCKET:-smoke}"
 export MAXIO_OBJECT="${MAXIO_OBJECT:-hello.txt}"
 ```
 
-For the three-node Compose example, point `MAXIO_URL` at node 1:
+For the multi-node Compose example, point `MAXIO_URL` at node 1:
 
 ```sh
 export MAXIO_URL="http://127.0.0.1:8081"
@@ -138,7 +138,7 @@ curl --fail -X POST \
   "$MAXIO_URL/_dedupe/run"
 ```
 
-For a three-node Compose cluster, also verify every exposed node is ready:
+For a multi-node Compose deployment, also verify every exposed node is ready:
 
 ```sh
 for port in 8081 8082 8083; do

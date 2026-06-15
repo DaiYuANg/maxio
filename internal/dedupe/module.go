@@ -97,14 +97,8 @@ func (runtime *Runtime) startInitialDedupe(ctx context.Context) {
 		runtime.logger.Warn("skip initial dedupe: nil context")
 		return
 	}
-	runCtx, cancel := context.WithCancel(ctx)
 	go func() {
-		defer cancel()
-		if err := runtime.scheduler.RequireLeader(runCtx); err != nil {
-			runtime.logger.DebugContext(runCtx, "skip initial dedupe on non-leader", "error", err)
-			return
-		}
-		runtime.runScheduled(runCtx)
+		runtime.runScheduled(ctx)
 	}()
 }
 

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/lyonbrown4d/maxio/internal/control"
 	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
@@ -23,10 +22,6 @@ func (s *Service) writeJSON(w http.ResponseWriter, code int, value any) {
 
 func (s *Service) writeError(w http.ResponseWriter, err error) {
 	msg := err.Error()
-	if errors.Is(err, control.ErrNotLeader) || errors.Is(err, control.ErrLeaderUnavailable) {
-		s.writeJSON(w, http.StatusConflict, map[string]string{"error": msg})
-		return
-	}
 	if errors.Is(err, object.ErrBucketExists) {
 		s.writeJSON(w, http.StatusConflict, map[string]string{"error": msg})
 		return

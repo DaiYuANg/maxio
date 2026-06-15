@@ -20,7 +20,6 @@ require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/gofiber/fiber/v3 v3.3.0
 	github.com/gofiber/template/html/v3 v3.0.5
-	github.com/hashicorp/memberlist v0.5.4
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/redis/go-redis/v9 v9.20.1
 	github.com/samber/oops v1.22.0
