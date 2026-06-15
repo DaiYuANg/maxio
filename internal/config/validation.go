@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/samber/mo"
 )
 
 type durationConfig struct {
@@ -95,10 +97,28 @@ func validateIntegerConfigs(configs []intConfig) error {
 }
 
 func validateDuration(name, value string) error {
-	if _, err := time.ParseDuration(value); err != nil {
+	if _, err := parseDuration(value); err != nil {
 		return fmt.Errorf("invalid config: %s: %w", name, err)
 	}
 	return nil
+}
+
+func parseDuration(value string) (time.Duration, error) {
+	result := mo.Try(func() (time.Duration, error) {
+		return time.ParseDuration(value)
+	})
+	if result.IsError() {
+		return 0, result.Error()
+	}
+	return result.OrElse(0), nil
+}
+
+func parseDurationOr(value string, fallback time.Duration) time.Duration {
+	duration, err := parseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return duration
 }
 
 func validateNonNegativeInt(name string, value, minimum int) error {

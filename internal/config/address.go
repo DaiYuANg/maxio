@@ -14,11 +14,7 @@ func (cfg Config) StorageAdvertiseAddress() string {
 }
 
 func (cfg Config) PendingObjectTTLDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.PendingObjectTTL)
-	if err != nil {
-		return time.Hour
-	}
-	return duration
+	return parseDurationOr(cfg.PendingObjectTTL, time.Hour)
 }
 
 func storageAddressFromHTTPAddress(address string) string {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/samber/lo"
 )
@@ -202,13 +203,12 @@ func (s *SearchEngine) searchIndex(query model.SearchQuery) ([]searchHit, error)
 	if err != nil {
 		return nil, fmt.Errorf("search bleve index: %w", err)
 	}
-	hits := make([]searchHit, 0, len(result.Hits))
-	for _, hit := range result.Hits {
-		hits = append(hits, searchHit{
+	hits := lo.Map(result.Hits, func(hit *search.DocumentMatch, _ int) searchHit {
+		return searchHit{
 			ID:     hit.ID,
 			Fields: hit.Fields,
-		})
-	}
+		}
+	})
 	return hits, nil
 }
 

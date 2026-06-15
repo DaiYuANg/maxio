@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"time"
 )
 
 func applyIndexZeroDefaults(cfg Config) Config {
@@ -23,10 +22,10 @@ func applyIndexZeroDefaults(cfg Config) Config {
 }
 
 func validateIndexConfig(cfg Config) error {
-	if _, err := time.ParseDuration(cfg.IndexTimeout); err != nil {
+	if _, err := parseDuration(cfg.IndexTimeout); err != nil {
 		return fmt.Errorf("invalid config: index_timeout: %w", err)
 	}
-	if _, err := time.ParseDuration(cfg.IndexRetryBackoff); err != nil {
+	if _, err := parseDuration(cfg.IndexRetryBackoff); err != nil {
 		return fmt.Errorf("invalid config: index_retry_backoff: %w", err)
 	}
 	if cfg.IndexMaxRetries < 0 {

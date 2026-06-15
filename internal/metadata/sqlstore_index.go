@@ -84,28 +84,13 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
 		query.Where(predicate)
 	}
-	rows, err := s.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query index documents: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "index documents", "error", closeErr)
-		}
-	}()
-
-	documents := make([]model.IndexDocument, 0)
-	for rows.Next() {
-		document, err := scanIndexDocument(rows)
-		if err != nil {
-			return nil, err
-		}
-		documents = append(documents, document)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate index documents: %w", err)
-	}
-	return documents, nil
+	return listSQLRows(
+		ctx,
+		s,
+		query,
+		"index documents",
+		scanIndexDocument,
+	)
 }
 
 func indexDocumentFilter(bucket, prefix string) querydsl.Predicate {

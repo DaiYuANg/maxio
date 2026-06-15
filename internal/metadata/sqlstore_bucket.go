@@ -38,28 +38,13 @@ func (s *SQLMetadata) ListBuckets(ctx context.Context) ([]model.Bucket, error) {
 	ctx = ensureContext(ctx)
 	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.selectItems()...).
 		OrderBy(metadataBuckets.name.Asc())
-	rows, err := s.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query buckets: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "buckets", "error", closeErr)
-		}
-	}()
-
-	buckets := make([]model.Bucket, 0)
-	for rows.Next() {
-		bucket, err := scanBucket(rows)
-		if err != nil {
-			return nil, err
-		}
-		buckets = append(buckets, bucket)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate buckets: %w", err)
-	}
-	return buckets, nil
+	return listSQLRows(
+		ctx,
+		s,
+		query,
+		"buckets",
+		scanBucket,
+	)
 }
 
 func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, error) {

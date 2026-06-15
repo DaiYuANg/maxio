@@ -30,15 +30,18 @@ func (s *SearchEngine) PruneExcept(valid []model.ObjectMeta) error {
 }
 
 func objectIDSet(objects []model.ObjectMeta) map[string]struct{} {
-	ids := make(map[string]struct{}, len(objects))
-	for index := range objects {
-		meta := objects[index]
+	ids := lo.FilterMap(objects, func(meta model.ObjectMeta, _ int) (string, bool) {
 		if meta.Bucket == "" || meta.Key == "" {
-			continue
+			return "", false
 		}
-		ids[objectID(meta.Bucket, meta.Key)] = struct{}{}
+		return objectID(meta.Bucket, meta.Key), true
+	})
+	ids = lo.Uniq(ids)
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		set[id] = struct{}{}
 	}
-	return ids
+	return set
 }
 
 func (s *SearchEngine) indexedDocumentIDs() (map[string]struct{}, error) {

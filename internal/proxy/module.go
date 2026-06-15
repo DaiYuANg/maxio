@@ -13,6 +13,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -188,13 +189,9 @@ func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) ([]
 	if err != nil {
 		return nil, oops.Wrapf(err, "list upstreams")
 	}
-	enabled := make([]model.Upstream, 0, len(upstreams))
-	for i := range upstreams {
-		upstream := upstreams[i]
-		if upstream.Enabled {
-			enabled = append(enabled, upstream)
-		}
-	}
+	enabled := lo.Filter(upstreams, func(upstream model.Upstream, _ int) bool {
+		return upstream.Enabled
+	})
 	return enabled, nil
 }
 

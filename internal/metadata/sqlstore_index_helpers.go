@@ -187,6 +187,16 @@ func listSQLIndexQueue[T any](
 	label string,
 	scan func(sqlScanner) (T, error),
 ) ([]T, error) {
+	return listSQLRows(ctx, store, query, label, scan)
+}
+
+func listSQLRows[T any](
+	ctx context.Context,
+	store *SQLMetadata,
+	query querydsl.Builder,
+	label string,
+	scan func(sqlScanner) (T, error),
+) ([]T, error) {
 	rows, err := store.queryBuilderContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query %s: %w", label, err)

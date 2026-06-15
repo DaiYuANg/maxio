@@ -1,6 +1,10 @@
 package metadata
 
-import "context"
+import (
+	"context"
+
+	"github.com/samber/lo"
+)
 
 func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, bool, error) {
 	m.mu.RLock()
@@ -13,11 +17,11 @@ func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, 
 func (m *InMemoryMetadata) ListBlobRefs(_ context.Context) ([]BlobRef, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	refs := make([]BlobRef, 0, len(m.blobs))
-	for hash, ref := range m.blobs {
+	refs := lo.Map(lo.Keys(m.blobs), func(hash string, _ int) BlobRef {
+		ref := m.blobs[hash]
 		ref.Hash = hash
-		refs = append(refs, ref)
-	}
+		return ref
+	})
 	return refs, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 var metadataUpstreams = newMetadataUpstreamsTable()
@@ -63,28 +64,7 @@ func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
 func (s *SQLMetadata) ListUpstreams(ctx context.Context) ([]model.Upstream, error) {
 	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
 		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
-	rows, err := s.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query upstreams: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "upstreams", "error", closeErr)
-		}
-	}()
-
-	upstreams := make([]model.Upstream, 0)
-	for rows.Next() {
-		upstream, err := scanUpstream(rows)
-		if err != nil {
-			return nil, err
-		}
-		upstreams = append(upstreams, upstream)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate upstreams: %w", err)
-	}
-	return upstreams, nil
+	return listSQLRows(ctx, s, query, "upstreams", scanUpstream)
 }
 
 func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstream, bool, error) {
@@ -226,18 +206,11 @@ func normalizeUpstream(upstream model.Upstream) (model.Upstream, error) {
 }
 
 func normalizeStringList(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
+	return lo.Uniq(lo.FilterMap(values, func(value string, _ int) (string, bool) {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return "", false
 		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result
+		return trimmed, true
+	}))
 }

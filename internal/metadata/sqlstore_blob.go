@@ -12,28 +12,13 @@ import (
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
 	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...)
-	rows, err := s.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query blob refs: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "blob refs", "error", closeErr)
-		}
-	}()
-
-	refs := make([]BlobRef, 0)
-	for rows.Next() {
-		ref, err := scanBlobRef(rows)
-		if err != nil {
-			return nil, err
-		}
-		refs = append(refs, ref)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate blob refs: %w", err)
-	}
-	return refs, nil
+	return listSQLRows(
+		ctx,
+		s,
+		query,
+		"blob refs",
+		scanBlobRef,
+	)
 }
 
 func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error) {

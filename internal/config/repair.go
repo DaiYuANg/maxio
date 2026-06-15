@@ -3,27 +3,15 @@ package config
 import "time"
 
 func (cfg Config) RepairIntervalDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.RepairInterval)
-	if err != nil {
-		return 10 * time.Minute
-	}
-	return duration
+	return parseDurationOr(cfg.RepairInterval, 10*time.Minute)
 }
 
 func (cfg Config) RepairRetryBackoffDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.RepairRetryBackoff)
-	if err != nil {
-		return time.Second
-	}
-	return duration
+	return parseDurationOr(cfg.RepairRetryBackoff, time.Second)
 }
 
 func (cfg Config) RepairRetryMaxBackoffDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.RepairRetryMaxBackoff)
-	if err != nil {
-		return 10 * time.Second
-	}
-	return duration
+	return parseDurationOr(cfg.RepairRetryMaxBackoff, 10*time.Second)
 }
 
 func (cfg Config) RepairRetryMultiplier() float64 {
@@ -34,25 +22,13 @@ func (cfg Config) RepairRetryMultiplier() float64 {
 }
 
 func (cfg Config) DedupeIntervalDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.DedupeInterval)
-	if err != nil {
-		return 30 * time.Minute
-	}
-	return duration
+	return parseDurationOr(cfg.DedupeInterval, 30*time.Minute)
 }
 
 func (cfg Config) IndexTimeoutDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.IndexTimeout)
-	if err != nil {
-		return 30 * time.Second
-	}
-	return duration
+	return parseDurationOr(cfg.IndexTimeout, 30*time.Second)
 }
 
 func (cfg Config) IndexRetryBackoffDuration() time.Duration {
-	duration, err := time.ParseDuration(cfg.IndexRetryBackoff)
-	if err != nil {
-		return time.Second
-	}
-	return duration
+	return parseDurationOr(cfg.IndexRetryBackoff, time.Second)
 }

@@ -187,28 +187,13 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 	query := querydsl.SelectFrom(metadataObjectVersions.table, metadataObjectVersions.selectItems()...).
 		Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))).
 		OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc())
-	rows, err := s.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query object versions: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "object versions", "error", closeErr)
-		}
-	}()
-
-	versions := make([]model.ObjectVersion, 0)
-	for rows.Next() {
-		version, err := scanObjectVersion(rows)
-		if err != nil {
-			return nil, err
-		}
-		versions = append(versions, version)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate object versions: %w", err)
-	}
-	return versions, nil
+	return listSQLRows(
+		ctx,
+		s,
+		query,
+		"object versions",
+		scanObjectVersion,
+	)
 }
 
 func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, versionID string) (bool, error) {

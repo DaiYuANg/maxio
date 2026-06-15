@@ -74,28 +74,13 @@ func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) 
 }
 
 func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) ([]model.ObjectMeta, error) {
-	rows, err := s.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query object metas: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "object metas", "error", closeErr)
-		}
-	}()
-
-	metas := make([]model.ObjectMeta, 0)
-	for rows.Next() {
-		meta, err := scanObjectMeta(rows)
-		if err != nil {
-			return nil, err
-		}
-		metas = append(metas, meta)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate object metas: %w", err)
-	}
-	return metas, nil
+	return listSQLRows(
+		ctx,
+		s,
+		query,
+		"object metas",
+		scanObjectMeta,
+	)
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
