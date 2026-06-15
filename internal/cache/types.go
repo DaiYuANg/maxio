@@ -141,7 +141,12 @@ func cloneObjectMetaList(items *collectionlist.List[model.ObjectMeta]) *collecti
 	if items == nil {
 		return collectionlist.NewList[model.ObjectMeta]()
 	}
-	return collectionlist.MapList(items, cloneObjectMeta)
+	return collectionlist.MapList(
+		items,
+		func(_ int, meta model.ObjectMeta) model.ObjectMeta {
+			return cloneObjectMeta(meta)
+		},
+	)
 }
 
 func cloneStringMap(input map[string]string) map[string]string {

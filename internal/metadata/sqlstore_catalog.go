@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -59,18 +57,11 @@ func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (
 	query := querydsl.SelectFrom(metadataObjectRecords.table, metadataObjectRecords.selectItems()...).
 		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key))).
 		Limit(1)
-	row, queryErr := s.queryRowBuilderContext(ctx, query)
-	if queryErr != nil {
-		return model.ObjectRecord{}, false, fmt.Errorf("get object record: %w", queryErr)
-	}
-	record, err := scanObjectRecord(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.ObjectRecord{}, false, nil
-	}
+	record, found, err := querySQLOne(ctx, s, query, "object record", metadataObjectRecordMapper)
 	if err != nil {
-		return model.ObjectRecord{}, false, fmt.Errorf("get object record: %w", err)
+		return model.ObjectRecord{}, false, err
 	}
-	return record, true, nil
+	return record, found, nil
 }
 
 func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string) (bool, error) {
@@ -164,18 +155,11 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 			metadataObjectVersions.versionID.Eq(versionID),
 		)).
 		Limit(1)
-	row, queryErr := s.queryRowBuilderContext(ctx, query)
-	if queryErr != nil {
-		return model.ObjectVersion{}, false, fmt.Errorf("get object version: %w", queryErr)
-	}
-	version, err := scanObjectVersion(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.ObjectVersion{}, false, nil
-	}
+	version, found, err := querySQLOne(ctx, s, query, "object version", metadataObjectVersionMapper)
 	if err != nil {
-		return model.ObjectVersion{}, false, fmt.Errorf("get object version: %w", err)
+		return model.ObjectVersion{}, false, err
 	}
-	return version, true, nil
+	return version, found, nil
 }
 
 func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string) (*collectionlist.List[model.ObjectVersion], error) {
@@ -188,12 +172,12 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 	query := querydsl.SelectFrom(metadataObjectVersions.table, metadataObjectVersions.selectItems()...).
 		Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))).
 		OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc())
-	versions, err := listSQLRows(
+	versions, err := querySQLRows(
 		ctx,
 		s,
 		query,
 		"object versions",
-		scanObjectVersion,
+		metadataObjectVersionMapper,
 	)
 	if err != nil {
 		return nil, err

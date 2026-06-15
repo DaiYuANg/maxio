@@ -39,12 +39,12 @@ func (s *SQLMetadata) ListBuckets(ctx context.Context) (*collectionlist.List[mod
 	ctx = ensureContext(ctx)
 	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.selectItems()...).
 		OrderBy(metadataBuckets.name.Asc())
-	buckets, err := listSQLRows(
+	buckets, err := querySQLRows(
 		ctx,
 		s,
 		query,
 		"buckets",
-		scanBucket,
+		metadataBucketMapper,
 	)
 	if err != nil {
 		return nil, err
@@ -61,19 +61,11 @@ func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, er
 	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.name).
 		Where(metadataBuckets.name.Eq(bucket)).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	_, found, err := querySQLOne(ctx, s, query, "bucket exists", metadataNameMapper)
 	if err != nil {
-		return false, fmt.Errorf("query bucket exists: %w", err)
+		return false, err
 	}
-	var found string
-	err = row.Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("query bucket exists: %w", err)
-	}
-	return true, nil
+	return found, nil
 }
 
 func (s *SQLMetadata) CreateBucket(ctx context.Context, bucket string) error {
@@ -152,40 +144,11 @@ func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx
 func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) (*collectionlist.List[string], error) {
 	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.hash).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.state.Eq(model.ObjectStateCommitted)))
-	rows, err := s.txQueryBuilderContext(ctx, tx, query)
+	hashes, err := querySQLRowsInTx(ctx, s, tx, query, "bucket object hashes", metadataHashMapper)
 	if err != nil {
-		return nil, fmt.Errorf("query bucket committed objects: %w", err)
+		return nil, err
 	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && s.logger != nil {
-			s.logger.Error("close sql metadata rows", "rows", "bucket object hashes", "error", closeErr)
-		}
-	}()
-
-	hashes := collectionlist.NewList[string]()
-	for rows.Next() {
-		var hash string
-		if err := rows.Scan(&hash); err != nil {
-			return nil, fmt.Errorf("scan object hash: %w", err)
-		}
-		hashes.Add(hash)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate bucket object hashes: %w", err)
-	}
-	return hashes, nil
-}
-
-func scanBucket(scanner interface{ Scan(dest ...any) error }) (model.Bucket, error) {
-	var name string
-	var createdAt int64
-	if err := scanner.Scan(&name, &createdAt); err != nil {
-		return model.Bucket{}, fmt.Errorf("scan bucket: %w", err)
-	}
-	return model.Bucket{
-		Name:      name,
-		CreatedAt: unixNanoToTime(createdAt),
-	}, nil
+	return metadataHashRowsToList(hashes), nil
 }
 
 func (s *SQLMetadata) ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
@@ -203,19 +166,11 @@ func (s *SQLMetadata) bucketExistsInTx(ctx context.Context, tx *sql.Tx, bucket s
 	query := querydsl.SelectFrom(metadataBuckets.table, metadataBuckets.name).
 		Where(metadataBuckets.name.Eq(bucket)).
 		Limit(1)
-	row, err := s.txQueryRowBuilderContext(ctx, tx, query)
+	_, found, err := querySQLOneInTx(ctx, s, tx, query, "bucket exists", metadataNameMapper)
 	if err != nil {
-		return false, fmt.Errorf("query bucket exists: %w", err)
+		return false, err
 	}
-	var found string
-	err = row.Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("query bucket exists: %w", err)
-	}
-	return true, nil
+	return found, nil
 }
 
 func (s *SQLMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, bucket, state string) error {

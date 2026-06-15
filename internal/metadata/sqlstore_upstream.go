@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -65,7 +64,7 @@ func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
 func (s *SQLMetadata) ListUpstreams(ctx context.Context) (*collectionlist.List[model.Upstream], error) {
 	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
 		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
-	upstreams, err := listSQLRows(ctx, s, query, "upstreams", scanUpstream)
+	upstreams, err := querySQLRows(ctx, s, query, "upstreams", metadataUpstreamMapper)
 	if err != nil {
 		return nil, err
 	}
@@ -81,18 +80,11 @@ func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstrea
 	query := querydsl.SelectFrom(metadataUpstreams.table, metadataUpstreams.selectItems()...).
 		Where(metadataUpstreams.id.Eq(id)).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	upstream, found, err := querySQLOne(ctx, s, query, "upstream", metadataUpstreamMapper)
 	if err != nil {
-		return model.Upstream{}, false, fmt.Errorf("query upstream: %w", err)
+		return model.Upstream{}, false, err
 	}
-	upstream, err := scanUpstream(row)
-	if err != nil {
-		if errorsIsNoRows(err) {
-			return model.Upstream{}, false, nil
-		}
-		return model.Upstream{}, false, fmt.Errorf("query upstream: %w", err)
-	}
-	return upstream, true, nil
+	return upstream, found, nil
 }
 
 func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstream) (model.Upstream, error) {
@@ -159,37 +151,6 @@ func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, erro
 		return false, fmt.Errorf("delete upstream rows: %w", err)
 	}
 	return affected > 0, nil
-}
-
-func scanUpstream(scanner interface{ Scan(dest ...any) error }) (model.Upstream, error) {
-	var (
-		upstream model.Upstream
-		buckets  sql.NullString
-		enabled  int
-		created  int64
-		updated  int64
-	)
-	if err := scanner.Scan(
-		&upstream.ID,
-		&upstream.Name,
-		&upstream.Endpoint,
-		&upstream.Region,
-		&upstream.Weight,
-		&upstream.Priority,
-		&buckets,
-		&enabled,
-		&created,
-		&updated,
-	); err != nil {
-		return model.Upstream{}, fmt.Errorf("scan upstream: %w", err)
-	}
-	if err := decodeJSON(buckets, &upstream.Buckets); err != nil {
-		return model.Upstream{}, fmt.Errorf("decode upstream buckets: %w", err)
-	}
-	upstream.Enabled = enabled != 0
-	upstream.CreatedAt = unixNanoToTime(created)
-	upstream.UpdatedAt = unixNanoToTime(updated)
-	return upstream, nil
 }
 
 func normalizeUpstream(upstream model.Upstream) (model.Upstream, error) {

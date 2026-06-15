@@ -127,7 +127,7 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 			return 0
 		}
 	})
-	return &sorted, nil
+	return sorted, nil
 }
 
 func (m *InMemoryMetadata) DeleteObjectVersion(_ context.Context, bucket, key, versionID string) (bool, error) {

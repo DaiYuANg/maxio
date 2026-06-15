@@ -3,7 +3,6 @@ package metadata
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -60,18 +59,11 @@ func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.Di
 	query := querydsl.SelectFrom(metadataDigestRefs.table, metadataDigestRefs.selectItems()...).
 		Where(metadataDigestRefs.digest.Eq(digest)).
 		Limit(1)
-	row, queryErr := s.queryRowBuilderContext(ctx, query)
-	if queryErr != nil {
-		return model.DigestRef{}, false, fmt.Errorf("get digest ref: %w", queryErr)
-	}
-	ref, err := scanDigestRef(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.DigestRef{}, false, nil
-	}
+	ref, found, err := querySQLOne(ctx, s, query, "digest ref", metadataDigestRefMapper)
 	if err != nil {
-		return model.DigestRef{}, false, fmt.Errorf("get digest ref: %w", err)
+		return model.DigestRef{}, false, err
 	}
-	return ref, true, nil
+	return ref, found, nil
 }
 
 func (s *SQLMetadata) RetainDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
@@ -142,4 +134,18 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 		return false, fmt.Errorf("delete digest ref rows: %w", err)
 	}
 	return affected > 0, nil
+}
+
+func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *sql.Tx, digest string) (model.DigestRef, error) {
+	query := querydsl.SelectFrom(metadataDigestRefs.table, metadataDigestRefs.selectItems()...).
+		Where(metadataDigestRefs.digest.Eq(digest)).
+		Limit(1)
+	ref, found, err := querySQLOneInTx(ctx, s, tx, query, "digest ref", metadataDigestRefMapper)
+	if err != nil {
+		return model.DigestRef{}, err
+	}
+	if !found {
+		return model.DigestRef{}, ErrObjectNotFound
+	}
+	return ref, nil
 }

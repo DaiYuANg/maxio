@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
@@ -143,41 +144,70 @@ func (adapter *memoryKVAdapter) scanKeys(pattern string) (*collectionlist.List[s
 
 func pageScanKeys(keys *collectionlist.List[string], cursor uint64, count int64) (*collectionlist.List[string], uint64, error) {
 	limit, limited := memoryScanLimit(count)
-	keyCount := uint64(keys.Len())
-	if cursor >= keyCount {
+	keyCount := keys.Len()
+	cursorIndex, ok := scanCursorIndex(cursor)
+	if !ok || cursorIndex >= keyCount {
 		return collectionlist.NewList[string](), 0, nil
 	}
 	if !limited {
-		result := collectionlist.NewListWithCapacity[string](int(keyCount - cursor))
-		keys.Range(func(index int, key string) bool {
-			if uint64(index) >= cursor {
-				result.Add(key)
-			}
-			return true
-		})
-		return result, 0, nil
+		return pageRemainingScanKeys(keys, cursorIndex, keyCount), 0, nil
 	}
 
-	start := cursor
-	end := start + limit
+	limitCount, _ := scanCursorIndex(limit)
+	result, next := pageLimitedScanKeys(keys, cursorIndex, keyCount, limitCount)
+	return result, next, nil
+}
+
+func pageRemainingScanKeys(keys *collectionlist.List[string], cursorIndex, keyCount int) *collectionlist.List[string] {
+	result := collectionlist.NewListWithCapacity[string](keyCount - cursorIndex)
+	keys.Range(func(index int, key string) bool {
+		if index >= cursorIndex {
+			result.Add(key)
+		}
+		return true
+	})
+	return result
+}
+
+func pageLimitedScanKeys(
+	keys *collectionlist.List[string],
+	start int,
+	keyCount int,
+	limitCount int,
+) (*collectionlist.List[string], uint64) {
+	end := start + limitCount
 	if end > keyCount {
 		end = keyCount
 	}
 
-	result := collectionlist.NewListWithCapacity[string](int(end - start))
+	result := collectionlist.NewListWithCapacity[string](end - start)
 	keys.Range(func(index int, key string) bool {
-		indexUint := uint64(index)
-		if indexUint < start || indexUint >= end {
+		if index < start || index >= end {
 			return true
 		}
 		result.Add(key)
-		return indexUint+1 < end
+		return index+1 < end
 	})
 	next := uint64(0)
 	if end < keyCount {
-		next = end
+		next = scanNextCursor(end)
 	}
-	return result, next, nil
+	return result, next
+}
+
+func scanCursorIndex(cursor uint64) (int, bool) {
+	index, err := strconv.Atoi(strconv.FormatUint(cursor, 10))
+	if err != nil {
+		return 0, false
+	}
+	return index, true
+}
+
+func scanNextCursor(index int) uint64 {
+	if index <= 0 {
+		return 0
+	}
+	return uint64(index)
 }
 
 func memoryScanLimit(count int64) (uint64, bool) {

@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -63,18 +61,11 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 	query := querydsl.SelectFrom(metadataIndexDocuments.table, metadataIndexDocuments.selectItems()...).
 		Where(metadataIndexDocuments.id.Eq(id)).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	document, found, err := querySQLOne(ctx, s, query, "index document", metadataIndexDocumentMapper)
 	if err != nil {
-		return model.IndexDocument{}, false, fmt.Errorf("get index document: %w", err)
+		return model.IndexDocument{}, false, err
 	}
-	document, err := scanIndexDocument(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.IndexDocument{}, false, nil
-	}
-	if err != nil {
-		return model.IndexDocument{}, false, fmt.Errorf("get index document: %w", err)
-	}
-	return document, true, nil
+	return document, found, nil
 }
 
 func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.IndexDocument], error) {
@@ -85,12 +76,12 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
 		query.Where(predicate)
 	}
-	documents, err := listSQLRows(
+	documents, err := querySQLRows(
 		ctx,
 		s,
 		query,
 		"index documents",
-		scanIndexDocument,
+		metadataIndexDocumentMapper,
 	)
 	if err != nil {
 		return nil, err

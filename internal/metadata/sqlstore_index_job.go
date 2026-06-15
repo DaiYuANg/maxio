@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -69,18 +67,11 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 	query := querydsl.SelectFrom(metadataIndexJobs.table, metadataIndexJobs.selectItems()...).
 		Where(metadataIndexJobs.id.Eq(id)).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	job, found, err := querySQLOne(ctx, s, query, "index job", metadataIndexJobMapper)
 	if err != nil {
-		return model.IndexJob{}, false, fmt.Errorf("get index job: %w", err)
+		return model.IndexJob{}, false, err
 	}
-	job, err := scanIndexJob(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.IndexJob{}, false, nil
-	}
-	if err != nil {
-		return model.IndexJob{}, false, fmt.Errorf("get index job: %w", err)
-	}
-	return job, true, nil
+	return job, found, nil
 }
 
 func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexJob], error) {
@@ -91,12 +82,12 @@ func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit in
 	if status != "" {
 		query.Where(metadataIndexJobs.status.Eq(status))
 	}
-	return listSQLIndexQueue(
+	return querySQLRows(
 		ctx,
 		s,
 		query,
 		"index jobs",
-		scanIndexJob,
+		metadataIndexJobMapper,
 	)
 }
 

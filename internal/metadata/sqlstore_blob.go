@@ -3,7 +3,6 @@ package metadata
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -13,12 +12,12 @@ import (
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) (*collectionlist.List[BlobRef], error) {
 	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...)
-	refs, err := listSQLRows(
+	refs, err := querySQLRows(
 		ctx,
 		s,
 		query,
 		"blob refs",
-		scanBlobRef,
+		metadataBlobRefMapper,
 	)
 	if err != nil {
 		return nil, err
@@ -35,18 +34,11 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.selectItems()...).
 		Where(metadataBlobRefs.hash.Eq(hash)).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	ref, found, err := querySQLOne(ctx, s, query, "blob ref", metadataBlobRefMapper)
 	if err != nil {
-		return BlobRef{}, false, fmt.Errorf("get blob ref: %w", err)
+		return BlobRef{}, false, err
 	}
-	ref, err := scanBlobRef(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return BlobRef{}, false, nil
-	}
-	if err != nil {
-		return BlobRef{}, false, fmt.Errorf("get blob ref: %w", err)
-	}
-	return ref, true, nil
+	return ref, found, nil
 }
 
 func (s *SQLMetadata) CreateBlobRef(
@@ -104,42 +96,21 @@ func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string,
 	return path, removed, err
 }
 
-func scanBlobRef(scanner interface{ Scan(dest ...any) error }) (BlobRef, error) {
-	var (
-		ref BlobRef
-	)
-	if err := scanner.Scan(
-		&ref.Hash,
-		&ref.Path,
-		&ref.Size,
-		&ref.RefCount,
-	); err != nil {
-		return BlobRef{}, fmt.Errorf("scan blob ref: %w", err)
-	}
-	return ref, nil
-}
-
 func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
-	var path string
-	var refCount int
 	query := querydsl.SelectFrom(metadataBlobRefs.table, metadataBlobRefs.path, metadataBlobRefs.refCount).
 		Where(metadataBlobRefs.hash.Eq(hash)).
 		Limit(1)
-	row, queryErr := s.txQueryRowBuilderContext(ctx, tx, query)
-	if queryErr != nil {
-		return "", false, fmt.Errorf("query blob ref: %w", queryErr)
+	ref, found, err := querySQLOneInTx(ctx, s, tx, query, "blob ref", metadataBlobRefCounterMapper)
+	if err != nil {
+		return "", false, err
 	}
-	err := row.Scan(&path, &refCount)
-	if errors.Is(err, sql.ErrNoRows) {
+	if !found {
 		return "", false, ErrObjectNotFound
 	}
-	if err != nil {
-		return "", false, fmt.Errorf("query blob ref: %w", err)
+	if ref.RefCount <= 1 {
+		return ref.Path, true, s.deleteBlobRefInTx(ctx, tx, hash)
 	}
-	if refCount <= 1 {
-		return path, true, s.deleteBlobRefInTx(ctx, tx, hash)
-	}
-	return path, false, s.updateBlobRefCountInTx(ctx, tx, hash)
+	return ref.Path, false, s.updateBlobRefCountInTx(ctx, tx, hash)
 }
 
 func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {

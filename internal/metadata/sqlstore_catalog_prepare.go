@@ -65,7 +65,3 @@ func boolToInt(value bool) int {
 	}
 	return 0
 }
-
-func intToBool(value int) bool {
-	return value != 0
-}

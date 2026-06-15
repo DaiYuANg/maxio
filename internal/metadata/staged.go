@@ -27,7 +27,7 @@ func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, pref
 		}
 		return meta, true
 	}).Sort(compareObjectLocation)
-	return &sorted, nil
+	return sorted, nil
 }
 
 func (m *InMemoryMetadata) validateOptionalBucketLocked(bucket string) error {

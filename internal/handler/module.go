@@ -21,7 +21,7 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider1(newLogger),
 			dix.Provider1(newEventBus),
-			dix.Provider3(newGatewayDependencies),
+			dix.Provider2(newGatewayDependencies),
 			dix.Provider3(newGatewayService),
 		),
 		dix.Hooks(

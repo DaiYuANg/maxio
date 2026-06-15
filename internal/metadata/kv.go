@@ -23,10 +23,10 @@ var (
 )
 
 type BlobRef struct {
-	Hash     string
-	Path     string
-	RefCount int
-	Size     int64
+	Hash     string `dbx:"hash"`
+	Path     string `dbx:"path"`
+	RefCount int    `dbx:"ref_count"`
+	Size     int64  `dbx:"size"`
 }
 
 type Repository interface {
@@ -120,44 +120,18 @@ func (m *InMemoryMetadata) ListBuckets(context.Context) (*list.List[model.Bucket
 	defer m.mu.RUnlock()
 
 	now := time.Now().UTC()
-	buckets := listKeysFromMap(m.buckets).
-		Sort(func(left, right string) int {
-			return strings.Compare(left, right)
-		}).
-		MapList(func(_ int, name string) model.Bucket {
+	buckets := list.MapList(
+		listKeysFromMap(m.buckets),
+		func(_ int, name string) model.Bucket {
 			return model.Bucket{
 				Name:      name,
 				CreatedAt: now,
 			}
-		})
-	return &buckets, nil
-}
-
-func listKeysFromMap[K comparable, V any](values map[K]V) *list.List[K] {
-	keys := list.NewListWithCapacity[K](len(values))
-	for key := range values {
-		keys.Add(key)
-	}
-	return keys
-}
-
-func listValuesFromMap[K comparable, V any](values map[K]V) *list.List[V] {
-	items := list.NewListWithCapacity[V](len(values))
-	for _, value := range values {
-		items.Add(value)
-	}
-	return items
-}
-
-func listValuesFromMapWithKey[V any, T any](
-	values map[string]V,
-	mapper func(string, V) T,
-) *list.List[T] {
-	items := list.NewListWithCapacity[T](len(values))
-	for key, value := range values {
-		items.Add(mapper(key, value))
-	}
-	return items
+		},
+	).Sort(func(left, right model.Bucket) int {
+		return strings.Compare(left.Name, right.Name)
+	})
+	return buckets, nil
 }
 
 func (m *InMemoryMetadata) BucketExists(_ context.Context, bucket string) (bool, error) {
@@ -253,7 +227,7 @@ func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix str
 		}
 		return 0
 	})
-	return &sorted, nil
+	return sorted, nil
 }
 
 func (m *InMemoryMetadata) GetObjectMeta(_ context.Context, bucket, key string) (model.ObjectMeta, bool, error) {

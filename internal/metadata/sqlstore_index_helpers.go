@@ -1,106 +1,11 @@
 package metadata
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
 	"strings"
 	"time"
 
-	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
-
-func scanIndexDocument(scanner interface{ Scan(dest ...any) error }) (model.IndexDocument, error) {
-	var (
-		document model.IndexDocument
-		indexed  sql.NullInt64
-		created  int64
-		updated  int64
-	)
-	if err := scanner.Scan(
-		&document.ID,
-		&document.Bucket,
-		&document.Key,
-		&document.VersionID,
-		&document.Digest,
-		&document.State,
-		&document.Error,
-		&indexed,
-		&created,
-		&updated,
-	); err != nil {
-		return model.IndexDocument{}, fmt.Errorf("scan index document: %w", err)
-	}
-	document.IndexedAt = unixNanoToTimeOpt(indexed)
-	document.CreatedAt = unixNanoToTime(created)
-	document.UpdatedAt = unixNanoToTime(updated)
-	return document, nil
-}
-
-func scanIndexJob(scanner interface{ Scan(dest ...any) error }) (model.IndexJob, error) {
-	var (
-		job       model.IndexJob
-		started   sql.NullInt64
-		finished  sql.NullInt64
-		created   int64
-		updated   int64
-		available int64
-	)
-	if err := scanner.Scan(
-		&job.ID,
-		&job.Kind,
-		&job.Bucket,
-		&job.Key,
-		&job.VersionID,
-		&job.Status,
-		&job.Attempts,
-		&job.Error,
-		&available,
-		&started,
-		&finished,
-		&created,
-		&updated,
-	); err != nil {
-		return model.IndexJob{}, fmt.Errorf("scan index job: %w", err)
-	}
-	job.AvailableAt = unixNanoToTime(available)
-	job.StartedAt = unixNanoToTimeOpt(started)
-	job.FinishedAt = unixNanoToTimeOpt(finished)
-	job.CreatedAt = unixNanoToTime(created)
-	job.UpdatedAt = unixNanoToTime(updated)
-	return job, nil
-}
-
-func scanIndexOutboxEvent(scanner interface{ Scan(dest ...any) error }) (model.IndexOutboxEvent, error) {
-	var (
-		event     model.IndexOutboxEvent
-		available int64
-		created   int64
-		updated   int64
-	)
-	if err := scanner.Scan(
-		&event.ID,
-		&event.EventType,
-		&event.Bucket,
-		&event.Key,
-		&event.VersionID,
-		&event.Payload,
-		&event.Status,
-		&event.Attempts,
-		&event.Error,
-		&available,
-		&created,
-		&updated,
-	); err != nil {
-		return model.IndexOutboxEvent{}, fmt.Errorf("scan index outbox event: %w", err)
-	}
-	event.AvailableAt = unixNanoToTime(available)
-	event.CreatedAt = unixNanoToTime(created)
-	event.UpdatedAt = unixNanoToTime(updated)
-	return event, nil
-}
 
 func prepareIndexDocument(document model.IndexDocument) (model.IndexDocument, error) {
 	document.ID = strings.TrimSpace(document.ID)
@@ -175,49 +80,4 @@ func indexQueueTimes(availableAt, createdAt time.Time) (time.Time, time.Time, ti
 		createdAt = now
 	}
 	return availableAt, createdAt, now
-}
-
-func listSQLIndexQueue[T any](
-	ctx context.Context,
-	store *SQLMetadata,
-	query querydsl.Builder,
-	label string,
-	scan func(interface{ Scan(dest ...any) error }) (T, error),
-) (*collectionlist.List[T], error) {
-	items, err := listSQLRows(ctx, store, query, label, scan)
-	if err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-func listSQLRows[T any](
-	ctx context.Context,
-	store *SQLMetadata,
-	query querydsl.Builder,
-	label string,
-	scan func(interface{ Scan(dest ...any) error }) (T, error),
-) (*collectionlist.List[T], error) {
-	rows, err := store.queryBuilderContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query %s: %w", label, err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && store.logger != nil {
-			store.logger.Error("close sql metadata rows", "rows", label, "error", closeErr)
-		}
-	}()
-
-	items := collectionlist.NewList[T]()
-	for rows.Next() {
-		item, scanErr := scan(rows)
-		if scanErr != nil {
-			return nil, scanErr
-		}
-		items.Add(item)
-	}
-	if rowsErr := rows.Err(); rowsErr != nil {
-		return nil, fmt.Errorf("iterate %s: %w", label, rowsErr)
-	}
-	return items, nil
 }

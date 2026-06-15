@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -67,18 +65,11 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 	query := querydsl.SelectFrom(metadataIndexOutbox.table, metadataIndexOutbox.selectItems()...).
 		Where(metadataIndexOutbox.id.Eq(id)).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	event, found, err := querySQLOne(ctx, s, query, "index outbox event", metadataIndexOutboxEventMapper)
 	if err != nil {
-		return model.IndexOutboxEvent{}, false, fmt.Errorf("get index outbox event: %w", err)
+		return model.IndexOutboxEvent{}, false, err
 	}
-	event, err := scanIndexOutboxEvent(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.IndexOutboxEvent{}, false, nil
-	}
-	if err != nil {
-		return model.IndexOutboxEvent{}, false, fmt.Errorf("get index outbox event: %w", err)
-	}
-	return event, true, nil
+	return event, found, nil
 }
 
 func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexOutboxEvent], error) {
@@ -89,12 +80,12 @@ func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, 
 	if status != "" {
 		query.Where(metadataIndexOutbox.status.Eq(status))
 	}
-	return listSQLIndexQueue(
+	return querySQLRows(
 		ctx,
 		s,
 		query,
 		"index outbox",
-		scanIndexOutboxEvent,
+		metadataIndexOutboxEventMapper,
 	)
 }
 

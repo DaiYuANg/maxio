@@ -192,9 +192,12 @@ func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) (*l
 	if upstreams == nil {
 		return list.NewList[model.Upstream](), nil
 	}
-	return list.Where(upstreams, func(_ int, upstream model.Upstream) bool {
-		return upstream.Enabled
-	}), nil
+	return list.FilterMapList(
+		upstreams,
+		func(_ int, upstream model.Upstream) (model.Upstream, bool) {
+			return upstream, upstream.Enabled
+		},
+	), nil
 }
 
 func startValeGateway(ctx context.Context, runtime *ValeRuntime) error {

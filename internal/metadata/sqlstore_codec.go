@@ -4,40 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/mo"
 )
-
-func decodeJSON(raw sql.NullString, value any) error {
-	if !raw.Valid || raw.String == "" || raw.String == "null" {
-		return nil
-	}
-	unmarshal := mo.Try(func() (struct{}, error) {
-		return struct{}{}, json.Unmarshal([]byte(raw.String), value)
-	})
-	if unmarshal.IsError() {
-		return fmt.Errorf("unmarshal json: %w", unmarshal.Error())
-	}
-	return nil
-}
 
 func marshalStrings(values []string) string {
 	return marshalJSON(values, "[]")
-}
-
-func marshalInt64s(values []int64) string {
-	return marshalJSON(values, "[]")
-}
-
-func marshalInt64sVariadic(values ...[]int64) string {
-	if len(values) == 0 {
-		return "[]"
-	}
-	return marshalInt64s(values[0])
 }
 
 func marshalUserMetadata(value map[string]string) string {
@@ -81,20 +55,6 @@ func unixNanoOrNil(t time.Time) any {
 		return nil
 	}
 	return t.UTC().UnixNano()
-}
-
-func unixNanoToTime(timestamp int64) time.Time {
-	if timestamp <= 0 {
-		return time.Time{}
-	}
-	return time.Unix(0, timestamp).UTC()
-}
-
-func unixNanoToTimeOpt(value sql.NullInt64) time.Time {
-	if !value.Valid || value.Int64 <= 0 {
-		return time.Time{}
-	}
-	return unixNanoToTime(value.Int64)
 }
 
 func ensureContext(ctx context.Context) context.Context {

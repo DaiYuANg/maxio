@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -75,35 +73,31 @@ func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) 
 }
 
 func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) (*collectionlist.List[model.ObjectMeta], error) {
-	metas, err := listSQLRows(
+	rows, err := querySQLRows(
 		ctx,
 		s,
 		query,
 		"object metas",
-		scanObjectMeta,
+		metadataObjectMetaMapper,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return metas, nil
+	return objectMetaRowsToList(rows), nil
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {
 	query := querydsl.SelectFrom(metadataObjects.table, metadataObjects.selectItems()...).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state))).
 		Limit(1)
-	row, err := s.queryRowBuilderContext(ctx, query)
+	row, found, err := querySQLOne(ctx, s, query, "object meta", metadataObjectMetaMapper)
 	if err != nil {
-		return model.ObjectMeta{}, false, fmt.Errorf("query object meta: %w", err)
+		return model.ObjectMeta{}, false, err
 	}
-	meta, err := scanObjectMeta(row)
-	if err != nil {
-		if errorsIsNoRows(err) {
-			return model.ObjectMeta{}, false, nil
-		}
-		return model.ObjectMeta{}, false, fmt.Errorf("query object meta: %w", err)
+	if !found {
+		return model.ObjectMeta{}, false, nil
 	}
-	return meta, true, nil
+	return row.objectMeta(), true, nil
 }
 
 func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta, state, op string) error {
@@ -229,8 +223,4 @@ func prefixPattern(prefix string) string {
 		return ""
 	}
 	return prefix + "%"
-}
-
-func errorsIsNoRows(err error) bool {
-	return errors.Is(err, sql.ErrNoRows)
 }

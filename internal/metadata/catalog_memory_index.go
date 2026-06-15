@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -47,38 +48,13 @@ func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	sorted := list.FilterMapList(
+	documents := list.FilterMapList(
 		listValuesFromMap(m.indexDocuments),
 		func(_ int, document model.IndexDocument) (model.IndexDocument, bool) {
-			if bucket != "" && document.Bucket != bucket {
-				return model.IndexDocument{}, false
-			}
-			if prefix != "" && !strings.HasPrefix(document.Key, prefix) {
-				return model.IndexDocument{}, false
-			}
-			return document, true
+			return document, isIndexDocumentInScope(document, bucket, prefix)
 		},
-	).Sort(func(left, right model.IndexDocument) int {
-		if left.Bucket == right.Bucket {
-			switch {
-			case left.Key < right.Key:
-				return -1
-			case left.Key > right.Key:
-				return 1
-			default:
-				return 0
-			}
-		}
-		switch {
-		case left.Bucket < right.Bucket:
-			return -1
-		case left.Bucket > right.Bucket:
-			return 1
-		default:
-			return 0
-		}
-	})
-	return sorted, nil
+	).Sort(compareIndexDocumentLocation)
+	return documents, nil
 }
 
 func (m *InMemoryMetadata) DeleteIndexDocument(_ context.Context, id string) (bool, error) {
@@ -136,28 +112,16 @@ func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	jobs := list.FilterMapList(
+	jobs := filterAndSortByStatus(
 		listValuesFromMap(m.indexJobs),
-		func(_ int, job model.IndexJob) (model.IndexJob, bool) {
-			if status != "" && job.Status != status {
-				return model.IndexJob{}, false
-			}
-			return job, true
+		limit,
+		func(job model.IndexJob) bool {
+			return status == "" || job.Status == status
+		},
+		func(left, right model.IndexJob) int {
+			return compareByCreatedAt(left.CreatedAt, right.CreatedAt)
 		},
 	)
-	if queryLimit := limit; queryLimit > 0 && jobs.Len() > queryLimit {
-		jobs = jobs.Take(queryLimit)
-	}
-	jobs = jobs.Sort(func(left, right model.IndexJob) int {
-		switch {
-		case left.CreatedAt.Before(right.CreatedAt):
-			return -1
-		case left.CreatedAt.After(right.CreatedAt):
-			return 1
-		default:
-			return 0
-		}
-	})
 	return jobs, nil
 }
 
@@ -216,28 +180,16 @@ func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status strin
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	events := list.FilterMapList(
+	events := filterAndSortByStatus(
 		listValuesFromMap(m.indexOutbox),
-		func(_ int, event model.IndexOutboxEvent) (model.IndexOutboxEvent, bool) {
-			if status != "" && event.Status != status {
-				return model.IndexOutboxEvent{}, false
-			}
-			return event, true
+		limit,
+		func(event model.IndexOutboxEvent) bool {
+			return status == "" || event.Status == status
+		},
+		func(left, right model.IndexOutboxEvent) int {
+			return compareByCreatedAt(left.CreatedAt, right.CreatedAt)
 		},
 	)
-	if queryLimit := limit; queryLimit > 0 && events.Len() > queryLimit {
-		events = events.Take(queryLimit)
-	}
-	events = events.Sort(func(left, right model.IndexOutboxEvent) int {
-		switch {
-		case left.CreatedAt.Before(right.CreatedAt):
-			return -1
-		case left.CreatedAt.After(right.CreatedAt):
-			return 1
-		default:
-			return 0
-		}
-	})
 	return events, nil
 }
 
@@ -255,4 +207,63 @@ func (m *InMemoryMetadata) DeleteIndexOutboxEvent(_ context.Context, id string) 
 	}
 	delete(m.indexOutbox, id)
 	return true, nil
+}
+
+func isIndexDocumentInScope(document model.IndexDocument, bucket, prefix string) bool {
+	if bucket != "" && document.Bucket != bucket {
+		return false
+	}
+	if prefix != "" && !strings.HasPrefix(document.Key, prefix) {
+		return false
+	}
+	return true
+}
+
+func compareByCreatedAt(left, right time.Time) int {
+	switch {
+	case left.Before(right):
+		return -1
+	case left.After(right):
+		return 1
+	default:
+		return 0
+	}
+}
+
+func compareIndexDocumentLocation(left, right model.IndexDocument) int {
+	switch {
+	case left.Bucket < right.Bucket:
+		return -1
+	case left.Bucket > right.Bucket:
+		return 1
+	case left.Key < right.Key:
+		return -1
+	case left.Key > right.Key:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func filterAndSortByStatus[T any](
+	values *list.List[T],
+	limit int,
+	include func(T) bool,
+	compare func(T, T) int,
+) *list.List[T] {
+	filtered := list.FilterMapList(
+		values,
+		func(_ int, item T) (T, bool) {
+			if !include(item) {
+				var zero T
+				return zero, false
+			}
+			return item, true
+		},
+	)
+	if queryLimit := limit; queryLimit > 0 && filtered.Len() > queryLimit {
+		filtered = filtered.Take(queryLimit)
+	}
+	filtered = filtered.Sort(compare)
+	return filtered
 }

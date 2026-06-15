@@ -235,9 +235,7 @@ func buildServiceAndRoutes(
 		candidates.Add(bucket)
 		return true
 	})
-	candidates = candidates.Sort(func(left, right string) int {
-		return strings.Compare(left, right)
-	})
+	candidates = candidates.Sort(strings.Compare)
 	candidates.Range(func(_ int, cleanBucket string) bool {
 		pathPrefix := "/" + cleanBucket + "/"
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
