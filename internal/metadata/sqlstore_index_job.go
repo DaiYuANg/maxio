@@ -65,10 +65,7 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 		return model.IndexJob{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataIndexJobs.schema, metadataIndexJobs.selectItems()...).
-		Where(metadataIndexJobs.id.Eq(id)).
-		Limit(1)
-	option, err := s.repos.indexJobs.FirstOption(ctx, query)
+	option, err := s.repos.indexJobs.GetByKeyOption(ctx, metadataKey(metadataIndexJobs.id, id))
 	if err != nil {
 		return model.IndexJob{}, false, fmt.Errorf("query index job: %w", err)
 	}
@@ -96,14 +93,9 @@ func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, erro
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataIndexJobs.schema).Where(metadataIndexJobs.id.Eq(id))
-	result, err := s.repos.indexJobs.Delete(ctx, query)
+	result, err := s.repos.indexJobs.DeleteByKey(ctx, metadataKey(metadataIndexJobs.id, id))
 	if err != nil {
 		return false, fmt.Errorf("delete index job: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete index job rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete index job")
 }

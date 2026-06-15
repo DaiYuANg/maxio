@@ -52,10 +52,10 @@ func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (
 		return model.ObjectRecord{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataObjectRecords.schema, metadataObjectRecords.selectItems()...).
-		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key))).
-		Limit(1)
-	option, err := s.repos.objectRecords.FirstOption(ctx, query)
+	option, err := s.repos.objectRecords.GetByKeyOption(ctx, metadataCompositeKey(
+		metadataKeyPart(metadataObjectRecords.bucket, bucket),
+		metadataKeyPart(metadataObjectRecords.key, key),
+	))
 	if err != nil {
 		return model.ObjectRecord{}, false, fmt.Errorf("query object record: %w", err)
 	}
@@ -69,17 +69,14 @@ func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string
 	if bucket == "" || key == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataObjectRecords.schema).
-		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key)))
-	result, err := s.repos.objectRecords.Delete(ctx, query)
+	result, err := s.repos.objectRecords.DeleteByKey(ctx, metadataCompositeKey(
+		metadataKeyPart(metadataObjectRecords.bucket, bucket),
+		metadataKeyPart(metadataObjectRecords.key, key),
+	))
 	if err != nil {
 		return false, fmt.Errorf("delete object record: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete object record rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete object record")
 }
 
 func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.ObjectVersion) (model.ObjectVersion, error) {
@@ -132,14 +129,11 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 		return model.ObjectVersion{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataObjectVersions.schema, metadataObjectVersions.selectItems()...).
-		Where(querydsl.And(
-			metadataObjectVersions.bucket.Eq(bucket),
-			metadataObjectVersions.key.Eq(key),
-			metadataObjectVersions.versionID.Eq(versionID),
-		)).
-		Limit(1)
-	option, err := s.repos.objectVersions.FirstOption(ctx, query)
+	option, err := s.repos.objectVersions.GetByKeyOption(ctx, metadataCompositeKey(
+		metadataKeyPart(metadataObjectVersions.bucket, bucket),
+		metadataKeyPart(metadataObjectVersions.key, key),
+		metadataKeyPart(metadataObjectVersions.versionID, versionID),
+	))
 	if err != nil {
 		return model.ObjectVersion{}, false, fmt.Errorf("query object version: %w", err)
 	}
@@ -169,19 +163,13 @@ func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, vers
 	if bucket == "" || key == "" || versionID == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataObjectVersions.schema).
-		Where(querydsl.And(
-			metadataObjectVersions.bucket.Eq(bucket),
-			metadataObjectVersions.key.Eq(key),
-			metadataObjectVersions.versionID.Eq(versionID),
-		))
-	result, err := s.repos.objectVersions.Delete(ctx, query)
+	result, err := s.repos.objectVersions.DeleteByKey(ctx, metadataCompositeKey(
+		metadataKeyPart(metadataObjectVersions.bucket, bucket),
+		metadataKeyPart(metadataObjectVersions.key, key),
+		metadataKeyPart(metadataObjectVersions.versionID, versionID),
+	))
 	if err != nil {
 		return false, fmt.Errorf("delete object version: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete object version rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete object version")
 }

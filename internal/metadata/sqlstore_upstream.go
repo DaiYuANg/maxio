@@ -95,10 +95,7 @@ func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstrea
 		return model.Upstream{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataUpstreams.schema, metadataUpstreams.selectItems()...).
-		Where(metadataUpstreams.id.Eq(id)).
-		Limit(1)
-	option, err := s.repos.upstreams.FirstOption(ctx, query)
+	option, err := s.repos.upstreams.GetByKeyOption(ctx, metadataKey(metadataUpstreams.id, id))
 	if err != nil {
 		return model.Upstream{}, false, fmt.Errorf("query upstream: %w", err)
 	}
@@ -153,16 +150,11 @@ func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, erro
 		return false, ErrBadRequest
 	}
 
-	query := querydsl.DeleteFrom(metadataUpstreams.schema).Where(metadataUpstreams.id.Eq(id))
-	result, err := s.repos.upstreams.Delete(ctx, query)
+	result, err := s.repos.upstreams.DeleteByKey(ctx, metadataKey(metadataUpstreams.id, id))
 	if err != nil {
 		return false, fmt.Errorf("delete upstream: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete upstream rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete upstream")
 }
 
 func normalizeUpstream(upstream model.Upstream) (model.Upstream, error) {

@@ -114,17 +114,6 @@ func newMetadataObjectVersionsTable() metadataObjectVersionsTable {
 	}
 }
 
-func (t metadataObjectRecordsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.bucket,
-		t.key,
-		t.currentVersionID,
-		t.deleted,
-		t.createdAt,
-		t.updatedAt,
-	}
-}
-
 func (t metadataObjectVersionsTable) selectItems() []querydsl.SelectItem {
 	return []querydsl.SelectItem{
 		t.bucket,

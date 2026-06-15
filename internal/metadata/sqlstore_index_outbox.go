@@ -54,10 +54,7 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 		return model.IndexOutboxEvent{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataIndexOutbox.schema, metadataIndexOutbox.selectItems()...).
-		Where(metadataIndexOutbox.id.Eq(id)).
-		Limit(1)
-	option, err := s.repos.indexOutbox.FirstOption(ctx, query)
+	option, err := s.repos.indexOutbox.GetByKeyOption(ctx, metadataKey(metadataIndexOutbox.id, id))
 	if err != nil {
 		return model.IndexOutboxEvent{}, false, fmt.Errorf("query index outbox event: %w", err)
 	}
@@ -85,14 +82,9 @@ func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bo
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataIndexOutbox.schema).Where(metadataIndexOutbox.id.Eq(id))
-	result, err := s.repos.indexOutbox.Delete(ctx, query)
+	result, err := s.repos.indexOutbox.DeleteByKey(ctx, metadataKey(metadataIndexOutbox.id, id))
 	if err != nil {
 		return false, fmt.Errorf("delete index outbox event: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete index outbox event rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete index outbox event")
 }

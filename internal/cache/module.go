@@ -14,7 +14,7 @@ func Module() dix.Module {
 	return dix.NewModule(
 		"cache",
 		dix.WithModuleProviders(
-			dix.ProviderErr2(newMetadataCacheFromRuntimeConfig),
+			dix.ProviderErr1(newMetadataCacheFromRuntimeConfig),
 		),
 		dix.Hooks(
 			dix.OnStop(func(_ context.Context, metadata MetadataCache) error {
@@ -27,8 +27,7 @@ func Module() dix.Module {
 	)
 }
 
-func newMetadataCacheFromRuntimeConfig(cfg config.Config, logger any) (MetadataCache, error) {
-	_ = logger
+func newMetadataCacheFromRuntimeConfig(cfg config.Config) (MetadataCache, error) {
 	cacheConfig := Config{
 		Backend:       cfg.CacheBackend,
 		TTL:           cfg.CacheTTLDuration(),

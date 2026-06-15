@@ -51,10 +51,7 @@ func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.Di
 		return model.DigestRef{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataDigestRefs.schema, metadataDigestRefs.selectItems()...).
-		Where(metadataDigestRefs.digest.Eq(digest)).
-		Limit(1)
-	option, err := s.repos.digestRefs.FirstOption(ctx, query)
+	option, err := s.repos.digestRefs.GetByKeyOption(ctx, metadataKey(metadataDigestRefs.digest, digest))
 	if err != nil {
 		return model.DigestRef{}, false, fmt.Errorf("query digest ref: %w", err)
 	}
@@ -111,17 +108,11 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 	if digest == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataDigestRefs.schema).
-		Where(metadataDigestRefs.digest.Eq(digest))
-	result, err := s.repos.digestRefs.Delete(ctx, query)
+	result, err := s.repos.digestRefs.DeleteByKey(ctx, metadataKey(metadataDigestRefs.digest, digest))
 	if err != nil {
 		return false, fmt.Errorf("delete digest ref: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete digest ref rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete digest ref")
 }
 
 func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *dbx.Tx, digest string) (model.DigestRef, error) {

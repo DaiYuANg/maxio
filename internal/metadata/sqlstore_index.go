@@ -59,10 +59,7 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 		return model.IndexDocument{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataIndexDocuments.schema, metadataIndexDocuments.selectItems()...).
-		Where(metadataIndexDocuments.id.Eq(id)).
-		Limit(1)
-	option, err := s.repos.indexDocuments.FirstOption(ctx, query)
+	option, err := s.repos.indexDocuments.GetByKeyOption(ctx, metadataKey(metadataIndexDocuments.id, id))
 	if err != nil {
 		return model.IndexDocument{}, false, fmt.Errorf("query index document: %w", err)
 	}
@@ -105,14 +102,9 @@ func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool,
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	query := querydsl.DeleteFrom(metadataIndexDocuments.schema).Where(metadataIndexDocuments.id.Eq(id))
-	result, err := s.repos.indexDocuments.Delete(ctx, query)
+	result, err := s.repos.indexDocuments.DeleteByKey(ctx, metadataKey(metadataIndexDocuments.id, id))
 	if err != nil {
 		return false, fmt.Errorf("delete index document: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete index document rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete index document")
 }

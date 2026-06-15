@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -26,10 +25,7 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 		return BlobRef{}, false, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.selectItems()...).
-		Where(metadataBlobRefs.hash.Eq(hash)).
-		Limit(1)
-	option, err := s.repos.blobRefs.FirstOption(ctx, query)
+	option, err := s.repos.blobRefs.GetByKeyOption(ctx, metadataKey(metadataBlobRefs.hash, hash))
 	if err != nil {
 		return BlobRef{}, false, fmt.Errorf("query blob ref: %w", err)
 	}
@@ -73,7 +69,7 @@ func (s *SQLMetadata) IncreaseBlobRef(ctx context.Context, hash string) error {
 	if err != nil {
 		return fmt.Errorf("increase blob ref: %w", err)
 	}
-	return requireAffectedRow(result, ErrObjectNotFound, "increase blob ref rows")
+	return requireAffectedRow(result, ErrObjectNotFound, "increase blob ref")
 }
 
 func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string, bool, error) {
@@ -122,17 +118,6 @@ func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *dbx.Tx, hash st
 func (s *SQLMetadata) updateBlobRefCountInTx(ctx context.Context, tx *dbx.Tx, hash string) error {
 	if err := s.txExecSQLTemplateContext(ctx, tx, metadataSQLBlobDecreaseRefCount, metadataBlobRefHashParams{Hash: hash}); err != nil {
 		return fmt.Errorf("decrease blob ref: %w", err)
-	}
-	return nil
-}
-
-func requireAffectedRow(result sql.Result, missing error, op string) error {
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-	if affected == 0 {
-		return missing
 	}
 	return nil
 }

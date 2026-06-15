@@ -195,11 +195,7 @@ func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, stat
 	if err != nil {
 		return false, fmt.Errorf("delete object meta: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("delete object meta rows: %w", err)
-	}
-	return affected > 0, nil
+	return hasAffectedRow(result, "delete object meta")
 }
 
 func objectMetaFilter(bucket, prefix, state string) querydsl.Predicate {
