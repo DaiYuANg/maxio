@@ -92,16 +92,14 @@ The management plane is for operators and automation:
 /metrics
 /_index/*
 /_dedupe/*
-/_cluster/*       removed from the management plane
 ```
 
 Management endpoints must not be used as the primary object data plane.
 
-### Legacy native object API
+### Native object API
 
-The native object API is no longer the product default. If legacy routes remain
-available for compatibility tests, they should be treated as internal or
-temporary until removed from the proxy-only runtime.
+The native object API is not part of the proxy-only runtime. S3 proxy entrypoints
+and management APIs are the supported public interfaces.
 
 ## Metadata-first write path
 

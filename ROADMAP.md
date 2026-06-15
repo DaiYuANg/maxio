@@ -16,7 +16,7 @@ with DB metadata and a rebuildable Bleve file index.
 ## Architecture decisions
 
 - Remove the embedded consensus control plane from the runtime foundation.
-- Do not store authoritative object bytes in MaxIO local shard files.
+- Do not store authoritative object bytes in local files; upstream object storage is authoritative.
 - Persist object visibility, routing, fingerprints, and index status in DB.
 - Use DB transactions and leases for write state, worker queues, rebuilds, and
   recovery.
@@ -46,8 +46,7 @@ Status as of 2026-06-13:
 - Application assembly now lives under `internal/app`; cache and object service
   code have been moved under `internal/cache` and `internal/object` instead of
   root-level public packages.
-- Local object-shard storage remains legacy code and is not part of the target
-  default product path.
+- Local object-shard storage is not part of the target default product path.
 
 ## P0: Metadata foundation
 
@@ -155,7 +154,7 @@ Goal: prepare the proxy runtime for production use.
 
 - Chunk-level dedupe.
 - Cross-region active-active replication.
-- Local object shard storage as a default product path.
+- Local object shard storage is not supported in the target product path.
 - Gateway-local consensus as the control plane.
 - Treating Bleve as authoritative object state.
 

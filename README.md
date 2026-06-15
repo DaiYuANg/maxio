@@ -13,7 +13,7 @@ dedupe relationships, index state, and operational events.
 - Metadata DB is the source of truth.
 - Bleve is derived state and can be rebuilt.
 - Object-level dedupe starts in observe mode and can evolve to alias mode.
-- Local object-shard storage and embedded consensus are not part of the target architecture.
+- Embedded consensus is not part of the target architecture; upstream S3 stores all object bytes.
 
 ## Core documents
 
@@ -31,8 +31,8 @@ dedupe relationships, index state, and operational events.
 - `internal/app` owns process assembly and startup wiring.
 - `internal/cache` and `internal/object` are internal implementation packages;
   they are no longer public root-level libraries.
-- Legacy local object-store code may still exist behind internal packages while
-  the S3 proxy path is completed, but it is not the target product boundary.
+- Local object-store implementations are intentionally out of scope for the product
+  boundary and should not be treated as authoritative state.
 
 ## Minimal local configuration
 
