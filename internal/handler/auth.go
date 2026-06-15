@@ -21,27 +21,11 @@ type authPrincipal struct {
 const (
 	authPrincipalAnonymous = "anonymous"
 	authPrincipalAdmin     = "admin"
-	authPrincipalAPI       = "api"
 
 	authSourceNone          = "none"
 	authSourceBearer        = "authorization-bearer"
 	authSourceControlHeader = "x-maxio-control"
-	authSourceAPIHeader     = "x-maxio-api"
 )
-
-type objectPermission string
-
-const (
-	objectPermissionRead  objectPermission = "object:read"
-	objectPermissionWrite objectPermission = "object:write"
-)
-
-type objectAuthorization struct {
-	permission objectPermission
-	resource   string
-	bucket     string
-	key        string
-}
 
 func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 	if strings.TrimSpace(s.cfg.AdminToken) == "" {
@@ -61,16 +45,6 @@ func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 	}
 }
 
-func (s *Service) requiresObjectAuth(route string, parts []string) bool {
-	if strings.TrimSpace(s.cfg.APIToken) == "" || s.requiresAdminAuth(route, parts) {
-		return false
-	}
-	if isHealthRoute(route) || isReadinessRoute(route) {
-		return false
-	}
-	return true
-}
-
 func (s *Service) authorizeControlHTTPRequest(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -84,66 +58,11 @@ func (s *Service) authorizeControlHTTPRequest(
 	return true
 }
 
-func (s *Service) authorizeNativeObjectHTTPRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	route string,
-	parts []string,
-) bool {
-	objectAuthz := objectAuthorizationForRoute(route, parts, r.Method)
-	if s.requiresObjectAuth(route, parts) && !s.authorizeObject(r, objectAuthz) {
-		s.writeAPIUnauthorized(w)
-		return false
-	}
-	return true
-}
-
 func (s *Service) authorizeAdmin(r *http.Request) bool {
 	if strings.TrimSpace(s.cfg.AdminToken) == "" {
 		return true
 	}
 	return s.requestAuthPrincipal(r).kind == authPrincipalAdmin
-}
-
-func (s *Service) authorizeObject(r *http.Request, _ objectAuthorization) bool {
-	if strings.TrimSpace(s.cfg.APIToken) == "" {
-		return true
-	}
-	principal := s.requestAuthPrincipal(r)
-	switch principal.kind {
-	case authPrincipalAdmin, authPrincipalAPI:
-		return true
-	default:
-		return false
-	}
-}
-
-func objectAuthorizationForRoute(route string, parts []string, method string) objectAuthorization {
-	authz := objectAuthorization{
-		permission: objectPermissionForMethod(method),
-		resource:   "bucket_collection",
-	}
-	if route == "" {
-		return authz
-	}
-	if len(parts) == 1 {
-		authz.resource = "bucket"
-		authz.bucket = parts[0]
-		return authz
-	}
-	authz.resource = "object"
-	authz.bucket = parts[0]
-	authz.key = strings.Join(parts[1:], "/")
-	return authz
-}
-
-func objectPermissionForMethod(method string) objectPermission {
-	switch method {
-	case http.MethodGet, http.MethodHead:
-		return objectPermissionRead
-	default:
-		return objectPermissionWrite
-	}
 }
 
 func (s *Service) requestAuthPrincipal(r *http.Request) authPrincipal {
@@ -152,9 +71,6 @@ func (s *Service) requestAuthPrincipal(r *http.Request) authPrincipal {
 	}
 	if credential := adminCredentialFromRequest(r); tokenMatches(credential.value, s.cfg.AdminToken) {
 		return authPrincipal{kind: authPrincipalAdmin, source: credential.source}
-	}
-	if credential := apiCredentialFromRequestDetails(r); tokenMatches(credential.value, s.cfg.APIToken) {
-		return authPrincipal{kind: authPrincipalAPI, source: credential.source}
 	}
 	return authPrincipal{kind: authPrincipalAnonymous, source: authSourceNone}
 }
@@ -189,22 +105,7 @@ func bearerCredentialFromRequest(r *http.Request) authCredential {
 	return authCredential{source: authSourceNone}
 }
 
-func apiCredentialFromRequestDetails(r *http.Request) authCredential {
-	if r == nil {
-		return authCredential{source: authSourceNone}
-	}
-	if value := strings.TrimSpace(r.Header.Get("X-Maxio-API")); value != "" {
-		return authCredential{value: value, source: authSourceAPIHeader}
-	}
-	return bearerCredentialFromRequest(r)
-}
-
 func (s *Service) writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-admin"`)
 	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "admin authorization required"})
-}
-
-func (s *Service) writeAPIUnauthorized(w http.ResponseWriter) {
-	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-api"`)
-	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "api authorization required"})
 }

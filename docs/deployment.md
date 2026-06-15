@@ -37,7 +37,6 @@ Important settings:
   "metadata_backend": "sqlite",
   "metadata_dsn": "./data/maxio.db",
   "metadata_auto_migrate": true,
-  "enable_native_object_api": false,
   "enable_s3_proxy": true,
   "s3_proxy_entrypoint": ":8080",
   "s3_proxy_upstreams": []

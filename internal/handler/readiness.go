@@ -51,12 +51,7 @@ func (s *Service) checkGatewayDataPlaneReady(checks map[string]string) error {
 		checks["object_service"] = "disabled"
 		return nil
 	}
-	if s.cfg.EnableNativeObjectAPI {
-		checks["s3_proxy"] = "disabled"
-		checks["object_service"] = "removed"
-		return errReadinessUnavailable
-	}
 	checks["s3_proxy"] = "not_implemented"
 	checks["object_service"] = "disabled"
-	return nil
+	return errReadinessUnavailable
 }

@@ -2,11 +2,9 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -70,150 +68,11 @@ func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.handleControlRoute(w, r, route, parts) {
 		return
 	}
-	if !s.authorizeNativeObjectHTTPRequest(w, r, route, parts) {
-		return
-	}
-	if !s.cfg.EnableNativeObjectAPI {
+	if !s.cfg.EnableS3Proxy {
 		s.writeS3ProxyNotImplemented(w)
 		return
 	}
-
-	if route == "" {
-		s.handleBuckets(w, r)
-		return
-	}
-
-	if len(parts) == 1 {
-		s.handleBucket(w, r, parts[0])
-		return
-	}
-
-	bucket := parts[0]
-	key := strings.Join(parts[1:], "/")
-	s.handleObject(w, r, bucket, key)
-}
-
-func (s *Service) handleBuckets(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if s.objects == nil {
-		s.writeLegacyObjectUnavailable(w)
-		return
-	}
-	buckets, err := s.objects.ListBuckets(r.Context())
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
-	s.writeJSON(w, http.StatusOK, buckets)
-}
-
-func (s *Service) handleBucket(w http.ResponseWriter, r *http.Request, bucket string) {
-	if s.objects == nil {
-		s.writeLegacyObjectUnavailable(w)
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		prefix := r.URL.Query().Get("prefix")
-		items, err := s.objects.ListObjects(r.Context(), bucket, prefix)
-		if errors.Is(err, object.ErrBucketNotFound) {
-			s.writeError(w, err)
-			return
-		}
-		if err != nil {
-			s.writeError(w, err)
-			return
-		}
-		s.writeJSON(w, http.StatusOK, items)
-	case http.MethodPut:
-		if err := s.objects.CreateBucket(r.Context(), bucket); err != nil {
-			s.writeError(w, err)
-			return
-		}
-		s.auditHTTP(r, "bucket.create", "bucket", bucket)
-		s.writeJSON(w, http.StatusCreated, map[string]string{"bucket": bucket, "status": "created"})
-	case http.MethodDelete:
-		if err := s.objects.DeleteBucket(r.Context(), bucket); err != nil {
-			s.writeError(w, err)
-			return
-		}
-		s.auditHTTP(r, "bucket.delete", "bucket", bucket)
-		s.writeJSON(w, http.StatusNoContent, nil)
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (s *Service) handleObject(w http.ResponseWriter, r *http.Request, bucket, key string) {
-	if s.objects == nil {
-		s.writeLegacyObjectUnavailable(w)
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		s.handleGetObject(w, r, bucket, key)
-	case http.MethodHead:
-		s.handleHeadObject(w, r, bucket, key)
-	case http.MethodPut:
-		s.handlePutObject(w, r, bucket, key)
-	case http.MethodDelete:
-		s.handleDeleteObject(w, r, bucket, key)
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (s *Service) handleGetObject(w http.ResponseWriter, r *http.Request, bucket, key string) {
-	body, meta, err := s.objects.GetObject(r.Context(), bucket, key)
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
-	s.writeGetObjectResponse(w, r, body, meta)
-}
-
-func (s *Service) handleHeadObject(w http.ResponseWriter, r *http.Request, bucket, key string) {
-	meta, err := s.objects.StatObject(r.Context(), bucket, key)
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
-	writeObjectHeaders(w, meta)
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s *Service) handlePutObject(w http.ResponseWriter, r *http.Request, bucket, key string) {
-	meta, err := s.objects.PutObject(r.Context(), bucket, key, r.Body, object.PutOptions{
-		ContentType:        r.Header.Get("Content-Type"),
-		CacheControl:       r.Header.Get("Cache-Control"),
-		ContentDisposition: r.Header.Get("Content-Disposition"),
-		ContentEncoding:    r.Header.Get("Content-Encoding"),
-		ContentLanguage:    r.Header.Get("Content-Language"),
-	})
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
-	s.auditHTTP(r, "object.put",
-		"bucket", bucket,
-		"key", key,
-		"size", meta.Size,
-		"etag", meta.ETag,
-	)
-	s.writeJSON(w, http.StatusOK, meta)
-}
-
-func (s *Service) handleDeleteObject(w http.ResponseWriter, r *http.Request, bucket, key string) {
-	_, err := s.objects.DeleteObject(r.Context(), bucket, key)
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
-	s.auditHTTP(r, "object.delete", "bucket", bucket, "key", key)
-	w.WriteHeader(http.StatusNoContent)
+	http.NotFound(w, r)
 }
 
 func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -246,37 +105,4 @@ func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeJSON(w, http.StatusOK, result)
-}
-
-func contentTypeOrDefault(v string) string {
-	if v == "" {
-		return "application/octet-stream"
-	}
-	return v
-}
-
-func formatInt(v int64) string {
-	return strconv.FormatInt(v, 10)
-}
-
-func writeObjectHeaders(w http.ResponseWriter, meta object.ObjectMeta) {
-	w.Header().Set("ETag", meta.ETag)
-	w.Header().Set("Content-Type", contentTypeOrDefault(meta.ContentType))
-	w.Header().Set("Content-Length", formatInt(meta.Size))
-	w.Header().Set("Accept-Ranges", "bytes")
-	setObjectHeaderIfNotEmpty(w, "Cache-Control", meta.CacheControl)
-	setObjectHeaderIfNotEmpty(w, "Content-Disposition", meta.ContentDisposition)
-	setObjectHeaderIfNotEmpty(w, "Content-Encoding", meta.ContentEncoding)
-	setObjectHeaderIfNotEmpty(w, "Content-Language", meta.ContentLanguage)
-	for key, value := range meta.UserMetadata {
-		setObjectHeaderIfNotEmpty(w, "x-amz-meta-"+strings.ToLower(key), value)
-	}
-}
-
-func setObjectHeaderIfNotEmpty(w http.ResponseWriter, key, value string) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return
-	}
-	w.Header().Set(key, value)
 }

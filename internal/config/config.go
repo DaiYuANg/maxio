@@ -21,7 +21,6 @@ type Config struct {
 	StorageAddress               string           `json:"storage_address"          koanf:"storage_address"`
 	AdminToken                   string           `json:"admin_token"              koanf:"admin_token"`
 	APIToken                     string           `json:"api_token"                koanf:"api_token"`
-	EnableNativeObjectAPI        bool             `json:"enable_native_object_api" koanf:"enable_native_object_api"`
 	MetadataBackend              string           `json:"metadata_backend"         koanf:"metadata_backend"         validate:"required,oneof=sqlite postgres mysql"`
 	MetadataDSN                  string           `json:"metadata_dsn"             koanf:"metadata_dsn"`
 	MetadataAutoMigrate          bool             `json:"metadata_auto_migrate"    koanf:"metadata_auto_migrate"`
