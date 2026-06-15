@@ -3,10 +3,9 @@ package proxy
 import (
 	"log/slog"
 	"net/url"
-	"slices"
-	"sort"
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/vale"
 	valeconfig "github.com/arcgolabs/vale/config"
@@ -146,21 +145,20 @@ func BuildValeGatewayFromProvider(
 }
 
 func sortUpstreamsForDeterministicBuild(upstreams []model.Upstream) []model.Upstream {
-	sorted := append([]model.Upstream(nil), upstreams...)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		left := strings.TrimSpace(sorted[i].ID)
-		if left == "" {
-			left = strings.TrimSpace(sorted[i].Name)
+	sorted := collectionlist.NewList(upstreams...).Sort(func(left, right model.Upstream) int {
+		leftID := strings.TrimSpace(left.ID)
+		if leftID == "" {
+			leftID = strings.TrimSpace(left.Name)
 		}
-		right := strings.TrimSpace(sorted[j].ID)
-		if right == "" {
-			right = strings.TrimSpace(sorted[j].Name)
+		rightID := strings.TrimSpace(right.ID)
+		if rightID == "" {
+			rightID = strings.TrimSpace(right.Name)
 		}
-		if left == right {
-			return strings.TrimSpace(sorted[i].Name) < strings.TrimSpace(sorted[j].Name)
+		if leftID == rightID {
+			return strings.Compare(strings.TrimSpace(left.Name), strings.TrimSpace(right.Name))
 		}
-		return left < right
-	})
+		return strings.Compare(leftID, rightID)
+	}).Values()
 	return sorted
 }
 
@@ -224,9 +222,10 @@ func buildServiceAndRoutes(
 		}
 		uniqueBuckets.Add(cleanBucket)
 	}
-	candidates := uniqueBuckets.Values()
-	sort.Strings(candidates)
-	for _, cleanBucket := range candidates {
+	candidates := collectionlist.NewList(uniqueBuckets.Values()...).Sort(func(left, right string) int {
+		return strings.Compare(left, right)
+	})
+	for _, cleanBucket := range candidates.Values() {
 		pathPrefix := "/" + cleanBucket + "/"
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
 		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix), provider.RouteMiddlewares(middlewareName))
