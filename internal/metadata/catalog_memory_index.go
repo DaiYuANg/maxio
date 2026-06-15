@@ -47,17 +47,18 @@ func (m *InMemoryMetadata) ListIndexDocuments(_ context.Context, bucket, prefix 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	documents := list.NewList[model.IndexDocument]()
-	for _, document := range m.indexDocuments {
-		if bucket != "" && document.Bucket != bucket {
-			continue
-		}
-		if prefix != "" && !strings.HasPrefix(document.Key, prefix) {
-			continue
-		}
-		documents.Add(document)
-	}
-	sorted := documents.Sort(func(left, right model.IndexDocument) int {
+	sorted := list.FilterMapList(
+		listValuesFromMap(m.indexDocuments),
+		func(_ int, document model.IndexDocument) (model.IndexDocument, bool) {
+			if bucket != "" && document.Bucket != bucket {
+				return model.IndexDocument{}, false
+			}
+			if prefix != "" && !strings.HasPrefix(document.Key, prefix) {
+				return model.IndexDocument{}, false
+			}
+			return document, true
+		},
+	).Sort(func(left, right model.IndexDocument) int {
 		if left.Bucket == right.Bucket {
 			switch {
 			case left.Key < right.Key:
@@ -135,13 +136,15 @@ func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	jobs := list.NewList[model.IndexJob]()
-	for _, job := range m.indexJobs {
-		if status != "" && job.Status != status {
-			continue
-		}
-		jobs.Add(job)
-	}
+	jobs := list.FilterMapList(
+		listValuesFromMap(m.indexJobs),
+		func(_ int, job model.IndexJob) (model.IndexJob, bool) {
+			if status != "" && job.Status != status {
+				return model.IndexJob{}, false
+			}
+			return job, true
+		},
+	)
 	if queryLimit := limit; queryLimit > 0 && jobs.Len() > queryLimit {
 		jobs = jobs.Take(queryLimit)
 	}
@@ -213,13 +216,15 @@ func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status strin
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	events := list.NewList[model.IndexOutboxEvent]()
-	for _, event := range m.indexOutbox {
-		if status != "" && event.Status != status {
-			continue
-		}
-		events.Add(event)
-	}
+	events := list.FilterMapList(
+		listValuesFromMap(m.indexOutbox),
+		func(_ int, event model.IndexOutboxEvent) (model.IndexOutboxEvent, bool) {
+			if status != "" && event.Status != status {
+				return model.IndexOutboxEvent{}, false
+			}
+			return event, true
+		},
+	)
 	if queryLimit := limit; queryLimit > 0 && events.Len() > queryLimit {
 		events = events.Take(queryLimit)
 	}

@@ -109,14 +109,15 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	versions := list.NewList[model.ObjectVersion]()
-	for _, version := range m.objectVersions {
-		if version.Bucket != bucket || version.Key != key {
-			continue
-		}
-		versions.Add(cloneObjectVersion(version))
-	}
-	sorted := versions.Sort(func(left, right model.ObjectVersion) int {
+	sorted := list.FilterMapList(
+		listValuesFromMap(m.objectVersions),
+		func(_ int, version model.ObjectVersion) (model.ObjectVersion, bool) {
+			if version.Bucket != bucket || version.Key != key {
+				return model.ObjectVersion{}, false
+			}
+			return cloneObjectVersion(version), true
+		},
+	).Sort(func(left, right model.ObjectVersion) int {
 		switch {
 		case left.CreatedAt.After(right.CreatedAt):
 			return -1

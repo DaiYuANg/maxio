@@ -18,17 +18,15 @@ func (m *InMemoryMetadata) ListStagedObjectMetas(_ context.Context, bucket, pref
 		return nil, err
 	}
 
-	filtered := list.NewList[model.ObjectMeta]()
-	for _, meta := range m.staged {
+	sorted := list.FilterMapList(listValuesFromMap(m.staged), func(_ int, meta model.ObjectMeta) (model.ObjectMeta, bool) {
 		if bucket != "" && meta.Bucket != bucket {
-			continue
+			return model.ObjectMeta{}, false
 		}
 		if prefix != "" && !strings.HasPrefix(meta.Key, prefix) {
-			continue
+			return model.ObjectMeta{}, false
 		}
-		filtered.Add(meta)
-	}
-	sorted := filtered.Sort(compareObjectLocation)
+		return meta, true
+	}).Sort(compareObjectLocation)
 	return &sorted, nil
 }
 

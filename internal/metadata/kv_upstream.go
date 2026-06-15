@@ -13,11 +13,11 @@ func (m *InMemoryMetadata) ListUpstreams(context.Context) (*list.List[model.Upst
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	upstreams := list.NewList[model.Upstream]()
-	for _, upstream := range m.upstreams {
-		upstreams.Add(cloneUpstream(upstream))
-	}
-	sorted := upstreams.Sort(compareUpstream)
+	sorted := listValuesFromMap(m.upstreams).
+		MapList(func(_ int, upstream model.Upstream) model.Upstream {
+			return cloneUpstream(upstream)
+		}).
+		Sort(compareUpstream)
 	return &sorted, nil
 }
 

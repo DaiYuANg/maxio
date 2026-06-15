@@ -17,12 +17,11 @@ func (m *InMemoryMetadata) GetBlobRef(_ context.Context, hash string) (BlobRef, 
 func (m *InMemoryMetadata) ListBlobRefs(_ context.Context) (*list.List[BlobRef], error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	refs := list.NewList[BlobRef]()
-	for hash, ref := range m.blobs {
+	refs := listValuesFromMapWithKey(m.blobs, func(hash string, ref BlobRef) BlobRef {
 		ref.Hash = hash
-		refs.Add(ref)
-	}
-	return &refs, nil
+		return ref
+	})
+	return refs, nil
 }
 
 func (m *InMemoryMetadata) CreateBlobRef(

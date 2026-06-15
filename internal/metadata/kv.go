@@ -120,23 +120,44 @@ func (m *InMemoryMetadata) ListBuckets(context.Context) (*list.List[model.Bucket
 	defer m.mu.RUnlock()
 
 	now := time.Now().UTC()
-	buckets := list.NewListWithCapacity[model.Bucket](len(m.buckets))
-	for name := range m.buckets {
-		buckets.Add(model.Bucket{
-			Name:      name,
-			CreatedAt: now,
+	buckets := listKeysFromMap(m.buckets).
+		Sort(func(left, right string) int {
+			return strings.Compare(left, right)
+		}).
+		MapList(func(_ int, name string) model.Bucket {
+			return model.Bucket{
+				Name:      name,
+				CreatedAt: now,
+			}
 		})
+	return &buckets, nil
+}
+
+func listKeysFromMap[K comparable, V any](values map[K]V) *list.List[K] {
+	keys := list.NewListWithCapacity[K](len(values))
+	for key := range values {
+		keys.Add(key)
 	}
-	sorted := buckets.Sort(func(left, right model.Bucket) int {
-		if left.Name < right.Name {
-			return -1
-		}
-		if left.Name > right.Name {
-			return 1
-		}
-		return 0
-	})
-	return &sorted, nil
+	return keys
+}
+
+func listValuesFromMap[K comparable, V any](values map[K]V) *list.List[V] {
+	items := list.NewListWithCapacity[V](len(values))
+	for _, value := range values {
+		items.Add(value)
+	}
+	return items
+}
+
+func listValuesFromMapWithKey[V any, T any](
+	values map[string]V,
+	mapper func(string, V) T,
+) *list.List[T] {
+	items := list.NewListWithCapacity[T](len(values))
+	for key, value := range values {
+		items.Add(mapper(key, value))
+	}
+	return items
 }
 
 func (m *InMemoryMetadata) BucketExists(_ context.Context, bucket string) (bool, error) {

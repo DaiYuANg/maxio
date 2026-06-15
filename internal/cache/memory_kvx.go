@@ -108,7 +108,7 @@ func (adapter *memoryKVAdapter) Keys(_ context.Context, pattern string) (*collec
 	if err != nil {
 		return nil, err
 	}
-	return collectionlist.NewList(matched...), nil
+	return matched, nil
 }
 
 func (adapter *memoryKVAdapter) Close() error {
@@ -121,13 +121,13 @@ func (adapter *memoryKVAdapter) Wait() {
 	adapter.cache.Wait()
 }
 
-func (adapter *memoryKVAdapter) scanKeys(pattern string) ([]string, error) {
+func (adapter *memoryKVAdapter) scanKeys(pattern string) (*collectionlist.List[string], error) {
 	if _, err := path.Match(pattern, ""); err != nil {
 		return nil, fmt.Errorf("match memory cache key pattern: %w", err)
 	}
 
 	row := adapter.keys.Row(memoryKVKeyRow)
-	matched := make([]string, 0, len(row))
+	matched := collectionlist.NewListWithCapacity[string](len(row))
 	for key := range row {
 		ok, err := path.Match(pattern, key)
 		if err != nil {
@@ -136,19 +136,26 @@ func (adapter *memoryKVAdapter) scanKeys(pattern string) ([]string, error) {
 		if !ok {
 			continue
 		}
-		matched = append(matched, key)
+		matched.Add(key)
 	}
 	return matched, nil
 }
 
-func pageScanKeys(keys []string, cursor uint64, count int64) (*collectionlist.List[string], uint64, error) {
+func pageScanKeys(keys *collectionlist.List[string], cursor uint64, count int64) (*collectionlist.List[string], uint64, error) {
 	limit, limited := memoryScanLimit(count)
-	keyCount := uint64(len(keys))
+	keyCount := uint64(keys.Len())
 	if cursor >= keyCount {
 		return collectionlist.NewList[string](), 0, nil
 	}
 	if !limited {
-		return collectionlist.NewList(keys[cursor:]...), 0, nil
+		result := collectionlist.NewListWithCapacity[string](int(keyCount - cursor))
+		keys.Range(func(index int, key string) bool {
+			if uint64(index) >= cursor {
+				result.Add(key)
+			}
+			return true
+		})
+		return result, 0, nil
 	}
 
 	start := cursor
@@ -157,12 +164,20 @@ func pageScanKeys(keys []string, cursor uint64, count int64) (*collectionlist.Li
 		end = keyCount
 	}
 
-	result := keys[start:end]
+	result := collectionlist.NewListWithCapacity[string](int(end - start))
+	keys.Range(func(index int, key string) bool {
+		indexUint := uint64(index)
+		if indexUint < start || indexUint >= end {
+			return true
+		}
+		result.Add(key)
+		return indexUint+1 < end
+	})
 	next := uint64(0)
 	if end < keyCount {
 		next = end
 	}
-	return collectionlist.NewList(result...), next, nil
+	return result, next, nil
 }
 
 func memoryScanLimit(count int64) (uint64, bool) {
