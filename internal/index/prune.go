@@ -65,14 +65,8 @@ func (s *SearchEngine) memoryDocumentIDs() *set.Set[string] {
 }
 
 func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs *set.Set[string]) (*collectionlist.List[string], error) {
-	staleIDs := collectionlist.NewListWithCapacity[string](indexedIDs.Len())
-	indexedIDs.Range(func(id string) bool {
-		if validIDs.Contains(id) {
-			return true
-		}
-		staleIDs.Add(id)
-		return true
-	})
+	staleSet := indexedIDs.Difference(validIDs)
+	staleIDs := collectionlist.NewListWithCapacity[string](staleSet.Len(), staleSet.Values()...)
 	var deleteErr error
 	staleIDs.Range(func(_ int, id string) bool {
 		if err := s.deleteStaleDocument(id); err != nil {

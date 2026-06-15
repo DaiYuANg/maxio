@@ -230,11 +230,7 @@ func buildServiceAndRoutes(
 		}
 		uniqueBuckets.Add(cleanBucket)
 	}
-	candidates := collectionlist.NewList[string]()
-	uniqueBuckets.Range(func(bucket string) bool {
-		candidates.Add(bucket)
-		return true
-	})
+	candidates := collectionlist.NewList(uniqueBuckets.Values()...)
 	candidates = candidates.Sort(strings.Compare)
 	candidates.Range(func(_ int, cleanBucket string) bool {
 		pathPrefix := "/" + cleanBucket + "/"

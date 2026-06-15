@@ -150,7 +150,7 @@ func pageScanKeys(keys *collectionlist.List[string], cursor uint64, count int64)
 		return collectionlist.NewList[string](), 0, nil
 	}
 	if !limited {
-		return pageRemainingScanKeys(keys, cursorIndex, keyCount), 0, nil
+		return pageRemainingScanKeys(keys, cursorIndex), 0, nil
 	}
 
 	limitCount, _ := scanCursorIndex(limit)
@@ -158,15 +158,8 @@ func pageScanKeys(keys *collectionlist.List[string], cursor uint64, count int64)
 	return result, next, nil
 }
 
-func pageRemainingScanKeys(keys *collectionlist.List[string], cursorIndex, keyCount int) *collectionlist.List[string] {
-	result := collectionlist.NewListWithCapacity[string](keyCount - cursorIndex)
-	keys.Range(func(index int, key string) bool {
-		if index >= cursorIndex {
-			result.Add(key)
-		}
-		return true
-	})
-	return result
+func pageRemainingScanKeys(keys *collectionlist.List[string], cursorIndex int) *collectionlist.List[string] {
+	return keys.Drop(cursorIndex)
 }
 
 func pageLimitedScanKeys(
@@ -180,14 +173,7 @@ func pageLimitedScanKeys(
 		end = keyCount
 	}
 
-	result := collectionlist.NewListWithCapacity[string](end - start)
-	keys.Range(func(index int, key string) bool {
-		if index < start || index >= end {
-			return true
-		}
-		result.Add(key)
-		return index+1 < end
-	})
+	result := keys.Drop(start).Take(end - start)
 	next := uint64(0)
 	if end < keyCount {
 		next = scanNextCursor(end)

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/arcgolabs/collectionx/list"
+	collectionmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -253,17 +254,9 @@ func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchRes
 }
 
 func listValuesFromMap[K comparable, V any](values map[K]V) *list.List[V] {
-	items := list.NewListWithCapacity[V](len(values))
-	for _, value := range values {
-		items.Add(value)
-	}
-	return items
+	return list.NewList(collectionmapping.NewMapFrom(values).Values()...)
 }
 
 func listKeysFromMap[K comparable, V any](values map[K]V) *list.List[K] {
-	keys := list.NewListWithCapacity[K](len(values))
-	for key := range values {
-		keys.Add(key)
-	}
-	return keys
+	return list.NewList(collectionmapping.NewMapFrom(values).Keys()...)
 }

@@ -180,10 +180,5 @@ func normalizeStringList(values []string) []string {
 		}
 		uniqValues.Add(trimmed)
 	}
-	normalized := make([]string, 0, uniqValues.Len())
-	uniqValues.Range(func(value string) bool {
-		normalized = append(normalized, value)
-		return true
-	})
-	return normalized
+	return uniqValues.Values()
 }
