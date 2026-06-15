@@ -26,13 +26,6 @@ type Upstream struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type ShardPlacement struct {
-	Index       int    `json:"index"`
-	NodeID      string `json:"node_id"`
-	NodeAddress string `json:"node_address,omitempty"`
-	Local       bool   `json:"local,omitempty"`
-}
-
 type ObjectMeta struct {
 	Bucket             string            `json:"bucket"`
 	Key                string            `json:"key"`
@@ -48,9 +41,6 @@ type ObjectMeta struct {
 	UpdatedAt          time.Time         `json:"updated_at"`
 	State              string            `json:"state,omitempty"`
 	WriteIntent        *WriteIntent      `json:"write_intent,omitempty"`
-	ShardPlacements    []ShardPlacement  `json:"shard_placements,omitempty"`
-	ShardChecksums     []string          `json:"shard_checksums,omitempty"`
-	ShardSizes         []int64           `json:"shard_sizes,omitempty"`
 }
 
 type ObjectRecord struct {

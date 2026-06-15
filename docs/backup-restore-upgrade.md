@@ -23,8 +23,7 @@ process-local temporary files
 logs
 ```
 
-Do not rely on local shard directories or process-local state for a consistent
-application backup.
+Do not rely on process-local state for a consistent application backup.
 
 ## Cold backup
 

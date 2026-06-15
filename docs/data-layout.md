@@ -81,8 +81,7 @@ Expected proxy-mode layout:
   logs/               # optional local logs if file logging is enabled
 ```
 
-Legacy local shard directories may exist during the migration away from the
-previous storage-engine design. They are not part of the target proxy-only
+Local process directories for object blobs are not part of the proxy-only
 architecture and should not be introduced into new deployments.
 
 ## Metadata DB

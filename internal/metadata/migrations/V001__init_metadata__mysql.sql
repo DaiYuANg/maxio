@@ -36,9 +36,6 @@ CREATE TABLE IF NOT EXISTS metadata_objects (
 	write_intent_stage VARCHAR(255),
 	write_intent_started_at BIGINT,
 	write_intent_updated_at BIGINT,
-	shard_placements TEXT,
-	shard_checksums TEXT,
-	shard_sizes TEXT,
 	PRIMARY KEY(bucket, object_key)
 );
 
@@ -46,10 +43,7 @@ CREATE TABLE IF NOT EXISTS metadata_blob_refs (
 	hash VARCHAR(255) PRIMARY KEY,
 	path TEXT NOT NULL,
 	size BIGINT NOT NULL,
-	ref_count INTEGER NOT NULL,
-	shard_placements TEXT,
-	shard_checksums TEXT,
-	shard_sizes TEXT
+	ref_count INTEGER NOT NULL
 );
 
 CREATE INDEX idx_metadata_objects_bucket_key ON metadata_objects (bucket, object_key);

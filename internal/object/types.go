@@ -18,7 +18,6 @@ var (
 	ErrDataPlaneUnavailable = errors.New("native object data plane is unavailable in s3 proxy mode")
 	ErrEngineFailed         = ErrDataPlaneUnavailable
 	ErrObjectCorrupted      = errors.New("object corrupted")
-	ErrShardRecoveryFailed  = errors.New("shard recovery failed")
 )
 
 type Bucket = model.Bucket
@@ -58,28 +57,18 @@ type DedupeResult struct {
 }
 
 type RebalanceResult struct {
-	NodeID    string `json:"node_id,omitempty"`
-	Objects   int    `json:"objects"`
-	Shards    int    `json:"shards"`
-	UsedBytes int64  `json:"used_bytes"`
+	Objects   int   `json:"objects"`
+	UsedBytes int64 `json:"used_bytes"`
 }
 
 type RecoveryOptions struct {
-	PendingTTL          time.Duration `json:"-"`
-	CleanupOrphanShards bool          `json:"cleanup_orphan_shards,omitempty"`
-}
-
-type OrphanShardCleanup struct {
-	Scanned int      `json:"scanned"`
-	Removed int      `json:"removed"`
-	Orphans []string `json:"orphans,omitempty"`
+	PendingTTL time.Duration `json:"-"`
 }
 
 type RecoveryResult struct {
-	DryRun             bool               `json:"dry_run"`
-	PendingRemoved     int                `json:"pending_removed"`
-	PendingActions     map[string]int     `json:"pending_actions,omitempty"`
-	OrphanShardCleanup OrphanShardCleanup `json:"orphan_shard_cleanup"`
+	DryRun         bool           `json:"dry_run"`
+	PendingRemoved int            `json:"pending_removed"`
+	PendingActions map[string]int `json:"pending_actions,omitempty"`
 }
 
 type RecoveryPlan struct {

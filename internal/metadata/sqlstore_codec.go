@@ -21,10 +21,6 @@ func decodeJSON(raw sql.NullString, value any) error {
 	return nil
 }
 
-func marshalShardPlacements(value any) string {
-	return marshalJSON(value, "[]")
-}
-
 func marshalStrings(values []string) string {
 	return marshalJSON(values, "[]")
 }

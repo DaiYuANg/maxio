@@ -145,9 +145,6 @@ func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta
 			metadataObjects.writeIntentStage.Set(intentStage),
 			metadataObjects.writeIntentStartedAt.Set(intentStartedAt),
 			metadataObjects.writeIntentUpdatedAt.Set(intentUpdatedAt),
-			metadataObjects.shardPlacements.Set(marshalShardPlacements(meta.ShardPlacements)),
-			metadataObjects.shardChecksums.Set(marshalStrings(meta.ShardChecksums)),
-			metadataObjects.shardSizes.Set(marshalInt64s(meta.ShardSizes)),
 		).
 		OnConflict(metadataObjects.bucket, metadataObjects.key).
 		DoUpdateSet(
@@ -166,9 +163,6 @@ func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta
 			metadataObjects.writeIntentStage.SetExcluded(),
 			metadataObjects.writeIntentStartedAt.SetExcluded(),
 			metadataObjects.writeIntentUpdatedAt.SetExcluded(),
-			metadataObjects.shardPlacements.SetExcluded(),
-			metadataObjects.shardChecksums.SetExcluded(),
-			metadataObjects.shardSizes.SetExcluded(),
 		)
 	if _, err := s.execBuilderContext(ensureContext(ctx), query); err != nil {
 		return fmt.Errorf("%s object meta: %w", op, err)

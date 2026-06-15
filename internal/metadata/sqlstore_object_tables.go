@@ -26,9 +26,6 @@ type metadataObjectsTable struct {
 	writeIntentStage     columnx.Column[struct{}, any]
 	writeIntentStartedAt columnx.Column[struct{}, any]
 	writeIntentUpdatedAt columnx.Column[struct{}, any]
-	shardPlacements      columnx.Column[struct{}, string]
-	shardChecksums       columnx.Column[struct{}, string]
-	shardSizes           columnx.Column[struct{}, string]
 }
 
 func newMetadataObjectsTable() metadataObjectsTable {
@@ -52,9 +49,6 @@ func newMetadataObjectsTable() metadataObjectsTable {
 		writeIntentStage:     columnx.Named[any](table, "write_intent_stage"),
 		writeIntentStartedAt: columnx.Named[any](table, "write_intent_started_at"),
 		writeIntentUpdatedAt: columnx.Named[any](table, "write_intent_updated_at"),
-		shardPlacements:      columnx.Named[string](table, "shard_placements"),
-		shardChecksums:       columnx.Named[string](table, "shard_checksums"),
-		shardSizes:           columnx.Named[string](table, "shard_sizes"),
 	}
 }
 
@@ -77,8 +71,5 @@ func (t metadataObjectsTable) selectItems() []querydsl.SelectItem {
 		t.writeIntentStage,
 		t.writeIntentStartedAt,
 		t.writeIntentUpdatedAt,
-		t.shardPlacements,
-		t.shardChecksums,
-		t.shardSizes,
 	}
 }

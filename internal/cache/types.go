@@ -121,9 +121,6 @@ func cloneBuckets(input []object.Bucket) []object.Bucket {
 
 func cloneObjectMeta(meta object.ObjectMeta) object.ObjectMeta {
 	meta.UserMetadata = cloneStringMap(meta.UserMetadata)
-	meta.ShardPlacements = cloneSlice(meta.ShardPlacements)
-	meta.ShardChecksums = cloneSlice(meta.ShardChecksums)
-	meta.ShardSizes = cloneSlice(meta.ShardSizes)
 	if meta.WriteIntent != nil {
 		meta.WriteIntent = new(*meta.WriteIntent)
 	}

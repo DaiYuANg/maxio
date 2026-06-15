@@ -30,7 +30,7 @@ func (s *Service) writeError(w http.ResponseWriter, err error) {
 		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": msg})
 		return
 	}
-	if errors.Is(err, object.ErrObjectCorrupted) || errors.Is(err, object.ErrShardRecoveryFailed) {
+	if errors.Is(err, object.ErrObjectCorrupted) {
 		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": msg})
 		return
 	}

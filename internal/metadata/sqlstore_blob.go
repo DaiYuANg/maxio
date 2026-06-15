@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/arcgolabs/dbx/querydsl"
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) ([]BlobRef, error) {
@@ -65,9 +64,6 @@ func (s *SQLMetadata) CreateBlobRef(
 	hash string,
 	path string,
 	size int64,
-	placements []model.ShardPlacement,
-	checksums []string,
-	shardSizes ...[]int64,
 ) error {
 	hash = strings.TrimSpace(hash)
 	path = strings.TrimSpace(path)
@@ -81,9 +77,6 @@ func (s *SQLMetadata) CreateBlobRef(
 			metadataBlobRefs.path.Set(path),
 			metadataBlobRefs.size.Set(size),
 			metadataBlobRefs.refCount.Set(1),
-			metadataBlobRefs.shardPlacements.Set(marshalShardPlacements(placements)),
-			metadataBlobRefs.shardChecksums.Set(marshalStrings(checksums)),
-			metadataBlobRefs.shardSizes.Set(marshalInt64sVariadic(shardSizes...)),
 		).
 		OnConflict(metadataBlobRefs.hash).
 		DoNothing()
@@ -91,21 +84,6 @@ func (s *SQLMetadata) CreateBlobRef(
 		return fmt.Errorf("create blob ref: %w", err)
 	}
 	return nil
-}
-
-func (s *SQLMetadata) UpdateBlobRefPlacements(ctx context.Context, hash string, placements []model.ShardPlacement) error {
-	hash = strings.TrimSpace(hash)
-	if hash == "" {
-		return ErrBadRequest
-	}
-	query := querydsl.Update(metadataBlobRefs.table).
-		Set(metadataBlobRefs.shardPlacements.Set(marshalShardPlacements(placements))).
-		Where(metadataBlobRefs.hash.Eq(hash))
-	result, err := s.execBuilderContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("update blob ref placements: %w", err)
-	}
-	return requireAffectedRow(result, ErrObjectNotFound, "update blob ref placements rows")
 }
 
 func (s *SQLMetadata) IncreaseBlobRef(ctx context.Context, hash string) error {
@@ -138,30 +116,15 @@ func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string,
 
 func scanBlobRef(scanner interface{ Scan(dest ...any) error }) (BlobRef, error) {
 	var (
-		ref        BlobRef
-		placements sql.NullString
-		checksums  sql.NullString
-		shardSizes sql.NullString
+		ref BlobRef
 	)
 	if err := scanner.Scan(
 		&ref.Hash,
 		&ref.Path,
 		&ref.Size,
 		&ref.RefCount,
-		&placements,
-		&checksums,
-		&shardSizes,
 	); err != nil {
 		return BlobRef{}, fmt.Errorf("scan blob ref: %w", err)
-	}
-	if err := decodeJSON(placements, &ref.ShardPlacements); err != nil {
-		return BlobRef{}, fmt.Errorf("decode placements: %w", err)
-	}
-	if err := decodeJSON(checksums, &ref.ShardChecksums); err != nil {
-		return BlobRef{}, fmt.Errorf("decode checksums: %w", err)
-	}
-	if err := decodeJSON(shardSizes, &ref.ShardSizes); err != nil {
-		return BlobRef{}, fmt.Errorf("decode shard sizes: %w", err)
 	}
 	return ref, nil
 }

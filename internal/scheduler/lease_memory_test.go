@@ -43,7 +43,7 @@ func TestInMemoryLeaseRepositoryAcquireExpiredLease(t *testing.T) {
 	ctx := context.Background()
 	first := Lease{
 		TaskName:  "partitioned",
-		Scope:     "shard-1",
+		Scope:     "partition-1",
 		Owner:     "replica-a",
 		ExpiresAt: now.Add(time.Minute),
 	}

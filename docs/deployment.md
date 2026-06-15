@@ -67,7 +67,8 @@ Multiple MaxIO instances can serve the same logical service when they share:
 - the same admin/API credential policy;
 - independent or shared Bleve rebuild strategy.
 
-The gateway must not depend on local consensus state or local object shard files
+The gateway must not depend on local consensus state or process-local object
+state
 in the target architecture. New deployments should treat gateway instances as
 replaceable stateless processes.
 

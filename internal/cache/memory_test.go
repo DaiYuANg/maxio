@@ -216,10 +216,5 @@ func testObjectMeta(bucket, key string) model.ObjectMeta {
 		},
 		UpdatedAt: time.Now().UTC(),
 		State:     model.ObjectStateCommitted,
-		ShardPlacements: []model.ShardPlacement{
-			{Index: 0, NodeID: "node-1", NodeAddress: "127.0.0.1:10000", Local: true},
-		},
-		ShardChecksums: []string{"checksum-0"},
-		ShardSizes:     []int64{1234},
 	}
 }

@@ -2,23 +2,15 @@ package metadata_test
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
-func TestInMemoryMetadataBlobRefStoresShardPlacements(t *testing.T) {
+func TestInMemoryMetadataBlobRefStoresCoreFields(t *testing.T) {
 	meta := metadata.NewInMemoryMetadata()
 
-	placements := []model.ShardPlacement{
-		{Index: 0, NodeID: "node-a", NodeAddress: "127.0.0.1:9001", Local: true},
-		{Index: 1, NodeID: "node-b", NodeAddress: "127.0.0.1:9002", Local: true},
-	}
-	checksums := []string{"checksum-a", "checksum-b"}
-	sizes := []int64{128, 256}
-	err := meta.CreateBlobRef(context.Background(), "hash", "shard-dir", 2048, placements, checksums, sizes)
+	err := meta.CreateBlobRef(context.Background(), "hash", "blob-dir", 2048)
 	if err != nil {
 		t.Fatalf("create blob ref: %v", err)
 	}
@@ -30,52 +22,16 @@ func TestInMemoryMetadataBlobRefStoresShardPlacements(t *testing.T) {
 	if !ok {
 		t.Fatal("blob ref not found")
 	}
-	if !reflect.DeepEqual(ref.ShardPlacements, placements) {
-		t.Fatalf("stored shard placements %#v, want %#v", ref.ShardPlacements, placements)
+	if ref.Hash != "hash" {
+		t.Fatalf("blob ref hash = %q, want hash", ref.Hash)
 	}
-	if !reflect.DeepEqual(ref.ShardChecksums, checksums) {
-		t.Fatalf("stored shard checksums %#v, want %#v", ref.ShardChecksums, checksums)
+	if ref.Path != "blob-dir" {
+		t.Fatalf("blob ref path = %q, want %q", ref.Path, "blob-dir")
 	}
-	if !reflect.DeepEqual(ref.ShardSizes, sizes) {
-		t.Fatalf("stored shard sizes %#v, want %#v", ref.ShardSizes, sizes)
+	if ref.Size != 2048 {
+		t.Fatalf("blob ref size = %d, want %d", ref.Size, 2048)
 	}
-
-	placements[0].NodeID = "changed"
-	checksums[0] = "changed"
-	sizes[0] = 999
-	if ref.ShardPlacements[0].NodeID != "node-a" {
-		t.Fatalf("stored shard placements mutated by caller: %q", ref.ShardPlacements[0].NodeID)
-	}
-	if ref.ShardChecksums[0] != "checksum-a" {
-		t.Fatalf("stored shard checksums mutated by caller: %q", ref.ShardChecksums[0])
-	}
-	if ref.ShardSizes[0] != 128 {
-		t.Fatalf("stored shard sizes mutated by caller: %d", ref.ShardSizes[0])
-	}
-}
-
-func TestInMemoryMetadataUpdatesBlobRefPlacements(t *testing.T) {
-	meta := metadata.NewInMemoryMetadata()
-	original := []model.ShardPlacement{{Index: 0, NodeID: "node-a"}}
-	updated := []model.ShardPlacement{{Index: 0, NodeID: "node-b"}}
-	err := meta.CreateBlobRef(context.Background(), "hash", "shard-dir", 2048, original, nil)
-	if err != nil {
-		t.Fatalf("create blob ref: %v", err)
-	}
-
-	updateErr := meta.UpdateBlobRefPlacements(context.Background(), "hash", updated)
-	if updateErr != nil {
-		t.Fatalf("update blob ref placements: %v", updateErr)
-	}
-
-	ref, ok, err := meta.GetBlobRef(context.Background(), "hash")
-	if err != nil {
-		t.Fatalf("get blob ref: %v", err)
-	}
-	if !ok {
-		t.Fatal("blob ref not found")
-	}
-	if !reflect.DeepEqual(ref.ShardPlacements, updated) {
-		t.Fatalf("updated shard placements %#v, want %#v", ref.ShardPlacements, updated)
+	if ref.RefCount != 1 {
+		t.Fatalf("blob ref ref count = %d, want %d", ref.RefCount, 1)
 	}
 }
