@@ -28,18 +28,17 @@ func (s *Service) handleMetrics(w http.ResponseWriter, r *http.Request) {
 func (s *Service) collectMetrics(ctx context.Context) string {
 	collector := metricsCollector{}
 	collector.addHTTPMetrics(s)
-	collector.addReadiness(ctx, s)
+	collector.addReadiness(s)
 	collector.addObjectCounts(ctx, s)
-	collector.addControlStatus(ctx, s)
 	collector.addDedupeStatus(s)
 	collector.addIndexStatus(s)
 	collector.gauge("maxio_metrics_collection_errors", "Number of metric collection failures.", collector.collectionErrors)
 	return collector.String()
 }
 
-func (collector *metricsCollector) addReadiness(ctx context.Context, s *Service) {
+func (collector *metricsCollector) addReadiness(s *Service) {
 	value := 0
-	if s.readiness(ctx).Status == "ok" {
+	if s.readiness().Status == "ok" {
 		value = 1
 	}
 	collector.gauge("maxio_ready", "Whether MaxIO is ready to serve traffic.", value)
@@ -118,12 +117,6 @@ func (collector *metricsCollector) gaugeInt64(name, help string, value int64) {
 	collector.line("# HELP " + name + " " + help)
 	collector.line("# TYPE " + name + " gauge")
 	collector.line(name + " " + formatMetricInt(value))
-}
-
-func (collector *metricsCollector) gaugeUint64(name, help string, value uint64) {
-	collector.line("# HELP " + name + " " + help)
-	collector.line("# TYPE " + name + " gauge")
-	collector.line(name + " " + strconv.FormatUint(value, 10))
 }
 
 func formatMetricInt(value int64) string {

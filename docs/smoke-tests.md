@@ -32,8 +32,6 @@ Readiness should include checks such as:
 object_service
 engine
 storage_writable
-control_membership
-control_leader
 repair_backlog
 ```
 
@@ -43,10 +41,10 @@ repair_backlog
 curl --fail \
   -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
   "$MAXIO_URL/metrics" \
-  | grep -E "maxio_ready|maxio_http_requests_total|maxio_control_members"
+  | grep -E "maxio_ready|maxio_http_requests_total|maxio_buckets"
 ```
 
-Expected result: the command prints at least readiness, HTTP request, and control membership metrics.
+Expected result: the command prints at least readiness, HTTP request, and object metric lines.
 
 ## Bucket and object API
 
@@ -138,20 +136,6 @@ Run object-level dedupe reconciliation:
 curl --fail -X POST \
   -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
   "$MAXIO_URL/_dedupe/run"
-```
-
-## Cluster state
-
-For single-node and three-node deployments:
-
-```sh
-curl --fail \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_cluster/members"
-
-curl --fail \
-  -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
-  "$MAXIO_URL/_cluster/nodes"
 ```
 
 For a three-node Compose cluster, also verify every exposed node is ready:

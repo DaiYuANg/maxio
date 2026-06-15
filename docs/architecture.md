@@ -92,7 +92,7 @@ The management plane is for operators and automation:
 /metrics
 /_index/*
 /_dedupe/*
-/_cluster/*       legacy or topology-oriented endpoints while migration continues
+/_cluster/*       removed from the management plane
 ```
 
 Management endpoints must not be used as the primary object data plane.

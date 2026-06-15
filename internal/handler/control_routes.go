@@ -17,33 +17,18 @@ func (s *Service) handleControlRoute(w http.ResponseWriter, r *http.Request, rou
 		s.handleMetrics(w, r)
 		return true
 	}
-	if isClusterRoute(route) && !s.cfg.EnableClusterManagement {
-		http.NotFound(w, r)
-		return true
-	}
 	return s.handleNamedControlRoute(w, r, route, parts)
-}
-
-func isClusterRoute(route string) bool {
-	return strings.HasPrefix(strings.TrimSpace(route), "_cluster")
 }
 
 func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request, route string, parts []string) bool {
 	routes := map[string]func(){
-		strings.Trim(defaultSearchPath, "/"):           func() { s.handleSearch(w, r) },
-		strings.Trim(defaultS3UpstreamsPath, "/"):      func() { s.handleS3Upstreams(w, r) },
-		strings.Trim(defaultClusterMembersPath, "/"):   func() { s.handleClusterMembers(w, r) },
-		strings.Trim(defaultClusterBootstrapPath, "/"): func() { s.handleClusterBootstrap(w, r) },
-		strings.Trim(defaultClusterJoinPath, "/"):      func() { s.handleClusterJoin(w, r) },
-		strings.Trim(defaultClusterStatusPath, "/"):    func() { s.handleClusterStatus(w, r) },
-		strings.Trim(defaultClusterNodesPath, "/"):     func() { s.handleClusterNodes(w, r) },
-		strings.Trim(defaultClusterReconcilePath, "/"): func() { s.handleClusterReconcile(w, r) },
-		strings.Trim(defaultDiscoveryPath, "/"):        func() { s.handleDiscovery(w, r) },
-		strings.Trim(defaultDedupeStatusPath, "/"):     func() { s.handleDedupeStatus(w, r) },
-		strings.Trim(defaultDedupePlanPath, "/"):       func() { s.handleDedupePlan(w, r) },
-		strings.Trim(defaultDedupeRunPath, "/"):        func() { s.handleDedupeRun(w, r) },
-		strings.Trim(defaultIndexStatusPath, "/"):      func() { s.handleIndexStatus(w, r) },
-		strings.Trim(defaultIndexRebuildPath, "/"):     func() { s.handleIndexRebuild(w, r) },
+		strings.Trim(defaultSearchPath, "/"):       func() { s.handleSearch(w, r) },
+		strings.Trim(defaultS3UpstreamsPath, "/"):  func() { s.handleS3Upstreams(w, r) },
+		strings.Trim(defaultDedupeStatusPath, "/"): func() { s.handleDedupeStatus(w, r) },
+		strings.Trim(defaultDedupePlanPath, "/"):   func() { s.handleDedupePlan(w, r) },
+		strings.Trim(defaultDedupeRunPath, "/"):    func() { s.handleDedupeRun(w, r) },
+		strings.Trim(defaultIndexStatusPath, "/"):  func() { s.handleIndexStatus(w, r) },
+		strings.Trim(defaultIndexRebuildPath, "/"): func() { s.handleIndexRebuild(w, r) },
 	}
 	if routeHandler, ok := routes[route]; ok {
 		routeHandler()
@@ -51,14 +36,6 @@ func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request
 	}
 	if isS3UpstreamRoute(parts) {
 		s.handleS3Upstream(w, r, parts[2])
-		return true
-	}
-	if isClusterMemberActionRoute(parts) {
-		s.handleClusterMemberAction(w, r, parts[2], parts[3])
-		return true
-	}
-	if isClusterMemberRoute(parts) {
-		s.handleClusterMember(w, r, parts[2])
 		return true
 	}
 	return false
@@ -74,14 +51,6 @@ func isReadinessRoute(route string) bool {
 
 func isMetricsRoute(route string) bool {
 	return route == "metrics"
-}
-
-func isClusterMemberRoute(parts []string) bool {
-	return len(parts) == 3 && parts[0] == "_cluster" && parts[1] == "members"
-}
-
-func isClusterMemberActionRoute(parts []string) bool {
-	return len(parts) == 4 && parts[0] == "_cluster" && parts[1] == "members"
 }
 
 func isS3UpstreamRoute(parts []string) bool {

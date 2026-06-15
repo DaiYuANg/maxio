@@ -16,13 +16,6 @@ import (
 )
 
 const defaultSearchPath = "/_search"
-const defaultClusterMembersPath = "/_cluster/members"
-const defaultClusterBootstrapPath = "/_cluster/bootstrap"
-const defaultClusterJoinPath = "/_cluster/join"
-const defaultClusterStatusPath = "/_cluster/status"
-const defaultClusterNodesPath = "/_cluster/nodes"
-const defaultClusterReconcilePath = "/_cluster/reconcile"
-const defaultDiscoveryPath = "/_cluster/discovery"
 const defaultDedupeStatusPath = "/_dedupe/status"
 const defaultDedupePlanPath = "/_dedupe/plan"
 const defaultDedupeRunPath = "/_dedupe/run"

@@ -7,7 +7,6 @@ import (
 )
 
 const maxioControlHeader = "X-Maxio-Control"
-const maxioClusterHeader = "X-Maxio-Cluster"
 
 type authCredential struct {
 	value  string
@@ -23,12 +22,10 @@ const (
 	authPrincipalAnonymous = "anonymous"
 	authPrincipalAdmin     = "admin"
 	authPrincipalAPI       = "api"
-	authPrincipalCluster   = "cluster"
 
 	authSourceNone          = "none"
 	authSourceBearer        = "authorization-bearer"
 	authSourceControlHeader = "x-maxio-control"
-	authSourceClusterHeader = "x-maxio-cluster"
 	authSourceAPIHeader     = "x-maxio-api"
 )
 
@@ -46,16 +43,8 @@ type objectAuthorization struct {
 	key        string
 }
 
-func (s *Service) requiresClusterAuth(parts []string) bool {
-	_ = parts
-	return false
-}
-
 func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 	if strings.TrimSpace(s.cfg.AdminToken) == "" {
-		return false
-	}
-	if s.requiresClusterAuth(parts) {
 		return false
 	}
 	if route == strings.Trim(defaultSearchPath, "/") || route == "metrics" {
@@ -65,7 +54,7 @@ func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 		return false
 	}
 	switch parts[0] {
-	case "_cluster", "_dedupe", "_index", "_s3":
+	case "_dedupe", "_index", "_s3":
 		return true
 	default:
 		return false
@@ -88,10 +77,6 @@ func (s *Service) authorizeControlHTTPRequest(
 	route string,
 	parts []string,
 ) bool {
-	if s.requiresClusterAuth(parts) && !s.authorizeCluster(r) {
-		s.writeClusterUnauthorized(w)
-		return false
-	}
 	if s.requiresAdminAuth(route, parts) && !s.authorizeAdmin(r) {
 		s.writeUnauthorized(w)
 		return false
@@ -118,13 +103,6 @@ func (s *Service) authorizeAdmin(r *http.Request) bool {
 		return true
 	}
 	return s.requestAuthPrincipal(r).kind == authPrincipalAdmin
-}
-
-func (s *Service) authorizeCluster(r *http.Request) bool {
-	if strings.TrimSpace(s.cfg.ClusterToken) == "" {
-		return true
-	}
-	return s.requestAuthPrincipal(r).kind == authPrincipalCluster
 }
 
 func (s *Service) authorizeObject(r *http.Request, _ objectAuthorization) bool {
@@ -172,9 +150,6 @@ func (s *Service) requestAuthPrincipal(r *http.Request) authPrincipal {
 	if s == nil || r == nil {
 		return authPrincipal{kind: authPrincipalAnonymous, source: authSourceNone}
 	}
-	if credential := clusterCredentialFromRequest(r); tokenMatches(credential.value, s.cfg.ClusterToken) {
-		return authPrincipal{kind: authPrincipalCluster, source: credential.source}
-	}
 	if credential := adminCredentialFromRequest(r); tokenMatches(credential.value, s.cfg.AdminToken) {
 		return authPrincipal{kind: authPrincipalAdmin, source: credential.source}
 	}
@@ -203,16 +178,6 @@ func adminCredentialFromRequest(r *http.Request) authCredential {
 	return bearerCredentialFromRequest(r)
 }
 
-func clusterCredentialFromRequest(r *http.Request) authCredential {
-	if r == nil {
-		return authCredential{source: authSourceNone}
-	}
-	if value := strings.TrimSpace(r.Header.Get(maxioClusterHeader)); value != "" {
-		return authCredential{value: value, source: authSourceClusterHeader}
-	}
-	return bearerCredentialFromRequest(r)
-}
-
 func bearerCredentialFromRequest(r *http.Request) authCredential {
 	if r == nil {
 		return authCredential{source: authSourceNone}
@@ -237,11 +202,6 @@ func apiCredentialFromRequestDetails(r *http.Request) authCredential {
 func (s *Service) writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-admin"`)
 	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "admin authorization required"})
-}
-
-func (s *Service) writeClusterUnauthorized(w http.ResponseWriter) {
-	w.Header().Set("WWW-Authenticate", `Bearer realm="maxio-cluster"`)
-	s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "cluster authorization required"})
 }
 
 func (s *Service) writeAPIUnauthorized(w http.ResponseWriter) {
