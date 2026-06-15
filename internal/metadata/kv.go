@@ -179,13 +179,19 @@ func (m *InMemoryMetadata) DeleteBucket(_ context.Context, bucket string) error 
 	if !ok {
 		return ErrBucketNotFound
 	}
-	for _, key := range keys.Values() {
+	var deleteErr error
+	keys.Range(func(key string) bool {
 		id := objectID(bucket, key)
 		meta := m.objects[id]
 		delete(m.objects, id)
 		if _, _, err := m.decreaseBlobRefLocked(meta.Hash); err != nil && !errors.Is(err, ErrObjectNotFound) {
-			return err
+			deleteErr = err
+			return false
 		}
+		return true
+	})
+	if deleteErr != nil {
+		return deleteErr
 	}
 	delete(m.buckets, bucket)
 	for key := range m.staged {
@@ -211,12 +217,12 @@ func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix str
 	}
 
 	result := list.NewListWithCapacity[model.ObjectMeta](keys.Len())
-	for _, key := range keys.Values() {
+	keys.Each(func(key string) {
 		if strings.HasPrefix(key, prefix) {
 			meta := m.objects[objectID(bucket, key)]
 			result.Add(meta)
 		}
-	}
+	})
 	sorted := result.Sort(func(left, right model.ObjectMeta) int {
 		if left.Key < right.Key {
 			return -1

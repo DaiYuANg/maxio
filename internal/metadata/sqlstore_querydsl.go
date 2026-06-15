@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
 )
 
@@ -38,7 +39,7 @@ func (s *SQLMetadata) queryRowBuilderContext(ctx context.Context, query querydsl
 	if err != nil {
 		return nil, fmt.Errorf("build metadata query: %w", err)
 	}
-	return s.dbxDB.QueryRowContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...), nil
+	return s.dbxDB.QueryRowContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...), nil
 }
 
 func (s *SQLMetadata) execBuilderContext(ctx context.Context, query querydsl.Builder) (sql.Result, error) {
@@ -69,7 +70,7 @@ func (s *SQLMetadata) txQueryBuilderContext(ctx context.Context, tx *sql.Tx, que
 	if err != nil {
 		return nil, fmt.Errorf("build metadata tx query: %w", err)
 	}
-	rows, err := tx.QueryContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...)
+	rows, err := tx.QueryContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...)
 	if err != nil {
 		return nil, fmt.Errorf("query metadata tx rows: %w", err)
 	}
@@ -88,7 +89,7 @@ func (s *SQLMetadata) txQueryRowBuilderContext(ctx context.Context, tx *sql.Tx, 
 	if err != nil {
 		return nil, fmt.Errorf("build metadata tx query: %w", err)
 	}
-	return tx.QueryRowContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...), nil
+	return tx.QueryRowContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...), nil
 }
 
 func (s *SQLMetadata) txExecBuilderContext(ctx context.Context, tx *sql.Tx, query querydsl.Builder) error {
@@ -103,8 +104,19 @@ func (s *SQLMetadata) txExecBuilderContext(ctx context.Context, tx *sql.Tx, quer
 	if err != nil {
 		return fmt.Errorf("build metadata tx mutation: %w", err)
 	}
-	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...); err != nil {
+	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...); err != nil {
 		return fmt.Errorf("exec metadata tx query: %w", err)
 	}
 	return nil
+}
+
+func boundArgs(queryArgs *collectionlist.List[any]) []any {
+	if queryArgs == nil {
+		return nil
+	}
+	var result []any
+	queryArgs.ViewValues(func(values []any) {
+		result = values
+	})
+	return result
 }

@@ -36,7 +36,11 @@ func limitedSearchResult(query model.SearchQuery, items *list.List[model.ObjectM
 	if query.Limit > 0 && sorted.Len() > query.Limit {
 		sorted = sorted.Take(query.Limit)
 	}
-	return model.SearchResult{Items: sorted.Values()}
+	var result []model.ObjectMeta
+	sorted.ViewValues(func(items []model.ObjectMeta) {
+		result = items
+	})
+	return model.SearchResult{Items: result}
 }
 
 func documentFromMeta(meta model.ObjectMeta, text string) document {

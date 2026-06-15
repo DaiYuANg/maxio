@@ -3,6 +3,7 @@ package index
 import (
 	"fmt"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/collectionx/set"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -67,18 +68,25 @@ func (s *SearchEngine) memoryDocumentIDs() *set.Set[string] {
 	return ids
 }
 
-func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs *set.Set[string]) ([]string, error) {
-	staleIDs := make([]string, 0, indexedIDs.Len())
-	for _, id := range indexedIDs.Values() {
+func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs *set.Set[string]) (*collectionlist.List[string], error) {
+	staleIDs := collectionlist.NewListWithCapacity[string](indexedIDs.Len())
+	indexedIDs.Range(func(id string) bool {
 		if validIDs.Contains(id) {
-			continue
+			return true
 		}
-		staleIDs = append(staleIDs, id)
-	}
-	for _, id := range staleIDs {
+		staleIDs.Add(id)
+		return true
+	})
+	var deleteErr error
+	staleIDs.Range(func(_ int, id string) bool {
 		if err := s.deleteStaleDocument(id); err != nil {
-			return nil, err
+			deleteErr = err
+			return false
 		}
+		return true
+	})
+	if deleteErr != nil {
+		return nil, deleteErr
 	}
 	return staleIDs, nil
 }
@@ -93,13 +101,14 @@ func (s *SearchEngine) deleteStaleDocument(id string) error {
 	return nil
 }
 
-func (s *SearchEngine) removeMemoryDocuments(ids []string) {
+func (s *SearchEngine) removeMemoryDocuments(ids *collectionlist.List[string]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, id := range ids {
+	ids.Range(func(_ int, id string) bool {
 		delete(s.items, id)
-	}
+		return true
+	})
 }
 
 func (s *SearchEngine) bleveDocumentIDs() ([]string, error) {

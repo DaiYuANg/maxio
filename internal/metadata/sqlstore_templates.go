@@ -59,7 +59,7 @@ func (s *SQLMetadata) txExecSQLTemplateContext(ctx context.Context, tx *sql.Tx, 
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, bound.Args.Values()...); err != nil {
+	if _, err := tx.ExecContext(ensureContext(ctx), bound.SQL, boundArgs(bound.Args)...); err != nil {
 		return fmt.Errorf("exec metadata tx sql template %q: %w", name, err)
 	}
 	return nil

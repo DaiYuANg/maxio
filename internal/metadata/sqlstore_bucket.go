@@ -135,10 +135,16 @@ func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx
 	if err != nil {
 		return err
 	}
-	for _, hash := range hashes.Values() {
+	var queryErr error
+	hashes.Range(func(_ int, hash string) bool {
 		if _, _, err := s.decreaseBlobRefInTx(ctx, tx, hash); err != nil && !errors.Is(err, ErrObjectNotFound) {
-			return fmt.Errorf("decrease blob ref: %w", err)
+			queryErr = fmt.Errorf("decrease blob ref: %w", err)
+			return false
 		}
+		return true
+	})
+	if queryErr != nil {
+		return queryErr
 	}
 	return nil
 }
