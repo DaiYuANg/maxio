@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -114,5 +115,5 @@ type SearchIndex interface {
 	UpsertDocument(meta ObjectMeta, text string)
 	UpsertDocuments(docs []index.IndexDocument) (int, error)
 	Remove(bucket, key string)
-	PruneExcept(valid []ObjectMeta) error
+	PruneExcept(valid *collectionlist.List[ObjectMeta]) error
 }

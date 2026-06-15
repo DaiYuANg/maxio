@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/kvx"
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/samber/mo"
@@ -86,21 +87,24 @@ func (cache *metadataJSONCache) GetListObjects(
 	ctx context.Context,
 	bucket string,
 	prefix string,
-) ([]model.ObjectMeta, bool, error) {
+) (*collectionlist.List[model.ObjectMeta], bool, error) {
 	items, ok, err := getCacheJSON[[]model.ObjectMeta](ctx, cache, cache.listKey(bucket, prefix))
 	if err != nil || !ok {
 		return nil, ok, err
 	}
-	return cloneObjectMetaSlice(items), true, nil
+	return cloneObjectMetaList(collectionlist.NewList(items...)), true, nil
 }
 
 func (cache *metadataJSONCache) SetListObjects(
 	ctx context.Context,
 	bucket string,
 	prefix string,
-	items []model.ObjectMeta,
+	items *collectionlist.List[model.ObjectMeta],
 ) error {
-	return setCacheJSON(ctx, cache, cache.listKey(bucket, prefix), cloneObjectMetaSlice(items))
+	if items == nil {
+		return setCacheJSON(ctx, cache, cache.listKey(bucket, prefix), []model.ObjectMeta(nil))
+	}
+	return setCacheJSON(ctx, cache, cache.listKey(bucket, prefix), cloneObjectMetaList(items).Values())
 }
 
 func (cache *metadataJSONCache) GetObjectVersion(

@@ -3,6 +3,7 @@ package cache
 
 import (
 	"context"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"maps"
 	"time"
 
@@ -16,8 +17,8 @@ type MetadataCache interface {
 	GetObject(ctx context.Context, bucket, key string) (object.ObjectMeta, bool, error)
 	SetObject(ctx context.Context, meta object.ObjectMeta) error
 	DeleteObject(ctx context.Context, bucket, key string) error
-	GetListObjects(ctx context.Context, bucket, prefix string) ([]object.ObjectMeta, bool, error)
-	SetListObjects(ctx context.Context, bucket, prefix string, objects []object.ObjectMeta) error
+	GetListObjects(ctx context.Context, bucket, prefix string) (*collectionlist.List[object.ObjectMeta], bool, error)
+	SetListObjects(ctx context.Context, bucket, prefix string, objects *collectionlist.List[object.ObjectMeta]) error
 	GetObjectVersion(ctx context.Context, bucket, key string) (model.ObjectVersion, bool, error)
 	SetObjectVersion(ctx context.Context, version model.ObjectVersion) error
 	DeleteObjectVersion(ctx context.Context, bucket, key string) error
@@ -66,11 +67,11 @@ func (c *NoopCache) DeleteObject(context.Context, string, string) error {
 	return nil
 }
 
-func (c *NoopCache) GetListObjects(context.Context, string, string) ([]object.ObjectMeta, bool, error) {
+func (c *NoopCache) GetListObjects(context.Context, string, string) (*collectionlist.List[object.ObjectMeta], bool, error) {
 	return nil, false, nil
 }
 
-func (c *NoopCache) SetListObjects(context.Context, string, string, []object.ObjectMeta) error {
+func (c *NoopCache) SetListObjects(context.Context, string, string, *collectionlist.List[object.ObjectMeta]) error {
 	return nil
 }
 
@@ -136,15 +137,11 @@ func cloneDigestRef(ref model.DigestRef) model.DigestRef {
 	return ref
 }
 
-func cloneObjectMetaSlice(items []model.ObjectMeta) []model.ObjectMeta {
+func cloneObjectMetaList(items *collectionlist.List[model.ObjectMeta]) *collectionlist.List[model.ObjectMeta] {
 	if items == nil {
-		return nil
+		return collectionlist.NewList[model.ObjectMeta]()
 	}
-	output := make([]model.ObjectMeta, len(items))
-	for i := range items {
-		output[i] = cloneObjectMeta(items[i])
-	}
-	return output
+	return collectionlist.MapList(items, cloneObjectMeta)
 }
 
 func cloneStringMap(input map[string]string) map[string]string {

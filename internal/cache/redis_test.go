@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -28,7 +29,7 @@ func TestRedisCacheListObjectsRoundTrip(t *testing.T) {
 	cache := NewRedisCache(client, WithRedisPrefix("test-cache"))
 	items := []model.ObjectMeta{{Bucket: "docs", Key: "a.txt", Size: 1}, {Bucket: "docs", Key: "b.txt", Size: 2}}
 
-	mustSetRedisList(ctx, t, cache, "docs", "a", items)
+	mustSetRedisList(ctx, t, cache, "docs", "a", list.NewList(items...))
 	requireRedisListHit(ctx, t, cache, "docs", "a", len(items))
 }
 
@@ -82,7 +83,7 @@ func mustSetRedisObject(ctx context.Context, t *testing.T, cache *RedisCache, me
 	}
 }
 
-func mustSetRedisList(ctx context.Context, t *testing.T, cache *RedisCache, bucket, prefix string, items []model.ObjectMeta) {
+func mustSetRedisList(ctx context.Context, t *testing.T, cache *RedisCache, bucket, prefix string, items *list.List[model.ObjectMeta]) {
 	t.Helper()
 	if err := cache.SetListObjects(ctx, bucket, prefix, items); err != nil {
 		t.Fatalf("set list objects: %v", err)
@@ -132,8 +133,8 @@ func requireRedisListHit(ctx context.Context, t *testing.T, cache *RedisCache, b
 	if err != nil {
 		t.Fatalf("get list objects: %v", err)
 	}
-	if !ok || len(items) != want {
-		t.Fatalf("list cache hit = %v len = %d, want hit len %d", ok, len(items), want)
+	if !ok || items.Len() != want {
+		t.Fatalf("list cache hit = %v len = %d, want hit len %d", ok, items.Len(), want)
 	}
 }
 

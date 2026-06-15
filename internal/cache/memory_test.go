@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -33,7 +34,7 @@ func TestMemoryMetadataCacheDeleteObjectInvalidatesLists(t *testing.T) {
 	meta := testObjectMeta("photos", "2026/cat.jpg")
 
 	mustSetMemoryObject(ctx, t, cache, meta)
-	mustSetMemoryList(ctx, t, cache, meta.Bucket, "2026/", []model.ObjectMeta{meta})
+	mustSetMemoryList(ctx, t, cache, meta.Bucket, "2026/", list.NewList(meta))
 	requireMemoryListHit(ctx, t, cache, meta.Bucket, "2026/", 1)
 
 	mustDeleteMemoryObject(ctx, t, cache, meta.Bucket, meta.Key)
@@ -45,7 +46,7 @@ func TestMemoryMetadataCacheSetObjectInvalidatesLists(t *testing.T) {
 	cache := newTestMemoryCache(t, time.Minute)
 	meta := testObjectMeta("photos", "2026/cat.jpg")
 
-	mustSetMemoryList(ctx, t, cache, meta.Bucket, "2026/", []model.ObjectMeta{meta})
+	mustSetMemoryList(ctx, t, cache, meta.Bucket, "2026/", list.NewList(meta))
 	requireMemoryListHit(ctx, t, cache, meta.Bucket, "2026/", 1)
 
 	mustSetMemoryObject(ctx, t, cache, meta)
@@ -59,7 +60,7 @@ func TestMemoryMetadataCacheInvalidateBucket(t *testing.T) {
 	video := testObjectMeta("videos", "2026/cat.mp4")
 
 	mustSetMemoryObject(ctx, t, cache, photo)
-	mustSetMemoryList(ctx, t, cache, photo.Bucket, "2026/", []model.ObjectMeta{photo})
+	mustSetMemoryList(ctx, t, cache, photo.Bucket, "2026/", list.NewList(photo))
 	mustSetMemoryObject(ctx, t, cache, video)
 	mustInvalidateMemoryBucket(ctx, t, cache, photo.Bucket)
 
@@ -121,7 +122,7 @@ func mustSetMemoryList(
 	cache *MemoryMetadataCache,
 	bucket string,
 	prefix string,
-	items []model.ObjectMeta,
+	items *list.List[model.ObjectMeta],
 ) {
 	t.Helper()
 	if err := cache.SetListObjects(ctx, bucket, prefix, items); err != nil {
@@ -180,8 +181,8 @@ func requireMemoryListHit(
 	if err != nil {
 		t.Fatalf("get list objects: %v", err)
 	}
-	if !ok || len(items) != want {
-		t.Fatalf("list cache hit = %v len = %d, want hit len %d", ok, len(items), want)
+	if !ok || items.Len() != want {
+		t.Fatalf("list cache hit = %v len = %d, want hit len %d", ok, items.Len(), want)
 	}
 }
 

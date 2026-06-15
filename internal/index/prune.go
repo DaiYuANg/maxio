@@ -13,7 +13,7 @@ const pruneSearchPageSize = 1000
 
 // PruneExcept removes indexed documents that are no longer present in the
 // committed object metadata snapshot.
-func (s *SearchEngine) PruneExcept(valid []model.ObjectMeta) error {
+func (s *SearchEngine) PruneExcept(valid *collectionlist.List[model.ObjectMeta]) error {
 	if s == nil {
 		return nil
 	}
@@ -30,8 +30,11 @@ func (s *SearchEngine) PruneExcept(valid []model.ObjectMeta) error {
 	return nil
 }
 
-func objectIDSet(objects []model.ObjectMeta) *set.Set[string] {
-	ids := list.FilterMapList(list.NewList(objects...), func(_ int, meta model.ObjectMeta) (string, bool) {
+func objectIDSet(objects *collectionlist.List[model.ObjectMeta]) *set.Set[string] {
+	if objects == nil || objects.Len() == 0 {
+		return set.NewSet[string]()
+	}
+	ids := collectionlist.FilterMapList(objects, func(_ int, meta model.ObjectMeta) (string, bool) {
 		if meta.Bucket == "" || meta.Key == "" {
 			return "", false
 		}
