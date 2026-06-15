@@ -8,6 +8,7 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
+	"github.com/arcgolabs/dbx"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
@@ -117,19 +118,12 @@ func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstrea
 	}
 	upstream.UpdatedAt = now
 
+	assignments, err := s.repos.upstreams.Mapper().InsertAssignmentsWithID(ctx, metadataUpstreams.schema, &upstream, nil)
+	if err != nil {
+		return model.Upstream{}, fmt.Errorf("map upstream insert assignments: %w", err)
+	}
 	query := querydsl.InsertInto(metadataUpstreams.schema).
-		Values(
-			metadataUpstreams.id.Set(upstream.ID),
-			metadataUpstreams.name.Set(upstream.Name),
-			metadataUpstreams.endpoint.Set(upstream.Endpoint),
-			metadataUpstreams.region.Set(upstream.Region),
-			metadataUpstreams.weight.Set(upstream.Weight),
-			metadataUpstreams.priority.Set(upstream.Priority),
-			metadataUpstreams.buckets.Set(marshalStrings(upstream.Buckets)),
-			metadataUpstreams.enabled.Set(boolToInt(upstream.Enabled)),
-			metadataUpstreams.createdAt.Set(upstream.CreatedAt.UnixNano()),
-			metadataUpstreams.updatedAt.Set(upstream.UpdatedAt.UnixNano()),
-		).
+		ValuesList(assignments).
 		OnConflict(metadataUpstreams.id).
 		DoUpdateSet(
 			metadataUpstreams.name.SetExcluded(),
@@ -142,7 +136,7 @@ func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstrea
 			metadataUpstreams.updatedAt.SetExcluded(),
 		)
 
-	_, execErr := s.execBuilderContext(ctx, query)
+	_, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query)
 	if execErr != nil {
 		return model.Upstream{}, fmt.Errorf("upsert upstream: %w", execErr)
 	}

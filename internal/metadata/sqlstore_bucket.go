@@ -2,13 +2,13 @@ package metadata
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
@@ -92,7 +92,7 @@ func (s *SQLMetadata) DeleteBucket(ctx context.Context, bucket string) error {
 		return ErrBadRequest
 	}
 
-	return s.withTx(ctx, "delete bucket", func(tx *sql.Tx) error {
+	return s.withTx(ctx, "delete bucket", func(tx *dbx.Tx) error {
 		if err := s.ensureBucketInTx(ctx, tx, bucket); err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (s *SQLMetadata) ensureBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
+func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *dbx.Tx, bucket string) error {
 	hashes, err := s.queryBucketCommittedHashesInTx(ctx, tx, bucket)
 	if err != nil {
 		return err
@@ -139,18 +139,18 @@ func (s *SQLMetadata) decreaseBucketBlobRefsInTx(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *sql.Tx, bucket string) (*collectionlist.List[string], error) {
+func (s *SQLMetadata) queryBucketCommittedHashesInTx(ctx context.Context, tx *dbx.Tx, bucket string) (*collectionlist.List[string], error) {
 	query := querydsl.SelectValue(metadataObjects.hash).
 		From(metadataObjects.schema).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.state.Eq(model.ObjectStateCommitted)))
-	hashes, err := querySQLScalarsInTx(ctx, s, tx, query, "bucket object hashes")
+	hashes, err := dbx.QueryTyped[string](ensureContext(ctx), tx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query bucket object hashes: %w", err)
 	}
 	return hashes, nil
 }
 
-func (s *SQLMetadata) ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
+func (s *SQLMetadata) ensureBucketInTx(ctx context.Context, tx *dbx.Tx, bucket string) error {
 	exists, err := s.bucketExistsInTx(ctx, tx, bucket)
 	if err != nil {
 		return err
@@ -161,31 +161,31 @@ func (s *SQLMetadata) ensureBucketInTx(ctx context.Context, tx *sql.Tx, bucket s
 	return nil
 }
 
-func (s *SQLMetadata) bucketExistsInTx(ctx context.Context, tx *sql.Tx, bucket string) (bool, error) {
+func (s *SQLMetadata) bucketExistsInTx(ctx context.Context, tx *dbx.Tx, bucket string) (bool, error) {
 	query := querydsl.SelectValue(metadataBuckets.name).
 		From(metadataBuckets.schema).
 		Where(metadataBuckets.name.Eq(bucket)).
 		Limit(1)
-	_, found, err := querySQLScalarOptionInTx(ctx, s, tx, query, "bucket exists")
+	option, err := dbx.QueryScalarOption(ensureContext(ctx), tx, query)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("query bucket exists: %w", err)
 	}
-	return found, nil
+	return option.IsPresent(), nil
 }
 
-func (s *SQLMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *sql.Tx, bucket, state string) error {
+func (s *SQLMetadata) deleteBucketObjectsInTx(ctx context.Context, tx *dbx.Tx, bucket, state string) error {
 	query := querydsl.DeleteFrom(metadataObjects.schema).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.state.Eq(state)))
-	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
+	if _, err := dbx.Exec(ensureContext(ctx), tx, query); err != nil {
 		return fmt.Errorf("delete bucket objects: %w", err)
 	}
 	return nil
 }
 
-func (s *SQLMetadata) deleteBucketRowInTx(ctx context.Context, tx *sql.Tx, bucket string) error {
+func (s *SQLMetadata) deleteBucketRowInTx(ctx context.Context, tx *dbx.Tx, bucket string) error {
 	query := querydsl.DeleteFrom(metadataBuckets.schema).
 		Where(metadataBuckets.name.Eq(bucket))
-	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
+	if _, err := dbx.Exec(ensureContext(ctx), tx, query); err != nil {
 		return fmt.Errorf("delete bucket: %w", err)
 	}
 	return nil

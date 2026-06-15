@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -19,22 +20,19 @@ func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.Objec
 	if ensureErr := s.ensureBucket(ctx, record.Bucket); ensureErr != nil {
 		return model.ObjectRecord{}, ensureErr
 	}
+	assignments, err := s.repos.objectRecords.Mapper().InsertAssignmentsWithID(ctx, metadataObjectRecords.schema, &record, nil)
+	if err != nil {
+		return model.ObjectRecord{}, fmt.Errorf("map object record insert assignments: %w", err)
+	}
 	query := querydsl.InsertInto(metadataObjectRecords.schema).
-		Values(
-			metadataObjectRecords.bucket.Set(record.Bucket),
-			metadataObjectRecords.key.Set(record.Key),
-			metadataObjectRecords.currentVersionID.Set(record.CurrentVersionID),
-			metadataObjectRecords.deleted.Set(boolToInt(record.Deleted)),
-			metadataObjectRecords.createdAt.Set(record.CreatedAt.UnixNano()),
-			metadataObjectRecords.updatedAt.Set(record.UpdatedAt.UnixNano()),
-		).
+		ValuesList(assignments).
 		OnConflict(metadataObjectRecords.bucket, metadataObjectRecords.key).
 		DoUpdateSet(
 			metadataObjectRecords.currentVersionID.SetExcluded(),
 			metadataObjectRecords.deleted.SetExcluded(),
 			metadataObjectRecords.updatedAt.SetExcluded(),
 		)
-	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
+	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.ObjectRecord{}, fmt.Errorf("upsert object record: %w", execErr)
 	}
 	stored, found, err := s.GetObjectRecord(ctx, record.Bucket, record.Key)
@@ -92,27 +90,12 @@ func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.Obj
 	if ensureErr := s.ensureBucket(ctx, version.Bucket); ensureErr != nil {
 		return model.ObjectVersion{}, ensureErr
 	}
+	assignments, err := s.repos.objectVersions.Mapper().InsertAssignmentsWithID(ctx, metadataObjectVersions.schema, &version, nil)
+	if err != nil {
+		return model.ObjectVersion{}, fmt.Errorf("map object version insert assignments: %w", err)
+	}
 	query := querydsl.InsertInto(metadataObjectVersions.schema).
-		Values(
-			metadataObjectVersions.bucket.Set(version.Bucket),
-			metadataObjectVersions.key.Set(version.Key),
-			metadataObjectVersions.versionID.Set(version.VersionID),
-			metadataObjectVersions.digest.Set(version.Digest),
-			metadataObjectVersions.etag.Set(version.ETag),
-			metadataObjectVersions.size.Set(version.Size),
-			metadataObjectVersions.contentType.Set(version.ContentType),
-			metadataObjectVersions.cacheControl.Set(version.CacheControl),
-			metadataObjectVersions.contentDisposition.Set(version.ContentDisposition),
-			metadataObjectVersions.contentEncoding.Set(version.ContentEncoding),
-			metadataObjectVersions.contentLanguage.Set(version.ContentLanguage),
-			metadataObjectVersions.userMetadata.Set(marshalUserMetadata(version.UserMetadata)),
-			metadataObjectVersions.upstreamID.Set(version.UpstreamID),
-			metadataObjectVersions.upstreamBucket.Set(version.UpstreamBucket),
-			metadataObjectVersions.upstreamKey.Set(version.UpstreamKey),
-			metadataObjectVersions.deleteMarker.Set(boolToInt(version.DeleteMarker)),
-			metadataObjectVersions.createdAt.Set(version.CreatedAt.UnixNano()),
-			metadataObjectVersions.updatedAt.Set(version.UpdatedAt.UnixNano()),
-		).
+		ValuesList(assignments).
 		OnConflict(metadataObjectVersions.bucket, metadataObjectVersions.key, metadataObjectVersions.versionID).
 		DoUpdateSet(
 			metadataObjectVersions.digest.SetExcluded(),
@@ -130,7 +113,7 @@ func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.Obj
 			metadataObjectVersions.deleteMarker.SetExcluded(),
 			metadataObjectVersions.updatedAt.SetExcluded(),
 		)
-	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
+	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.ObjectVersion{}, fmt.Errorf("upsert object version: %w", execErr)
 	}
 	stored, found, err := s.GetObjectVersion(ctx, version.Bucket, version.Key, version.VersionID)

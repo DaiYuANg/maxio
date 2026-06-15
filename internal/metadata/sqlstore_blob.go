@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 )
 
@@ -48,16 +49,16 @@ func (s *SQLMetadata) CreateBlobRef(
 		return ErrBadRequest
 	}
 
+	ref := BlobRef{Hash: hash, Path: path, Size: size, RefCount: 1}
+	assignments, err := s.repos.blobRefs.Mapper().InsertAssignmentsWithID(ctx, metadataBlobRefs.schema, &ref, nil)
+	if err != nil {
+		return fmt.Errorf("map blob ref insert assignments: %w", err)
+	}
 	query := querydsl.InsertInto(metadataBlobRefs.schema).
-		Values(
-			metadataBlobRefs.hash.Set(hash),
-			metadataBlobRefs.path.Set(path),
-			metadataBlobRefs.size.Set(size),
-			metadataBlobRefs.refCount.Set(1),
-		).
+		ValuesList(assignments).
 		OnConflict(metadataBlobRefs.hash).
 		DoNothing()
-	if _, err := s.execBuilderContext(ctx, query); err != nil {
+	if _, err := dbx.Exec(ensureContext(ctx), s.dbxDB, query); err != nil {
 		return fmt.Errorf("create blob ref: %w", err)
 	}
 	return nil
@@ -83,7 +84,7 @@ func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string,
 
 	var path string
 	var removed bool
-	err := s.withTx(ctx, "decrease blob ref", func(tx *sql.Tx) error {
+	err := s.withTx(ctx, "decrease blob ref", func(tx *dbx.Tx) error {
 		var err error
 		path, removed, err = s.decreaseBlobRefInTx(ctx, tx, hash)
 		return err
@@ -91,14 +92,15 @@ func (s *SQLMetadata) DecreaseBlobRef(ctx context.Context, hash string) (string,
 	return path, removed, err
 }
 
-func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) (string, bool, error) {
+func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *dbx.Tx, hash string) (string, bool, error) {
 	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.path, metadataBlobRefs.refCount).
 		Where(metadataBlobRefs.hash.Eq(hash)).
 		Limit(1)
-	ref, found, err := querySQLOneInTx(ctx, s, tx, query, "blob ref", metadataBlobRefCounterMapper)
+	option, err := dbx.QueryOption(ensureContext(ctx), tx, query, metadataBlobRefCounterMapper)
 	if err != nil {
-		return "", false, err
+		return "", false, fmt.Errorf("query blob ref: %w", err)
 	}
+	ref, found := option.Get()
 	if !found {
 		return "", false, ErrObjectNotFound
 	}
@@ -108,16 +110,16 @@ func (s *SQLMetadata) decreaseBlobRefInTx(ctx context.Context, tx *sql.Tx, hash 
 	return ref.Path, false, s.updateBlobRefCountInTx(ctx, tx, hash)
 }
 
-func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *sql.Tx, hash string) error {
+func (s *SQLMetadata) deleteBlobRefInTx(ctx context.Context, tx *dbx.Tx, hash string) error {
 	query := querydsl.DeleteFrom(metadataBlobRefs.schema).
 		Where(metadataBlobRefs.hash.Eq(hash))
-	if err := s.txExecBuilderContext(ctx, tx, query); err != nil {
+	if _, err := dbx.Exec(ensureContext(ctx), tx, query); err != nil {
 		return fmt.Errorf("delete blob ref: %w", err)
 	}
 	return nil
 }
 
-func (s *SQLMetadata) updateBlobRefCountInTx(ctx context.Context, tx *sql.Tx, hash string) error {
+func (s *SQLMetadata) updateBlobRefCountInTx(ctx context.Context, tx *dbx.Tx, hash string) error {
 	if err := s.txExecSQLTemplateContext(ctx, tx, metadataSQLBlobDecreaseRefCount, metadataBlobRefHashParams{Hash: hash}); err != nil {
 		return fmt.Errorf("decrease blob ref: %w", err)
 	}

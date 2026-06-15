@@ -17,17 +17,6 @@ func ensureContext(ctx context.Context) context.Context {
 	return ctx
 }
 
-func marshalStrings(values []string) string {
-	if len(values) == 0 {
-		return "[]"
-	}
-	data, err := json.Marshal(values)
-	if err != nil {
-		return "[]"
-	}
-	return string(data)
-}
-
 func marshalUserMetadata(values map[string]string) string {
 	if len(values) == 0 {
 		return "{}"

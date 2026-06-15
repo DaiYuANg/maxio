@@ -51,7 +51,7 @@ func (s *SQLMetadata) execSQLTemplateContext(ctx context.Context, name string, p
 	return result, nil
 }
 
-func (s *SQLMetadata) txExecSQLTemplateContext(ctx context.Context, tx *sql.Tx, name string, params any) error {
+func (s *SQLMetadata) txExecSQLTemplateContext(ctx context.Context, tx *dbx.Tx, name string, params any) error {
 	if tx == nil {
 		return errors.New("metadata tx is nil")
 	}
@@ -62,7 +62,7 @@ func (s *SQLMetadata) txExecSQLTemplateContext(ctx context.Context, tx *sql.Tx, 
 	if err != nil {
 		return err
 	}
-	if _, err := s.dbxDB.WithTx(tx).ExecBoundContext(ensureContext(ctx), bound); err != nil {
+	if _, err := tx.ExecBoundContext(ensureContext(ctx), bound); err != nil {
 		return fmt.Errorf("exec metadata tx sql template %q: %w", name, err)
 	}
 	return nil

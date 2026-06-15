@@ -135,9 +135,12 @@ func (s *SQLMetadata) applyPragmas(ctx context.Context) error {
 	return nil
 }
 
-func (s *SQLMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx) error) error {
+func (s *SQLMetadata) withTx(ctx context.Context, op string, fn func(*dbx.Tx) error) error {
 	ctx = ensureContext(ctx)
-	tx, err := s.db.BeginTx(ctx, nil)
+	if s == nil || s.dbxDB == nil {
+		return errors.New("metadata dbx session is nil")
+	}
+	tx, err := s.dbxDB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin %s transaction: %w", op, err)
 	}
@@ -147,7 +150,7 @@ func (s *SQLMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx) er
 		if committed {
 			return
 		}
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && s.logger != nil {
+		if rollbackErr := tx.RollbackContext(ctx); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && s.logger != nil {
 			s.logger.Error("rollback sql metadata transaction", "op", op, "error", rollbackErr)
 		}
 	}()
@@ -155,7 +158,7 @@ func (s *SQLMetadata) withTx(ctx context.Context, op string, fn func(*sql.Tx) er
 	if err := fn(tx); err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.CommitContext(ctx); err != nil {
 		return fmt.Errorf("commit %s transaction: %w", op, err)
 	}
 	committed = true

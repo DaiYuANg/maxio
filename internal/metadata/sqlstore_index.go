@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -39,7 +40,7 @@ func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.In
 			metadataIndexDocuments.indexedAt.SetExcluded(),
 			metadataIndexDocuments.updatedAt.SetExcluded(),
 		)
-	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
+	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.IndexDocument{}, fmt.Errorf("upsert index document: %w", execErr)
 	}
 	stored, found, err := s.GetIndexDocument(ctx, document.ID)

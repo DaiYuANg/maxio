@@ -7,6 +7,7 @@ import (
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -154,7 +155,7 @@ func (s *SQLMetadata) writeObjectMeta(ctx context.Context, meta model.ObjectMeta
 			metadataObjects.writeIntentStartedAt.SetExcluded(),
 			metadataObjects.writeIntentUpdatedAt.SetExcluded(),
 		)
-	if _, err := s.execBuilderContext(ensureContext(ctx), query); err != nil {
+	if _, err := dbx.Exec(ensureContext(ctx), s.dbxDB, query); err != nil {
 		return fmt.Errorf("%s object meta: %w", op, err)
 	}
 	return nil
@@ -190,7 +191,7 @@ func (s *SQLMetadata) deleteObjectMeta(
 func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, state string) (bool, error) {
 	query := querydsl.DeleteFrom(metadataObjects.schema).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state)))
-	result, err := s.execBuilderContext(ensureContext(ctx), query)
+	result, err := dbx.Exec(ensureContext(ctx), s.dbxDB, query)
 	if err != nil {
 		return false, fmt.Errorf("delete object meta: %w", err)
 	}

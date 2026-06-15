@@ -58,10 +58,3 @@ func prepareDBDigestRef(ref model.DigestRef) (model.DigestRef, error) {
 	ref.UpdatedAt = now
 	return ref, nil
 }
-
-func boolToInt(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
-}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -15,21 +16,12 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 	if err != nil {
 		return model.IndexOutboxEvent{}, err
 	}
+	assignments, err := s.repos.indexOutbox.Mapper().InsertAssignmentsWithID(ctx, metadataIndexOutbox.schema, &event, nil)
+	if err != nil {
+		return model.IndexOutboxEvent{}, fmt.Errorf("map index outbox insert assignments: %w", err)
+	}
 	query := querydsl.InsertInto(metadataIndexOutbox.schema).
-		Values(
-			metadataIndexOutbox.id.Set(event.ID),
-			metadataIndexOutbox.eventType.Set(event.EventType),
-			metadataIndexOutbox.bucket.Set(event.Bucket),
-			metadataIndexOutbox.key.Set(event.Key),
-			metadataIndexOutbox.versionID.Set(event.VersionID),
-			metadataIndexOutbox.payload.Set(event.Payload),
-			metadataIndexOutbox.status.Set(event.Status),
-			metadataIndexOutbox.attempts.Set(event.Attempts),
-			metadataIndexOutbox.errorText.Set(event.Error),
-			metadataIndexOutbox.availableAt.Set(event.AvailableAt.UnixNano()),
-			metadataIndexOutbox.createdAt.Set(event.CreatedAt.UnixNano()),
-			metadataIndexOutbox.updatedAt.Set(event.UpdatedAt.UnixNano()),
-		).
+		ValuesList(assignments).
 		OnConflict(metadataIndexOutbox.id).
 		DoUpdateSet(
 			metadataIndexOutbox.eventType.SetExcluded(),
@@ -43,7 +35,7 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 			metadataIndexOutbox.availableAt.SetExcluded(),
 			metadataIndexOutbox.updatedAt.SetExcluded(),
 		)
-	if _, execErr := s.execBuilderContext(ctx, query); execErr != nil {
+	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.IndexOutboxEvent{}, fmt.Errorf("upsert index outbox event: %w", execErr)
 	}
 	stored, found, err := s.GetIndexOutboxEvent(ctx, event.ID)
