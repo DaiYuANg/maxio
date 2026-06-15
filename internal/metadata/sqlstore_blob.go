@@ -12,15 +12,9 @@ import (
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) (*collectionlist.List[BlobRef], error) {
 	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.selectItems()...)
-	refs, err := querySQLRows(
-		ctx,
-		s,
-		query,
-		"blob refs",
-		metadataBlobRefMapper,
-	)
+	refs, err := s.repos.blobRefs.List(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list blob refs: %w", err)
 	}
 	return refs, nil
 }
@@ -34,10 +28,11 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.selectItems()...).
 		Where(metadataBlobRefs.hash.Eq(hash)).
 		Limit(1)
-	ref, found, err := querySQLOne(ctx, s, query, "blob ref", metadataBlobRefMapper)
+	option, err := s.repos.blobRefs.FirstOption(ctx, query)
 	if err != nil {
-		return BlobRef{}, false, err
+		return BlobRef{}, false, fmt.Errorf("query blob ref: %w", err)
 	}
+	ref, found := option.Get()
 	return ref, found, nil
 }
 

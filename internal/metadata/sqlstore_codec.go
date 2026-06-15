@@ -12,6 +12,10 @@ import (
 
 var metadataBoolIntCodec = codecx.New[bool]("bool_int", decodeBoolInt, encodeBoolInt)
 
+func init() {
+	codecx.MustRegister(metadataBoolIntCodec)
+}
+
 func decodeBoolInt(src any) (bool, error) {
 	switch value := src.(type) {
 	case nil:

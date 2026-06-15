@@ -21,6 +21,7 @@ type SQLMetadata struct {
 	db           *sql.DB
 	dbxDB        *dbx.DB
 	sqlTemplates *sqltmpl.Registry
+	repos        metadataSQLRepositories
 	logger       *slog.Logger
 }
 
@@ -54,6 +55,7 @@ func NewSQLiteMetadata(path string, logger *slog.Logger, migrateSchema ...bool) 
 		db:           db,
 		dbxDB:        session,
 		sqlTemplates: newMetadataSQLTemplateRegistry(session),
+		repos:        newMetadataSQLRepositories(session),
 		logger:       logger,
 	}
 
@@ -86,6 +88,7 @@ func newSQLMetadata(
 		db:           db,
 		dbxDB:        session,
 		sqlTemplates: newMetadataSQLTemplateRegistry(session),
+		repos:        newMetadataSQLRepositories(session),
 		logger:       logger,
 	}
 	if migrateSchema {

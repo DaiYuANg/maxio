@@ -65,10 +65,11 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 	query := querydsl.SelectFrom(metadataIndexOutbox.schema, metadataIndexOutbox.selectItems()...).
 		Where(metadataIndexOutbox.id.Eq(id)).
 		Limit(1)
-	event, found, err := querySQLOne(ctx, s, query, "index outbox event", metadataIndexOutboxEventMapper)
+	option, err := s.repos.indexOutbox.FirstOption(ctx, query)
 	if err != nil {
-		return model.IndexOutboxEvent{}, false, err
+		return model.IndexOutboxEvent{}, false, fmt.Errorf("query index outbox event: %w", err)
 	}
+	event, found := option.Get()
 	return event, found, nil
 }
 
@@ -80,13 +81,11 @@ func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, 
 	if status != "" {
 		query.Where(metadataIndexOutbox.status.Eq(status))
 	}
-	return querySQLRows(
-		ctx,
-		s,
-		query,
-		"index outbox",
-		metadataIndexOutboxEventMapper,
-	)
+	events, err := s.repos.indexOutbox.List(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list index outbox: %w", err)
+	}
+	return events, nil
 }
 
 func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bool, error) {
@@ -95,7 +94,7 @@ func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bo
 		return false, ErrBadRequest
 	}
 	query := querydsl.DeleteFrom(metadataIndexOutbox.schema).Where(metadataIndexOutbox.id.Eq(id))
-	result, err := s.execBuilderContext(ctx, query)
+	result, err := s.repos.indexOutbox.Delete(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete index outbox event: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -72,12 +73,11 @@ func (s *SQLMetadata) DeleteObjectMeta(ctx context.Context, bucket, key string) 
 	return s.deleteObjectMeta(ctx, bucket, key, model.ObjectStateCommitted, "committed")
 }
 
-func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query querydsl.Builder) (*collectionlist.List[model.ObjectMeta], error) {
-	rows, err := querySQLRows(
+func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query *querydsl.SelectQuery) (*collectionlist.List[model.ObjectMeta], error) {
+	rows, err := repositoryx.ListResultWithMapper[objectMetaRow](
 		ctx,
-		s,
-		query,
-		"object metas",
+		s.repos.objects,
+		querydsl.TypedSelect[objectMetaRow](query),
 		metadataObjectMetaMapper,
 	)
 	if err != nil {
@@ -90,13 +90,19 @@ func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state stri
 	query := querydsl.SelectFrom(metadataObjects.schema, metadataObjects.selectItems()...).
 		Where(querydsl.And(metadataObjects.bucket.Eq(bucket), metadataObjects.key.Eq(key), metadataObjects.state.Eq(state))).
 		Limit(1)
-	row, found, err := querySQLOne(ctx, s, query, "object meta", metadataObjectMetaMapper)
+	rows, err := repositoryx.ListResultWithMapper[objectMetaRow](
+		ctx,
+		s.repos.objects,
+		querydsl.TypedSelect[objectMetaRow](query),
+		metadataObjectMetaMapper,
+	)
 	if err != nil {
 		return model.ObjectMeta{}, false, err
 	}
-	if !found {
+	if rows.IsEmpty() {
 		return model.ObjectMeta{}, false, nil
 	}
+	row, _ := rows.GetFirst()
 	return row.objectMeta(), true, nil
 }
 

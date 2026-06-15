@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	metadataBuckets      = newMetadataBucketsTable()
-	metadataBucketMapper = newMetadataEntityMapper[model.Bucket](metadataBuckets.schema)
+	metadataBuckets = newMetadataBucketsTable()
 )
 
 type metadataBucketsTable struct {
@@ -49,15 +48,9 @@ func (s *SQLMetadata) ListBuckets(ctx context.Context) (*collectionlist.List[mod
 	ctx = ensureContext(ctx)
 	query := querydsl.SelectFrom(metadataBuckets.schema, metadataBuckets.selectItems()...).
 		OrderBy(metadataBuckets.name.Asc())
-	buckets, err := querySQLRows(
-		ctx,
-		s,
-		query,
-		"buckets",
-		metadataBucketMapper,
-	)
+	buckets, err := s.repos.buckets.List(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list buckets: %w", err)
 	}
 	return buckets, nil
 }
@@ -68,13 +61,11 @@ func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, er
 		return false, ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	query := querydsl.SelectValue(metadataBuckets.name).
-		From(metadataBuckets.schema).
-		Where(metadataBuckets.name.Eq(bucket)).
-		Limit(1)
-	_, found, err := querySQLScalarOption(ctx, s, query, "bucket exists")
+	query := querydsl.SelectFrom(metadataBuckets.schema).
+		Where(metadataBuckets.name.Eq(bucket))
+	found, err := s.repos.buckets.Exists(ctx, query)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("check bucket exists: %w", err)
 	}
 	return found, nil
 }
@@ -85,12 +76,8 @@ func (s *SQLMetadata) CreateBucket(ctx context.Context, bucket string) error {
 		return ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	query := querydsl.InsertInto(metadataBuckets.schema).
-		Values(
-			metadataBuckets.name.Set(bucket),
-			metadataBuckets.createdAt.Set(time.Now().UTC().UnixNano()),
-		)
-	if _, err := s.execBuilderContext(ctx, query); err != nil {
+	err := s.repos.buckets.Create(ctx, &model.Bucket{Name: bucket, CreatedAt: time.Now().UTC()})
+	if err != nil {
 		if isSQLConstraintError(err) {
 			return ErrBucketExists
 		}

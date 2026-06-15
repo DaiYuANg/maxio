@@ -3,15 +3,12 @@ package metadata
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx"
 	dbxmapper "github.com/arcgolabs/dbx/mapper"
 	"github.com/arcgolabs/dbx/querydsl"
-	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -34,74 +31,10 @@ type objectMetaRow struct {
 	WriteIntentUpdatedAt time.Time      `dbx:"write_intent_updated_at,codec=unix_nano_time"`
 }
 
-func newMetadataEntityMapper[T any](schema schemax.Resource) dbxmapper.Mapper[T] {
-	return dbxmapper.MustMapperWithOptions[T](
-		schema,
-		dbxmapper.WithMapperCodecs(metadataBoolIntCodec),
-	)
-}
-
 func newMetadataProjectionMapper[T any]() dbxmapper.StructMapper[T] {
 	return dbxmapper.MustStructMapperWithOptions[T](
 		dbxmapper.WithMapperCodecs(metadataBoolIntCodec),
 	)
-}
-
-func querySQLRows[E any](
-	ctx context.Context,
-	store *SQLMetadata,
-	query querydsl.Builder,
-	label string,
-	rowMapper dbxmapper.RowsScanner[E],
-) (*collectionlist.List[E], error) {
-	session, err := metadataDBSession(store)
-	if err != nil {
-		return nil, fmt.Errorf("query %s: %w", label, err)
-	}
-	items, err := dbx.QueryAll(ensureContext(ctx), session, query, rowMapper)
-	if err != nil {
-		return nil, fmt.Errorf("query %s: %w", label, err)
-	}
-	return items, nil
-}
-
-func querySQLOne[E any](
-	ctx context.Context,
-	store *SQLMetadata,
-	query querydsl.Builder,
-	label string,
-	rowMapper dbxmapper.RowsScanner[E],
-) (E, bool, error) {
-	var zero E
-	session, err := metadataDBSession(store)
-	if err != nil {
-		return zero, false, fmt.Errorf("query %s: %w", label, err)
-	}
-	item, err := dbx.QueryOption(ensureContext(ctx), session, query, rowMapper)
-	if err != nil {
-		return zero, false, fmt.Errorf("query %s: %w", label, err)
-	}
-	value, found := item.Get()
-	return value, found, nil
-}
-
-func querySQLScalarOption[T any](
-	ctx context.Context,
-	store *SQLMetadata,
-	query querydsl.SelectResult[T],
-	label string,
-) (T, bool, error) {
-	var zero T
-	session, err := metadataDBSession(store)
-	if err != nil {
-		return zero, false, fmt.Errorf("query %s: %w", label, err)
-	}
-	item, err := dbx.QueryScalarOption(ensureContext(ctx), session, query)
-	if err != nil {
-		return zero, false, fmt.Errorf("query %s: %w", label, err)
-	}
-	value, found := item.Get()
-	return value, found, nil
 }
 
 func querySQLOneInTx[E any](
@@ -227,13 +160,6 @@ func mapSQLRowsLimit[E any](
 		return nil, fmt.Errorf("map sql rows: %w", err)
 	}
 	return items, nil
-}
-
-func metadataDBSession(store *SQLMetadata) (dbx.Session, error) {
-	if store == nil || store.dbxDB == nil {
-		return nil, errors.New("metadata dbx session is nil")
-	}
-	return store.dbxDB, nil
 }
 
 func closeSQLRows(store *SQLMetadata, rows *sql.Rows, label string) {

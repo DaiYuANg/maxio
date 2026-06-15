@@ -61,10 +61,11 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 	query := querydsl.SelectFrom(metadataIndexDocuments.schema, metadataIndexDocuments.selectItems()...).
 		Where(metadataIndexDocuments.id.Eq(id)).
 		Limit(1)
-	document, found, err := querySQLOne(ctx, s, query, "index document", metadataIndexDocumentMapper)
+	option, err := s.repos.indexDocuments.FirstOption(ctx, query)
 	if err != nil {
-		return model.IndexDocument{}, false, err
+		return model.IndexDocument{}, false, fmt.Errorf("query index document: %w", err)
 	}
+	document, found := option.Get()
 	return document, found, nil
 }
 
@@ -76,15 +77,9 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
 		query.Where(predicate)
 	}
-	documents, err := querySQLRows(
-		ctx,
-		s,
-		query,
-		"index documents",
-		metadataIndexDocumentMapper,
-	)
+	documents, err := s.repos.indexDocuments.List(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list index documents: %w", err)
 	}
 	return documents, nil
 }
@@ -110,7 +105,7 @@ func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool,
 		return false, ErrBadRequest
 	}
 	query := querydsl.DeleteFrom(metadataIndexDocuments.schema).Where(metadataIndexDocuments.id.Eq(id))
-	result, err := s.execBuilderContext(ctx, query)
+	result, err := s.repos.indexDocuments.Delete(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete index document: %w", err)
 	}

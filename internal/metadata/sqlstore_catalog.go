@@ -57,10 +57,11 @@ func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (
 	query := querydsl.SelectFrom(metadataObjectRecords.schema, metadataObjectRecords.selectItems()...).
 		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key))).
 		Limit(1)
-	record, found, err := querySQLOne(ctx, s, query, "object record", metadataObjectRecordMapper)
+	option, err := s.repos.objectRecords.FirstOption(ctx, query)
 	if err != nil {
-		return model.ObjectRecord{}, false, err
+		return model.ObjectRecord{}, false, fmt.Errorf("query object record: %w", err)
 	}
+	record, found := option.Get()
 	return record, found, nil
 }
 
@@ -72,7 +73,7 @@ func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string
 	}
 	query := querydsl.DeleteFrom(metadataObjectRecords.schema).
 		Where(querydsl.And(metadataObjectRecords.bucket.Eq(bucket), metadataObjectRecords.key.Eq(key)))
-	result, err := s.execBuilderContext(ctx, query)
+	result, err := s.repos.objectRecords.Delete(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete object record: %w", err)
 	}
@@ -155,10 +156,11 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 			metadataObjectVersions.versionID.Eq(versionID),
 		)).
 		Limit(1)
-	version, found, err := querySQLOne(ctx, s, query, "object version", metadataObjectVersionMapper)
+	option, err := s.repos.objectVersions.FirstOption(ctx, query)
 	if err != nil {
-		return model.ObjectVersion{}, false, err
+		return model.ObjectVersion{}, false, fmt.Errorf("query object version: %w", err)
 	}
+	version, found := option.Get()
 	return version, found, nil
 }
 
@@ -172,15 +174,9 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 	query := querydsl.SelectFrom(metadataObjectVersions.schema, metadataObjectVersions.selectItems()...).
 		Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))).
 		OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc())
-	versions, err := querySQLRows(
-		ctx,
-		s,
-		query,
-		"object versions",
-		metadataObjectVersionMapper,
-	)
+	versions, err := s.repos.objectVersions.List(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list object versions: %w", err)
 	}
 	return versions, nil
 }
@@ -196,7 +192,7 @@ func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, vers
 			metadataObjectVersions.key.Eq(key),
 			metadataObjectVersions.versionID.Eq(versionID),
 		))
-	result, err := s.execBuilderContext(ctx, query)
+	result, err := s.repos.objectVersions.Delete(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete object version: %w", err)
 	}

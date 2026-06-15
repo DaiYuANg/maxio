@@ -7,8 +7,7 @@ import (
 )
 
 var (
-	metadataBlobRefs      = newMetadataBlobRefsTable()
-	metadataBlobRefMapper = newMetadataEntityMapper[BlobRef](metadataBlobRefs.schema)
+	metadataBlobRefs = newMetadataBlobRefsTable()
 )
 
 type metadataBlobRefsTable struct {

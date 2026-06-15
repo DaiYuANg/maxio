@@ -11,8 +11,7 @@ import (
 const metadataDigestRefsTableName = "metadata_digest_refs"
 
 var (
-	metadataDigestRefs      = newMetadataDigestRefsTable()
-	metadataDigestRefMapper = newMetadataEntityMapper[model.DigestRef](metadataDigestRefs.schema)
+	metadataDigestRefs = newMetadataDigestRefsTable()
 )
 
 type metadataDigestRefsTable struct {

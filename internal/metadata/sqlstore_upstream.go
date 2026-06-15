@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	metadataUpstreams      = newMetadataUpstreamsTable()
-	metadataUpstreamMapper = newMetadataEntityMapper[model.Upstream](metadataUpstreams.schema)
+	metadataUpstreams = newMetadataUpstreamsTable()
 )
 
 type metadataUpstreamsTable struct {
@@ -82,9 +81,9 @@ func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
 func (s *SQLMetadata) ListUpstreams(ctx context.Context) (*collectionlist.List[model.Upstream], error) {
 	query := querydsl.SelectFrom(metadataUpstreams.schema, metadataUpstreams.selectItems()...).
 		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
-	upstreams, err := querySQLRows(ctx, s, query, "upstreams", metadataUpstreamMapper)
+	upstreams, err := s.repos.upstreams.List(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list upstreams: %w", err)
 	}
 	return upstreams, nil
 }
@@ -98,10 +97,11 @@ func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstrea
 	query := querydsl.SelectFrom(metadataUpstreams.schema, metadataUpstreams.selectItems()...).
 		Where(metadataUpstreams.id.Eq(id)).
 		Limit(1)
-	upstream, found, err := querySQLOne(ctx, s, query, "upstream", metadataUpstreamMapper)
+	option, err := s.repos.upstreams.FirstOption(ctx, query)
 	if err != nil {
-		return model.Upstream{}, false, err
+		return model.Upstream{}, false, fmt.Errorf("query upstream: %w", err)
 	}
+	upstream, found := option.Get()
 	return upstream, found, nil
 }
 
@@ -160,7 +160,7 @@ func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, erro
 	}
 
 	query := querydsl.DeleteFrom(metadataUpstreams.schema).Where(metadataUpstreams.id.Eq(id))
-	result, err := s.execBuilderContext(ctx, query)
+	result, err := s.repos.upstreams.Delete(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete upstream: %w", err)
 	}

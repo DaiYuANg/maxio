@@ -8,10 +8,8 @@ import (
 )
 
 var (
-	metadataObjectRecords       = newMetadataObjectRecordsTable()
-	metadataObjectVersions      = newMetadataObjectVersionsTable()
-	metadataObjectRecordMapper  = newMetadataEntityMapper[model.ObjectRecord](metadataObjectRecords.schema)
-	metadataObjectVersionMapper = newMetadataEntityMapper[model.ObjectVersion](metadataObjectVersions.schema)
+	metadataObjectRecords  = newMetadataObjectRecordsTable()
+	metadataObjectVersions = newMetadataObjectVersionsTable()
 )
 
 type metadataObjectRecordsTable struct {

@@ -8,12 +8,9 @@ import (
 )
 
 var (
-	metadataIndexDocuments         = newMetadataIndexDocumentsTable()
-	metadataIndexJobs              = newMetadataIndexJobsTable()
-	metadataIndexOutbox            = newMetadataIndexOutboxTable()
-	metadataIndexDocumentMapper    = newMetadataEntityMapper[model.IndexDocument](metadataIndexDocuments.schema)
-	metadataIndexJobMapper         = newMetadataEntityMapper[model.IndexJob](metadataIndexJobs.schema)
-	metadataIndexOutboxEventMapper = newMetadataEntityMapper[model.IndexOutboxEvent](metadataIndexOutbox.schema)
+	metadataIndexDocuments = newMetadataIndexDocumentsTable()
+	metadataIndexJobs      = newMetadataIndexJobsTable()
+	metadataIndexOutbox    = newMetadataIndexOutboxTable()
 )
 
 type metadataIndexDocumentsTable struct {

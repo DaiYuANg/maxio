@@ -67,10 +67,11 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 	query := querydsl.SelectFrom(metadataIndexJobs.schema, metadataIndexJobs.selectItems()...).
 		Where(metadataIndexJobs.id.Eq(id)).
 		Limit(1)
-	job, found, err := querySQLOne(ctx, s, query, "index job", metadataIndexJobMapper)
+	option, err := s.repos.indexJobs.FirstOption(ctx, query)
 	if err != nil {
-		return model.IndexJob{}, false, err
+		return model.IndexJob{}, false, fmt.Errorf("query index job: %w", err)
 	}
+	job, found := option.Get()
 	return job, found, nil
 }
 
@@ -82,13 +83,11 @@ func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit in
 	if status != "" {
 		query.Where(metadataIndexJobs.status.Eq(status))
 	}
-	return querySQLRows(
-		ctx,
-		s,
-		query,
-		"index jobs",
-		metadataIndexJobMapper,
-	)
+	jobs, err := s.repos.indexJobs.List(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list index jobs: %w", err)
+	}
+	return jobs, nil
 }
 
 func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, error) {
@@ -97,7 +96,7 @@ func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, erro
 		return false, ErrBadRequest
 	}
 	query := querydsl.DeleteFrom(metadataIndexJobs.schema).Where(metadataIndexJobs.id.Eq(id))
-	result, err := s.execBuilderContext(ctx, query)
+	result, err := s.repos.indexJobs.Delete(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("delete index job: %w", err)
 	}
