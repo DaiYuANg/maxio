@@ -9,12 +9,9 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "127.0.0.1:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_NODE_ID: "1"
-      MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
     ports:
       - "8080:8080"
-      - "7946:7946"
     volumes:
       - maxio-data:/app/data
 

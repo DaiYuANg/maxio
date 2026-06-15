@@ -41,10 +41,6 @@ type Config struct {
 	CacheKeyPrefix               string           `json:"cache_key_prefix"         koanf:"cache_key_prefix"`
 	DataDir                      string           `json:"data_dir"                 koanf:"data_dir"                 validate:"required,min=1"`
 	LogLevel                     string           `json:"log_level"                koanf:"log_level"                validate:"required,oneof=debug info warn error"`
-	NodeID                       uint64           `json:"node_id"                  koanf:"node_id"`
-	GossipBindAddress            string           `json:"gossip_bind_address"      koanf:"gossip_bind_address"      validate:"required,min=1"`
-	GossipAdvertiseAddress       string           `json:"gossip_advertise_address" koanf:"gossip_advertise_address"`
-	GossipSeeds                  string           `json:"gossip_seeds"             koanf:"gossip_seeds"`
 	PendingObjectTTL             string           `json:"pending_object_ttl"       koanf:"pending_object_ttl"       validate:"required,min=1"`
 	RepairInterval               string           `json:"repair_interval"          koanf:"repair_interval"          validate:"required,min=1"`
 	RepairOnStart                bool             `json:"repair_on_start"          koanf:"repair_on_start"`
@@ -156,9 +152,6 @@ func trim(cfg Config) Config {
 	cfg.S3ProxyAdminAddress = strings.TrimSpace(cfg.S3ProxyAdminAddress)
 	cfg.S3ProxyHealthInterval = strings.TrimSpace(cfg.S3ProxyHealthInterval)
 	cfg.S3ProxyHealthTimeout = strings.TrimSpace(cfg.S3ProxyHealthTimeout)
-	cfg.GossipBindAddress = strings.TrimSpace(cfg.GossipBindAddress)
-	cfg.GossipAdvertiseAddress = strings.TrimSpace(cfg.GossipAdvertiseAddress)
-	cfg.GossipSeeds = strings.TrimSpace(cfg.GossipSeeds)
 	cfg.PendingObjectTTL = strings.TrimSpace(cfg.PendingObjectTTL)
 	cfg.RepairInterval = strings.TrimSpace(cfg.RepairInterval)
 	cfg.RepairRetryBackoff = strings.TrimSpace(cfg.RepairRetryBackoff)

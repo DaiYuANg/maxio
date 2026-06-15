@@ -51,7 +51,7 @@ func TestS3UpstreamRoutesRequireAdminAuth(t *testing.T) {
 func newS3UpstreamRouter(t *testing.T, cfg config.Config) http.Handler {
 	t.Helper()
 
-	deps := handler.NewDependencies(nil, metadata.NewInMemoryMetadata())
+	deps := handler.NewDependencies(metadata.NewInMemoryMetadata())
 	service := handler.NewService(deps, slog.New(slog.DiscardHandler), cfg)
 	router := http.NewServeMux()
 	service.RegisterHTTP(router)

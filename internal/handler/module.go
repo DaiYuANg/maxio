@@ -10,7 +10,6 @@ import (
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/logx"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/proxy"
 )
@@ -35,11 +34,10 @@ func newEventBus(logger *slog.Logger) eventx.BusRuntime {
 }
 
 func newGatewayDependencies(
-	discoveryRuntime *discovery.Runtime,
 	metadataStore metadata.MetadataStore,
 	proxyRuntime *proxy.ValeRuntime,
 ) Dependencies {
-	return NewDependencies(discoveryRuntime, metadataStore, proxyRuntime)
+	return NewDependencies(metadataStore, proxyRuntime)
 }
 
 func newGatewayService(deps Dependencies, logger *slog.Logger, cfg config.Config) *Service {

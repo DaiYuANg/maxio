@@ -12,7 +12,6 @@ import (
 	"github.com/arcgolabs/dix"
 	"github.com/lyonbrown4d/maxio/internal/cache"
 	"github.com/lyonbrown4d/maxio/internal/config"
-	"github.com/lyonbrown4d/maxio/internal/discovery"
 	"github.com/lyonbrown4d/maxio/internal/handler"
 	"github.com/lyonbrown4d/maxio/internal/http"
 	"github.com/lyonbrown4d/maxio/internal/index"
@@ -227,7 +226,6 @@ func applyOptions(opts ...Option) buildOptions {
 func defaultModules(configOptions ...configx.Option) []dix.Module {
 	return []dix.Module{
 		config.Module(configOptions...),
-		discovery.Module(),
 		cache.Module(),
 		metadata.Module(),
 		index.Module(),

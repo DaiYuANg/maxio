@@ -20,8 +20,6 @@ func Default() Config {
 		CacheKeyPrefix:               "maxio",
 		DataDir:                      "./data",
 		LogLevel:                     "info",
-		NodeID:                       1,
-		GossipBindAddress:            "0.0.0.0:7946",
 		PendingObjectTTL:             "1h",
 		RepairInterval:               "10m",
 		RepairOnStart:                true,
@@ -53,9 +51,6 @@ func applyRuntimeZeroDefaults(cfg Config) Config {
 	if cfg.MetadataBackend == "" {
 		cfg.MetadataBackend = Default().MetadataBackend
 	}
-	if cfg.NodeID == 0 {
-		cfg.NodeID = 1
-	}
 	if cfg.StorageAddress == "" {
 		cfg.StorageAddress = storageAddressFromHTTPAddress(cfg.HTTPAddress)
 	}
@@ -65,10 +60,6 @@ func applyRuntimeZeroDefaults(cfg Config) Config {
 
 	if cfg.PendingObjectTTL == "" {
 		cfg.PendingObjectTTL = Default().PendingObjectTTL
-	}
-
-	if cfg.GossipBindAddress == "" {
-		cfg.GossipBindAddress = Default().GossipBindAddress
 	}
 	return cfg
 }

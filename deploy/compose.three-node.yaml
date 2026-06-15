@@ -8,13 +8,9 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "maxio-1:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
-      MAXIO_GOSSIP_ADVERTISE_ADDRESS: "maxio-1:7946"
-      MAXIO_GOSSIP_SEEDS: "maxio-1:7946,maxio-2:7946,maxio-3:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
     ports:
       - "8081:8080"
-      - "7941:7946"
     volumes:
       - maxio-1-data:/app/data
 
@@ -26,13 +22,9 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "maxio-2:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
-      MAXIO_GOSSIP_ADVERTISE_ADDRESS: "maxio-2:7946"
-      MAXIO_GOSSIP_SEEDS: "maxio-1:7946,maxio-2:7946,maxio-3:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
     ports:
       - "8082:8080"
-      - "7942:7946"
     volumes:
       - maxio-2-data:/app/data
 
@@ -44,13 +36,9 @@ services:
       MAXIO_HTTP_ADDRESS: ":8080"
       MAXIO_STORAGE_ADDRESS: "maxio-3:8080"
       MAXIO_DATA_DIR: "/app/data"
-      MAXIO_GOSSIP_BIND_ADDRESS: "0.0.0.0:7946"
-      MAXIO_GOSSIP_ADVERTISE_ADDRESS: "maxio-3:7946"
-      MAXIO_GOSSIP_SEEDS: "maxio-1:7946,maxio-2:7946,maxio-3:7946"
       MAXIO_ADMIN_TOKEN: "${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
     ports:
       - "8083:8080"
-      - "7943:7946"
     volumes:
       - maxio-3-data:/app/data
 
