@@ -1,30 +1,25 @@
 package metadata
 
 import "github.com/arcgolabs/collectionx/list"
+import collectionmapping "github.com/arcgolabs/collectionx/mapping"
 
 func listKeysFromMap[K comparable, V any](values map[K]V) *list.List[K] {
-	keys := list.NewListWithCapacity[K](len(values))
-	for key := range values {
-		keys.Add(key)
-	}
-	return keys
+	return list.NewList(collectionmapping.NewMapFrom(values).Keys()...)
 }
 
 func listValuesFromMap[K comparable, V any](values map[K]V) *list.List[V] {
-	items := list.NewListWithCapacity[V](len(values))
-	for _, value := range values {
-		items.Add(value)
-	}
-	return items
+	return list.NewList(collectionmapping.NewMapFrom(values).Values()...)
 }
 
 func listValuesFromMapWithKey[V any, T any](
 	values map[string]V,
 	mapper func(string, V) T,
 ) *list.List[T] {
-	items := list.NewListWithCapacity[T](len(values))
-	for key, value := range values {
+	source := collectionmapping.NewMapFrom(values)
+	items := list.NewListWithCapacity[T](source.Len())
+	source.Range(func(key string, value V) bool {
 		items.Add(mapper(key, value))
-	}
+		return true
+	})
 	return items
 }
