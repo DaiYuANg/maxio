@@ -3,36 +3,39 @@ package index
 import (
 	"strings"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
 	qry "github.com/blevesearch/bleve/v2/search/query"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 func (s *SearchEngine) buildQuery(criteria model.SearchQuery) qry.Query {
-	queries := make([]qry.Query, 0, 6)
-	queries = appendQuery(queries, textQuery(criteria.Query))
-	queries = appendQuery(queries, fieldMatchQuery("bucket", strings.ToLower(criteria.Bucket)))
-	queries = appendQuery(queries, fieldMatchQuery("content_type", strings.ToLower(criteria.ContentType)))
-	queries = appendQuery(queries, prefixQuery("key", criteria.Prefix))
-	queries = appendQuery(queries, textQuery(criteria.NameContains))
-	if criteria.MinSize > 0 || criteria.MaxSize > 0 {
-		queries = append(queries, sizeRangeQuery(criteria))
-	}
+	queries := compactQueries(
+		textQuery(criteria.Query),
+		fieldMatchQuery("bucket", strings.ToLower(criteria.Bucket)),
+		fieldMatchQuery("content_type", strings.ToLower(criteria.ContentType)),
+		prefixQuery("key", criteria.Prefix),
+		textQuery(criteria.NameContains),
+		sizeRangeQuery(criteria),
+	)
 
-	if len(queries) == 0 {
+	if queries.IsEmpty() {
 		return bleve.NewMatchAllQuery()
 	}
-	if len(queries) == 1 {
-		return queries[0]
+	if queries.Len() == 1 {
+		query, _ := queries.GetFirst()
+		return query
 	}
-	return bleve.NewConjunctionQuery(queries...)
+	return bleve.NewConjunctionQuery(queries.Values()...)
 }
 
-func appendQuery(queries []qry.Query, query qry.Query) []qry.Query {
-	if query == nil {
-		return queries
-	}
-	return append(queries, query)
+func compactQueries(queries ...qry.Query) *collectionlist.List[qry.Query] {
+	return collectionlist.FilterMapList(
+		collectionlist.NewList(queries...),
+		func(_ int, query qry.Query) (qry.Query, bool) {
+			return query, query != nil
+		},
+	)
 }
 
 func textQuery(value string) qry.Query {
@@ -66,6 +69,9 @@ func prefixQuery(field, value string) qry.Query {
 }
 
 func sizeRangeQuery(criteria model.SearchQuery) qry.Query {
+	if criteria.MinSize <= 0 && criteria.MaxSize <= 0 {
+		return nil
+	}
 	var minSize, maxSize *float64
 	if criteria.MinSize > 0 {
 		minSizeValue := float64(criteria.MinSize)
@@ -85,16 +91,22 @@ func matchesQuery(meta model.ObjectMeta, query model.SearchQuery) bool {
 }
 
 func matchesLocation(meta model.ObjectMeta, query model.SearchQuery) bool {
-	return (query.Bucket == "" || meta.Bucket == query.Bucket) &&
+	bucket := normalizedSearchField(query.Bucket)
+	return (bucket == "" || normalizedSearchField(meta.Bucket) == bucket) &&
 		(query.Prefix == "" || strings.HasPrefix(meta.Key, query.Prefix))
 }
 
 func matchesMetadata(meta model.ObjectMeta, query model.SearchQuery) bool {
+	contentType := normalizedSearchField(query.ContentType)
 	return (query.NameContains == "" || strings.Contains(meta.Key, query.NameContains)) &&
-		(query.ContentType == "" || meta.ContentType == query.ContentType)
+		(contentType == "" || normalizedSearchField(meta.ContentType) == contentType)
 }
 
 func matchesSize(meta model.ObjectMeta, query model.SearchQuery) bool {
 	return (query.MinSize <= 0 || meta.Size >= query.MinSize) &&
 		(query.MaxSize <= 0 || meta.Size <= query.MaxSize)
+}
+
+func normalizedSearchField(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
