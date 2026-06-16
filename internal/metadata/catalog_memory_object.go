@@ -109,7 +109,7 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	sorted := list.FilterMapList(
+	versions := list.FilterMapList(
 		listValuesFromMap(m.objectVersions),
 		func(_ int, version model.ObjectVersion) (model.ObjectVersion, bool) {
 			if version.Bucket != bucket || version.Key != key {
@@ -117,17 +117,8 @@ func (m *InMemoryMetadata) ListObjectVersions(_ context.Context, bucket, key str
 			}
 			return cloneObjectVersion(version), true
 		},
-	).Sort(func(left, right model.ObjectVersion) int {
-		switch {
-		case left.CreatedAt.After(right.CreatedAt):
-			return -1
-		case left.CreatedAt.Before(right.CreatedAt):
-			return 1
-		default:
-			return 0
-		}
-	})
-	return sorted, nil
+	).Sort(compareObjectVersionCatalogOrder)
+	return versions, nil
 }
 
 func (m *InMemoryMetadata) DeleteObjectVersion(_ context.Context, bucket, key, versionID string) (bool, error) {
@@ -145,4 +136,19 @@ func (m *InMemoryMetadata) DeleteObjectVersion(_ context.Context, bucket, key, v
 	}
 	delete(m.objectVersions, id)
 	return true, nil
+}
+
+func compareObjectVersionCatalogOrder(left, right model.ObjectVersion) int {
+	switch {
+	case left.CreatedAt.After(right.CreatedAt):
+		return -1
+	case left.CreatedAt.Before(right.CreatedAt):
+		return 1
+	case left.VersionID > right.VersionID:
+		return -1
+	case left.VersionID < right.VersionID:
+		return 1
+	default:
+		return 0
+	}
 }

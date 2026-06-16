@@ -118,9 +118,7 @@ func (m *InMemoryMetadata) ListIndexJobs(_ context.Context, status string, limit
 		func(job model.IndexJob) bool {
 			return status == "" || job.Status == status
 		},
-		func(left, right model.IndexJob) int {
-			return compareByCreatedAt(left.CreatedAt, right.CreatedAt)
-		},
+		compareIndexJobSchedule,
 	)
 	return jobs, nil
 }
@@ -186,9 +184,7 @@ func (m *InMemoryMetadata) ListIndexOutboxEvents(_ context.Context, status strin
 		func(event model.IndexOutboxEvent) bool {
 			return status == "" || event.Status == status
 		},
-		func(left, right model.IndexOutboxEvent) int {
-			return compareByCreatedAt(left.CreatedAt, right.CreatedAt)
-		},
+		compareIndexOutboxSchedule,
 	)
 	return events, nil
 }
@@ -219,7 +215,27 @@ func isIndexDocumentInScope(document model.IndexDocument, bucket, prefix string)
 	return true
 }
 
-func compareByCreatedAt(left, right time.Time) int {
+func compareIndexJobSchedule(left, right model.IndexJob) int {
+	if compared := compareTimeAscending(left.AvailableAt, right.AvailableAt); compared != 0 {
+		return compared
+	}
+	if compared := compareTimeAscending(left.CreatedAt, right.CreatedAt); compared != 0 {
+		return compared
+	}
+	return strings.Compare(left.ID, right.ID)
+}
+
+func compareIndexOutboxSchedule(left, right model.IndexOutboxEvent) int {
+	if compared := compareTimeAscending(left.AvailableAt, right.AvailableAt); compared != 0 {
+		return compared
+	}
+	if compared := compareTimeAscending(left.CreatedAt, right.CreatedAt); compared != 0 {
+		return compared
+	}
+	return strings.Compare(left.ID, right.ID)
+}
+
+func compareTimeAscending(left, right time.Time) int {
 	switch {
 	case left.Before(right):
 		return -1
@@ -260,10 +276,9 @@ func filterAndSortByStatus[T any](
 			}
 			return item, true
 		},
-	)
+	).Sort(compare)
 	if queryLimit := limit; queryLimit > 0 && filtered.Len() > queryLimit {
 		filtered = filtered.Take(queryLimit)
 	}
-	filtered = filtered.Sort(compare)
 	return filtered
 }
