@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/arcgolabs/collectionx/list"
+	collectionmapping "github.com/arcgolabs/collectionx/mapping"
 	collectionset "github.com/arcgolabs/collectionx/set"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -189,12 +190,9 @@ func (m *InMemoryMetadata) DeleteBucket(_ context.Context, bucket string) error 
 		return deleteErr
 	}
 	delete(m.buckets, bucket)
-	for key := range m.staged {
-		meta := m.staged[key]
-		if meta.Bucket == bucket {
-			delete(m.staged, key)
-		}
-	}
+	m.staged = collectionmapping.NewMapFrom(m.staged).RejectEntries(func(_ string, value model.ObjectMeta) bool {
+		return value.Bucket == bucket
+	}).All()
 	return nil
 }
 

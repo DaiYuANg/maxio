@@ -176,13 +176,16 @@ func normalizeUpstream(upstream model.Upstream) (model.Upstream, error) {
 }
 
 func normalizeStringList(values []string) []string {
-	uniqValues := collectionset.NewOrderedSetWithCapacity[string](len(values))
-	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
-		if trimmed == "" {
-			continue
-		}
-		uniqValues.Add(trimmed)
-	}
-	return uniqValues.Values()
+	normalized := collectionlist.FilterMapList(
+		collectionlist.NewList(values...),
+		func(_ int, value string) (string, bool) {
+			trimmed := strings.TrimSpace(value)
+			if trimmed == "" {
+				return "", false
+			}
+			return trimmed, true
+		},
+	)
+	unique := collectionset.NewOrderedSetWithCapacity[string](normalized.Len(), normalized.Values()...)
+	return unique.Values()
 }

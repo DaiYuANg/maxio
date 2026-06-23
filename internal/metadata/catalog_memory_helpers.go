@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	collectionmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -65,11 +66,7 @@ func cloneStringMap(input map[string]string) map[string]string {
 	if len(input) == 0 {
 		return nil
 	}
-	output := make(map[string]string, len(input))
-	for key, value := range input {
-		output[key] = value
-	}
-	return output
+	return collectionmapping.NewMapFrom(input).All()
 }
 
 func trimObjectVersionKey(bucket, key, versionID string) (string, string, string) {
