@@ -2,7 +2,6 @@ package metadata
 
 import (
 	columnx "github.com/arcgolabs/dbx/column"
-	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -160,55 +159,5 @@ func newMetadataIndexOutboxTable() metadataIndexOutboxTable {
 		availableAt: schema.AvailableAt,
 		createdAt:   schema.CreatedAt,
 		updatedAt:   schema.UpdatedAt,
-	}
-}
-
-func (t metadataIndexDocumentsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.id,
-		t.bucket,
-		t.key,
-		t.versionID,
-		t.digest,
-		t.state,
-		t.errorText,
-		t.indexedAt,
-		t.createdAt,
-		t.updatedAt,
-	}
-}
-
-func (t metadataIndexJobsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.id,
-		t.kind,
-		t.bucket,
-		t.key,
-		t.versionID,
-		t.status,
-		t.attempts,
-		t.errorText,
-		t.availableAt,
-		t.startedAt,
-		t.finishedAt,
-		t.createdAt,
-		t.updatedAt,
-	}
-}
-
-func (t metadataIndexOutboxTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.id,
-		t.eventType,
-		t.bucket,
-		t.key,
-		t.versionID,
-		t.payload,
-		t.status,
-		t.attempts,
-		t.errorText,
-		t.availableAt,
-		t.createdAt,
-		t.updatedAt,
 	}
 }

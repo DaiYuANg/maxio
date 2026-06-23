@@ -9,10 +9,10 @@ import (
 	"sync"
 
 	"github.com/arcgolabs/collectionx/list"
-	collectionmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 const indexDir = "index/bleve"
@@ -161,15 +161,13 @@ func (s *SearchEngine) upsertMemoryDocuments(docs *list.List[IndexDocument]) {
 }
 
 func listFilterDocuments(docs []IndexDocument) *list.List[IndexDocument] {
-	return list.FilterMapList(
-		list.NewList(docs...),
-		func(_ int, doc IndexDocument) (IndexDocument, bool) {
-			if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
-				return IndexDocument{}, false
-			}
-			return doc, true
-		},
-	)
+	filtered := lo.FilterMap(docs, func(doc IndexDocument, _ int) (IndexDocument, bool) {
+		if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
+			return IndexDocument{}, false
+		}
+		return doc, true
+	})
+	return list.NewList(filtered...)
 }
 
 func (s *SearchEngine) Remove(bucket, key string) {
@@ -218,13 +216,13 @@ func (s *SearchEngine) searchIndex(query model.SearchQuery) (*list.List[searchHi
 	if err != nil {
 		return nil, fmt.Errorf("search bleve index: %w", err)
 	}
-	hits := list.MapList(list.NewList(result.Hits...), func(_ int, hit *search.DocumentMatch) searchHit {
+	hits := lo.Map(result.Hits, func(hit *search.DocumentMatch, _ int) searchHit {
 		return searchHit{
 			ID:     hit.ID,
 			Fields: hit.Fields,
 		}
 	})
-	return hits, nil
+	return list.NewList(hits...), nil
 }
 
 type searchHit struct {
@@ -269,9 +267,9 @@ func (s *SearchEngine) searchFromMemory(query model.SearchQuery) model.SearchRes
 }
 
 func listValuesFromMap[K comparable, V any](values map[K]V) *list.List[V] {
-	return list.NewList(collectionmapping.NewMapFrom(values).Values()...)
+	return list.NewList(lo.Values(values)...)
 }
 
 func listKeysFromMap[K comparable, V any](values map[K]V) *list.List[K] {
-	return list.NewList(collectionmapping.NewMapFrom(values).Keys()...)
+	return list.NewList(lo.Keys(values)...)
 }

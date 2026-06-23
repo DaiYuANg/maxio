@@ -2,7 +2,6 @@ package metadata
 
 import (
 	columnx "github.com/arcgolabs/dbx/column"
-	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
 )
 
@@ -34,14 +33,5 @@ func newMetadataBlobRefsTable() metadataBlobRefsTable {
 		path:     schema.Path,
 		size:     schema.Size,
 		refCount: schema.RefCount,
-	}
-}
-
-func (t metadataBlobRefsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.hash,
-		t.path,
-		t.size,
-		t.refCount,
 	}
 }

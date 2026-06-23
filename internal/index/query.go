@@ -1,12 +1,11 @@
 package index
 
 import (
-	"strings"
-
-	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
 	qry "github.com/blevesearch/bleve/v2/search/query"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
+	"strings"
 )
 
 func (s *SearchEngine) buildQuery(criteria model.SearchQuery) qry.Query {
@@ -19,23 +18,19 @@ func (s *SearchEngine) buildQuery(criteria model.SearchQuery) qry.Query {
 		sizeRangeQuery(criteria),
 	)
 
-	if queries.IsEmpty() {
+	if len(queries) == 0 {
 		return bleve.NewMatchAllQuery()
 	}
-	if queries.Len() == 1 {
-		query, _ := queries.GetFirst()
-		return query
+	if len(queries) == 1 {
+		return queries[0]
 	}
-	return bleve.NewConjunctionQuery(queries.Values()...)
+	return bleve.NewConjunctionQuery(queries...)
 }
 
-func compactQueries(queries ...qry.Query) *collectionlist.List[qry.Query] {
-	return collectionlist.FilterMapList(
-		collectionlist.NewList(queries...),
-		func(_ int, query qry.Query) (qry.Query, bool) {
-			return query, query != nil
-		},
-	)
+func compactQueries(queries ...qry.Query) []qry.Query {
+	return lo.Filter(queries, func(query qry.Query, _ int) bool {
+		return query != nil
+	})
 }
 
 func textQuery(value string) qry.Query {

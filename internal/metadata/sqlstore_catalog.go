@@ -3,12 +3,13 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"strings"
 )
 
 func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.ObjectRecord) (model.ObjectRecord, error) {
@@ -137,10 +138,11 @@ func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string
 		return nil, ErrBadRequest
 	}
 
-	query := querydsl.SelectFrom(metadataObjectVersions.schema, metadataObjectVersions.selectItems()...).
-		Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))).
-		OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc())
-	versions, err := s.repos.objectVersions.List(ctx, query)
+	versions, err := s.repos.objectVersions.ListSpec(
+		ctx,
+		repositoryx.Where(querydsl.And(metadataObjectVersions.bucket.Eq(bucket), metadataObjectVersions.key.Eq(key))),
+		repositoryx.OrderBy(metadataObjectVersions.createdAt.Desc(), metadataObjectVersions.versionID.Desc()),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("list object versions: %w", err)
 	}

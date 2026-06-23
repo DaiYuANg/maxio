@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/dbx"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -40,15 +41,9 @@ func newMetadataBucketsTable() metadataBucketsTable {
 	}
 }
 
-func (t metadataBucketsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{t.name, t.createdAt}
-}
-
 func (s *SQLMetadata) ListBuckets(ctx context.Context) (*collectionlist.List[model.Bucket], error) {
 	ctx = ensureContext(ctx)
-	query := querydsl.SelectFrom(metadataBuckets.schema, metadataBuckets.selectItems()...).
-		OrderBy(metadataBuckets.name.Asc())
-	buckets, err := s.repos.buckets.List(ctx, query)
+	buckets, err := s.repos.buckets.ListSpec(ctx, repositoryx.OrderBy(metadataBuckets.name.Asc()))
 	if err != nil {
 		return nil, fmt.Errorf("list buckets: %w", err)
 	}
@@ -61,9 +56,7 @@ func (s *SQLMetadata) BucketExists(ctx context.Context, bucket string) (bool, er
 		return false, ErrBadRequest
 	}
 	ctx = ensureContext(ctx)
-	query := querydsl.SelectFrom(metadataBuckets.schema).
-		Where(metadataBuckets.name.Eq(bucket))
-	found, err := s.repos.buckets.Exists(ctx, query)
+	found, err := s.repos.buckets.ExistsSpec(ctx, repositoryx.Where(metadataBuckets.name.Eq(bucket)))
 	if err != nil {
 		return false, fmt.Errorf("check bucket exists: %w", err)
 	}

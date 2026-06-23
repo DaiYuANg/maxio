@@ -2,7 +2,6 @@ package metadata
 
 import (
 	columnx "github.com/arcgolabs/dbx/column"
-	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -111,28 +110,5 @@ func newMetadataObjectVersionsTable() metadataObjectVersionsTable {
 		deleteMarker:       schema.DeleteMarker,
 		createdAt:          schema.CreatedAt,
 		updatedAt:          schema.UpdatedAt,
-	}
-}
-
-func (t metadataObjectVersionsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.bucket,
-		t.key,
-		t.versionID,
-		t.digest,
-		t.etag,
-		t.size,
-		t.contentType,
-		t.cacheControl,
-		t.contentDisposition,
-		t.contentEncoding,
-		t.contentLanguage,
-		t.userMetadata,
-		t.upstreamID,
-		t.upstreamBucket,
-		t.upstreamKey,
-		t.deleteMarker,
-		t.createdAt,
-		t.updatedAt,
 	}
 }

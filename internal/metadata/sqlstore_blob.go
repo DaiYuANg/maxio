@@ -3,16 +3,16 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
-	"strings"
 )
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) (*collectionlist.List[BlobRef], error) {
-	query := querydsl.SelectFrom(metadataBlobRefs.schema, metadataBlobRefs.selectItems()...)
-	refs, err := s.repos.blobRefs.List(ctx, query)
+	refs, err := s.repos.blobRefs.ListSpec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list blob refs: %w", err)
 	}

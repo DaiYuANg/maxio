@@ -3,12 +3,13 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"strings"
 )
 
 func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error) {
@@ -70,12 +71,12 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.IndexDocument], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
-	query := querydsl.SelectFrom(metadataIndexDocuments.schema, metadataIndexDocuments.selectItems()...).
-		OrderBy(metadataIndexDocuments.bucket.Asc(), metadataIndexDocuments.key.Asc(), metadataIndexDocuments.versionID.Asc())
+	specs := []repositoryx.Spec{}
 	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
-		query.Where(predicate)
+		specs = append(specs, repositoryx.Where(predicate))
 	}
-	documents, err := s.repos.indexDocuments.List(ctx, query)
+	specs = append(specs, repositoryx.OrderBy(metadataIndexDocuments.bucket.Asc(), metadataIndexDocuments.key.Asc(), metadataIndexDocuments.versionID.Asc()))
+	documents, err := s.repos.indexDocuments.ListSpec(ctx, specs...)
 	if err != nil {
 		return nil, fmt.Errorf("list index documents: %w", err)
 	}

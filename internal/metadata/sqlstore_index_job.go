@@ -3,12 +3,13 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"strings"
 )
 
 func (s *SQLMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (model.IndexJob, error) {
@@ -75,13 +76,16 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 
 func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexJob], error) {
 	status = strings.TrimSpace(status)
-	query := querydsl.SelectFrom(metadataIndexJobs.schema, metadataIndexJobs.selectItems()...).
-		OrderBy(metadataIndexJobs.availableAt.Asc(), metadataIndexJobs.createdAt.Asc()).
-		Limit(normalizeListLimit(limit))
+	specs := []repositoryx.Spec{}
 	if status != "" {
-		query.Where(metadataIndexJobs.status.Eq(status))
+		specs = append(specs, repositoryx.Where(metadataIndexJobs.status.Eq(status)))
 	}
-	jobs, err := s.repos.indexJobs.List(ctx, query)
+	specs = append(
+		specs,
+		repositoryx.OrderBy(metadataIndexJobs.availableAt.Asc(), metadataIndexJobs.createdAt.Asc()),
+		repositoryx.Limit(normalizeListLimit(limit)),
+	)
+	jobs, err := s.repos.indexJobs.ListSpec(ctx, specs...)
 	if err != nil {
 		return nil, fmt.Errorf("list index jobs: %w", err)
 	}

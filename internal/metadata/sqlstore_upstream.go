@@ -3,6 +3,9 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/dbx"
@@ -11,8 +14,6 @@ import (
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"strings"
-	"time"
 )
 
 var (
@@ -64,25 +65,11 @@ func newMetadataUpstreamsTable() metadataUpstreamsTable {
 	}
 }
 
-func (t metadataUpstreamsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.id,
-		t.name,
-		t.endpoint,
-		t.region,
-		t.weight,
-		t.priority,
-		t.buckets,
-		t.enabled,
-		t.createdAt,
-		t.updatedAt,
-	}
-}
-
 func (s *SQLMetadata) ListUpstreams(ctx context.Context) (*collectionlist.List[model.Upstream], error) {
-	query := querydsl.SelectFrom(metadataUpstreams.schema, metadataUpstreams.selectItems()...).
-		OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc())
-	upstreams, err := s.repos.upstreams.List(ctx, query)
+	upstreams, err := s.repos.upstreams.ListSpec(
+		ctx,
+		repositoryx.OrderBy(metadataUpstreams.priority.Asc(), metadataUpstreams.name.Asc(), metadataUpstreams.id.Asc()),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("list upstreams: %w", err)
 	}

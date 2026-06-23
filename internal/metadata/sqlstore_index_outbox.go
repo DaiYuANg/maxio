@@ -3,12 +3,13 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"strings"
 )
 
 func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.IndexOutboxEvent) (model.IndexOutboxEvent, error) {
@@ -64,13 +65,16 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 
 func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexOutboxEvent], error) {
 	status = strings.TrimSpace(status)
-	query := querydsl.SelectFrom(metadataIndexOutbox.schema, metadataIndexOutbox.selectItems()...).
-		OrderBy(metadataIndexOutbox.availableAt.Asc(), metadataIndexOutbox.createdAt.Asc()).
-		Limit(normalizeListLimit(limit))
+	specs := []repositoryx.Spec{}
 	if status != "" {
-		query.Where(metadataIndexOutbox.status.Eq(status))
+		specs = append(specs, repositoryx.Where(metadataIndexOutbox.status.Eq(status)))
 	}
-	events, err := s.repos.indexOutbox.List(ctx, query)
+	specs = append(
+		specs,
+		repositoryx.OrderBy(metadataIndexOutbox.availableAt.Asc(), metadataIndexOutbox.createdAt.Asc()),
+		repositoryx.Limit(normalizeListLimit(limit)),
+	)
+	events, err := s.repos.indexOutbox.ListSpec(ctx, specs...)
 	if err != nil {
 		return nil, fmt.Errorf("list index outbox: %w", err)
 	}
