@@ -3,13 +3,12 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
-
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"strings"
+	"time"
 )
 
 func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
@@ -51,7 +50,7 @@ func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.Di
 		return model.DigestRef{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.digestRefs.GetByKeyOption(ctx, metadataKey(metadataDigestRefs.digest, digest))
+	option, err := s.repos.digestRefs.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)))
 	if err != nil {
 		return model.DigestRef{}, false, fmt.Errorf("query digest ref: %w", err)
 	}
@@ -108,7 +107,7 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 	if digest == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.digestRefs.DeleteByKey(ctx, metadataKey(metadataDigestRefs.digest, digest))
+	result, err := s.repos.digestRefs.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)))
 	if err != nil {
 		return false, fmt.Errorf("delete digest ref: %w", err)
 	}

@@ -3,12 +3,12 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"strings"
 )
 
 func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.IndexDocument) (model.IndexDocument, error) {
@@ -59,7 +59,7 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 		return model.IndexDocument{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.indexDocuments.GetByKeyOption(ctx, metadataKey(metadataIndexDocuments.id, id))
+	option, err := s.repos.indexDocuments.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexDocuments.id, id)))
 	if err != nil {
 		return model.IndexDocument{}, false, fmt.Errorf("query index document: %w", err)
 	}
@@ -101,7 +101,7 @@ func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool,
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.indexDocuments.DeleteByKey(ctx, metadataKey(metadataIndexDocuments.id, id))
+	result, err := s.repos.indexDocuments.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexDocuments.id, id)))
 	if err != nil {
 		return false, fmt.Errorf("delete index document: %w", err)
 	}

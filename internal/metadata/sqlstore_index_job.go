@@ -3,12 +3,12 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"strings"
 )
 
 func (s *SQLMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (model.IndexJob, error) {
@@ -65,7 +65,7 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 		return model.IndexJob{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.indexJobs.GetByKeyOption(ctx, metadataKey(metadataIndexJobs.id, id))
+	option, err := s.repos.indexJobs.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexJobs.id, id)))
 	if err != nil {
 		return model.IndexJob{}, false, fmt.Errorf("query index job: %w", err)
 	}
@@ -93,7 +93,7 @@ func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, erro
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.indexJobs.DeleteByKey(ctx, metadataKey(metadataIndexJobs.id, id))
+	result, err := s.repos.indexJobs.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexJobs.id, id)))
 	if err != nil {
 		return false, fmt.Errorf("delete index job: %w", err)
 	}

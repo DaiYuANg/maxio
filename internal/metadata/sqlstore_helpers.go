@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	columnx "github.com/arcgolabs/dbx/column"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -54,27 +53,6 @@ func emptyStringOrDefault(value sql.NullString) string {
 		return model.WriteIntentStageUnknown
 	}
 	return value.String
-}
-
-type metadataRepositoryKeyPart struct {
-	column columnx.Accessor
-	value  any
-}
-
-func metadataKey(column columnx.Accessor, value any) repositoryx.Key {
-	return metadataCompositeKey(metadataKeyPart(column, value))
-}
-
-func metadataKeyPart(column columnx.Accessor, value any) metadataRepositoryKeyPart {
-	return metadataRepositoryKeyPart{column: column, value: value}
-}
-
-func metadataCompositeKey(parts ...metadataRepositoryKeyPart) repositoryx.Key {
-	key := make(repositoryx.Key, len(parts))
-	for _, part := range parts {
-		key[part.column.ColumnRef().Name] = part.value
-	}
-	return key
 }
 
 func affectedRowCount(result sql.Result, op string) (int64, error) {

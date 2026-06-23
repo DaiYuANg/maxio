@@ -3,11 +3,11 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
+	"strings"
 )
 
 func (s *SQLMetadata) ListBlobRefs(ctx context.Context) (*collectionlist.List[BlobRef], error) {
@@ -25,7 +25,7 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 		return BlobRef{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.blobRefs.GetByKeyOption(ctx, metadataKey(metadataBlobRefs.hash, hash))
+	option, err := s.repos.blobRefs.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataBlobRefs.hash, hash)))
 	if err != nil {
 		return BlobRef{}, false, fmt.Errorf("query blob ref: %w", err)
 	}

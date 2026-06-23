@@ -3,13 +3,12 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
-
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"strings"
 )
 
 func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.ObjectRecord) (model.ObjectRecord, error) {
@@ -52,10 +51,7 @@ func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (
 		return model.ObjectRecord{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.objectRecords.GetByKeyOption(ctx, metadataCompositeKey(
-		metadataKeyPart(metadataObjectRecords.bucket, bucket),
-		metadataKeyPart(metadataObjectRecords.key, key),
-	))
+	option, err := s.repos.objectRecords.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectRecords.bucket, bucket), repositoryx.Part(metadataObjectRecords.key, key)))
 	if err != nil {
 		return model.ObjectRecord{}, false, fmt.Errorf("query object record: %w", err)
 	}
@@ -69,10 +65,7 @@ func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string
 	if bucket == "" || key == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.objectRecords.DeleteByKey(ctx, metadataCompositeKey(
-		metadataKeyPart(metadataObjectRecords.bucket, bucket),
-		metadataKeyPart(metadataObjectRecords.key, key),
-	))
+	result, err := s.repos.objectRecords.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectRecords.bucket, bucket), repositoryx.Part(metadataObjectRecords.key, key)))
 	if err != nil {
 		return false, fmt.Errorf("delete object record: %w", err)
 	}
@@ -129,11 +122,7 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 		return model.ObjectVersion{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.objectVersions.GetByKeyOption(ctx, metadataCompositeKey(
-		metadataKeyPart(metadataObjectVersions.bucket, bucket),
-		metadataKeyPart(metadataObjectVersions.key, key),
-		metadataKeyPart(metadataObjectVersions.versionID, versionID),
-	))
+	option, err := s.repos.objectVersions.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectVersions.bucket, bucket), repositoryx.Part(metadataObjectVersions.key, key), repositoryx.Part(metadataObjectVersions.versionID, versionID)))
 	if err != nil {
 		return model.ObjectVersion{}, false, fmt.Errorf("query object version: %w", err)
 	}
@@ -163,11 +152,7 @@ func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, vers
 	if bucket == "" || key == "" || versionID == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.objectVersions.DeleteByKey(ctx, metadataCompositeKey(
-		metadataKeyPart(metadataObjectVersions.bucket, bucket),
-		metadataKeyPart(metadataObjectVersions.key, key),
-		metadataKeyPart(metadataObjectVersions.versionID, versionID),
-	))
+	result, err := s.repos.objectVersions.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectVersions.bucket, bucket), repositoryx.Part(metadataObjectVersions.key, key), repositoryx.Part(metadataObjectVersions.versionID, versionID)))
 	if err != nil {
 		return false, fmt.Errorf("delete object version: %w", err)
 	}

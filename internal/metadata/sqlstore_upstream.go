@@ -3,16 +3,16 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/dbx"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	schemax "github.com/arcgolabs/dbx/schema"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"strings"
+	"time"
 )
 
 var (
@@ -95,7 +95,7 @@ func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstrea
 		return model.Upstream{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.upstreams.GetByKeyOption(ctx, metadataKey(metadataUpstreams.id, id))
+	option, err := s.repos.upstreams.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataUpstreams.id, id)))
 	if err != nil {
 		return model.Upstream{}, false, fmt.Errorf("query upstream: %w", err)
 	}
@@ -150,7 +150,7 @@ func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, erro
 		return false, ErrBadRequest
 	}
 
-	result, err := s.repos.upstreams.DeleteByKey(ctx, metadataKey(metadataUpstreams.id, id))
+	result, err := s.repos.upstreams.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataUpstreams.id, id)))
 	if err != nil {
 		return false, fmt.Errorf("delete upstream: %w", err)
 	}

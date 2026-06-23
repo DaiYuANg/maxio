@@ -3,12 +3,12 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"strings"
 )
 
 func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.IndexOutboxEvent) (model.IndexOutboxEvent, error) {
@@ -54,7 +54,7 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 		return model.IndexOutboxEvent{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.indexOutbox.GetByKeyOption(ctx, metadataKey(metadataIndexOutbox.id, id))
+	option, err := s.repos.indexOutbox.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexOutbox.id, id)))
 	if err != nil {
 		return model.IndexOutboxEvent{}, false, fmt.Errorf("query index outbox event: %w", err)
 	}
@@ -82,7 +82,7 @@ func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bo
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.indexOutbox.DeleteByKey(ctx, metadataKey(metadataIndexOutbox.id, id))
+	result, err := s.repos.indexOutbox.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexOutbox.id, id)))
 	if err != nil {
 		return false, fmt.Errorf("delete index outbox event: %w", err)
 	}
