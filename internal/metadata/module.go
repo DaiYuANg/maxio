@@ -7,12 +7,14 @@ import (
 
 	"github.com/arcgolabs/dix"
 	"github.com/lyonbrown4d/maxio/internal/config"
+	"github.com/lyonbrown4d/maxio/internal/scheduler"
 )
 
 func Module() dix.Module {
 	return dix.NewModule("metadata",
 		dix.WithModuleProviders(
 			dix.ProviderErr2(newMetadataStore),
+			dix.ProviderErr1(newSchedulerLeaseRepository),
 		),
 		dix.Hooks(
 			dix.OnStop(func(_ context.Context, store MetadataStore) error {
@@ -37,4 +39,12 @@ func newMetadataStore(cfg config.Config, logger *slog.Logger) (MetadataStore, er
 
 	logger.Info("metadata backend selected", "backend", cfg.MetadataBackend)
 	return store, nil
+}
+
+func newSchedulerLeaseRepository(store MetadataStore) (scheduler.LeaseRepository, error) {
+	sqlStore, ok := store.(*SQLMetadata)
+	if !ok {
+		return nil, fmt.Errorf("scheduler lease repository requires SQL metadata backend, got %T", store)
+	}
+	return NewSQLSchedulerLeaseRepository(sqlStore), nil
 }

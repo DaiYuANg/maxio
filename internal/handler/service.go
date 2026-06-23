@@ -10,7 +10,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/dedupe"
-	"github.com/lyonbrown4d/maxio/internal/object"
+	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
 const defaultSearchPath = "/_search"
@@ -69,10 +69,10 @@ func (s *Service) dispatchHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.cfg.EnableS3Proxy {
-		s.writeS3ProxyNotImplemented(w)
+		s.writeS3ProxyDisabled(w)
 		return
 	}
-	http.NotFound(w, r)
+	s.writeHandlerControlRouteNotFound(w)
 }
 
 func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -80,12 +80,12 @@ func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.objects == nil {
-		s.writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "search is not wired to the S3 proxy metadata repository yet"})
+	if s.search == nil {
+		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "search index is unavailable"})
 		return
 	}
 
-	query := object.SearchQuery{}
+	query := model.SearchQuery{}
 	if r.Method == http.MethodPost {
 		if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
 			s.writeError(w, err)
@@ -99,10 +99,6 @@ func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 		query.ContentType = r.URL.Query().Get("content_type")
 	}
 
-	result, err := s.objects.Search(r.Context(), query)
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
+	result := s.search.Search(query)
 	s.writeJSON(w, http.StatusOK, result)
 }

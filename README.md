@@ -13,7 +13,8 @@ dedupe relationships, index state, and operational events.
 - Metadata DB is the source of truth.
 - Bleve is derived state and can be rebuilt.
 - Object-level dedupe starts in observe mode and can evolve to alias mode.
-- Embedded consensus is not part of the target architecture; upstream S3 stores all object bytes.
+- Cluster/gossip, embedded consensus, and local object-shard storage are
+  non-goals.
 
 ## Core documents
 
@@ -25,14 +26,15 @@ dedupe relationships, index state, and operational events.
 - `docs/deployment.md` - deployment and configuration guidance.
 - `ROADMAP.md` - staged implementation roadmap.
 
-## Code layout during migration
+## Code layout
 
 - `cmd/maxio` is the executable entrypoint.
 - `internal/app` owns process assembly and startup wiring.
 - `internal/cache` and `internal/object` are internal implementation packages;
   they are no longer public root-level libraries.
-- Local object-store implementations are intentionally out of scope for the product
-  boundary and should not be treated as authoritative state.
+- Local object-store implementations are legacy/internal compatibility code
+  only; local object-shard storage is not a supported product path or
+  authoritative state.
 
 ## Minimal local configuration
 
@@ -110,6 +112,11 @@ Not yet implemented:
 
 ## Development status
 
-Some code and older docs may still contain migration-era concepts from the
-previous full S3/storage-engine design. New work should align with the
-proxy-only direction described in the documents above.
+The previous full S3/storage-engine direction is closed. Cluster/gossip
+control planes, embedded consensus, and local object-shard storage are
+non-goals.
+
+Remaining gaps are target-architecture work: completing the proxy data path,
+leasing index jobs from the metadata DB in the runtime worker, connecting
+dedupe observe reporting to proxy writes, and hardening migrations,
+PostgreSQL, S3 compatibility, auth, metrics, tracing, and repair workflows.

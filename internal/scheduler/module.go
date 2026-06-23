@@ -25,7 +25,7 @@ func Module() dix.Module {
 	return dix.NewModule(
 		"scheduler",
 		dix.WithModuleProviders(
-			dix.ProviderErr1(newRuntime),
+			dix.ProviderErr2(newRuntime),
 		),
 		dix.Hooks(
 			dix.OnStart(startRuntime),
@@ -36,9 +36,13 @@ func Module() dix.Module {
 
 func newRuntime(
 	logger *slog.Logger,
+	leaseRepository LeaseRepository,
 ) (*Runtime, error) {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if leaseRepository == nil {
+		return nil, ErrLeaseRepositoryUnavailable
 	}
 
 	schedulerOptions := make([]gocron.SchedulerOption, 0, 2)
@@ -55,7 +59,7 @@ func newRuntime(
 	return &Runtime{
 		scheduler:       schedulerRuntime,
 		logger:          logger,
-		leaseRepository: NewInMemoryLeaseRepository(),
+		leaseRepository: leaseRepository,
 		leaseOwner:      defaultLeaseOwner(),
 	}, nil
 }

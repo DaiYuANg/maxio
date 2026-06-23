@@ -2,7 +2,8 @@
 
 MaxIO's target runtime is a stateless S3 proxy backed by an external metadata
 database and upstream S3-compatible storage. Local disk is not authoritative for
-object bytes.
+object bytes, and cluster/gossip or embedded consensus services are not part of
+the deployment target.
 
 ## Required services
 
@@ -66,10 +67,9 @@ Multiple MaxIO instances can serve the same logical service when they share:
 - the same admin/API credential policy;
 - independent or shared Bleve rebuild strategy.
 
-The gateway must not depend on local consensus state or process-local object
-state
-in the target architecture. New deployments should treat gateway instances as
-replaceable stateless processes.
+The gateway must not depend on cluster/gossip membership, embedded consensus
+state, or process-local object state in the target architecture. New
+deployments should treat gateway instances as replaceable stateless processes.
 
 ## Local startup
 

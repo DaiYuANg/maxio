@@ -10,6 +10,7 @@ import (
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/logx"
 	"github.com/lyonbrown4d/maxio/internal/config"
+	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/proxy"
 	"github.com/samber/mo"
@@ -21,7 +22,7 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider1(newLogger),
 			dix.Provider1(newEventBus),
-			dix.Provider2(newGatewayDependencies),
+			dix.Provider3(newGatewayDependencies),
 			dix.Provider3(newGatewayService),
 		),
 		dix.Hooks(
@@ -36,9 +37,10 @@ func newEventBus(logger *slog.Logger) eventx.BusRuntime {
 
 func newGatewayDependencies(
 	metadataStore metadata.MetadataStore,
+	searchEngine *index.SearchEngine,
 	proxyRuntime *proxy.ValeRuntime,
 ) Dependencies {
-	return NewDependencies(metadataStore, proxyRuntime)
+	return newDependencies(metadataStore, searchEngine, proxyRuntime)
 }
 
 func newGatewayService(deps Dependencies, logger *slog.Logger, cfg config.Config) *Service {

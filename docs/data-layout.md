@@ -63,6 +63,7 @@ Keep DB backups transactionally aligned with upstream operational recovery.
 ## Local runtime directories
 
 `data_dir` is still useful, but it is not an object storage root in proxy mode.
+It must not become a cluster shard or storage-engine root.
 
 Default values:
 
@@ -81,7 +82,7 @@ Expected proxy-mode layout:
   logs/               # optional local logs if file logging is enabled
 ```
 
-Local process directories for object blobs are not part of the proxy-only
+Local object-shard or blob directories are non-goals in the proxy-only
 architecture and should not be introduced into new deployments.
 
 ## Metadata DB

@@ -8,6 +8,8 @@ events.
 ## Product boundary
 
 MaxIO is not a full object storage engine in the current product direction.
+Cluster/gossip, embedded consensus, and local object-shard storage are outside
+the target product boundary.
 
 It does:
 
@@ -21,8 +23,8 @@ It does:
 
 It does not:
 
-- store authoritative object bytes locally;
-- use process-local consensus state as the control plane;
+- store authoritative object bytes locally or maintain local object shards;
+- use cluster/gossip membership or embedded consensus as the control plane;
 - treat Bleve as authoritative state;
 - require gateway-local state for horizontal scaling.
 

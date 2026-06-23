@@ -51,7 +51,7 @@ func (s *Service) checkGatewayDataPlaneReady(checks map[string]string) error {
 		checks["object_service"] = "disabled"
 		return nil
 	}
-	checks["s3_proxy"] = "not_implemented"
+	checks["s3_proxy"] = "disabled"
 	checks["object_service"] = "disabled"
 	return errReadinessUnavailable
 }

@@ -1,7 +1,9 @@
 # MaxIO roadmap
 
-MaxIO is moving from a full S3/storage-engine service to a stateless S3 proxy
-with DB metadata and a rebuildable Bleve file index.
+MaxIO targets a stateless S3 proxy with DB metadata and a rebuildable Bleve
+file index. The previous full S3/storage-engine direction is closed;
+cluster/gossip, embedded consensus, and local object-shard storage are
+non-goals.
 
 ## Product target
 
@@ -11,12 +13,15 @@ with DB metadata and a rebuildable Bleve file index.
 - Metadata DB is the source of truth.
 - Bleve is a derived index and can be rebuilt.
 - Gateway instances are stateless and horizontally scalable.
-- Object-level dedupe supports two evolution paths: observe first, alias later.
+- Object-level dedupe starts with observe-mode reporting; alias mode remains a
+  gated metadata policy, not a local storage engine.
 
 ## Architecture decisions
 
-- Remove the embedded consensus control plane from the runtime foundation.
-- Do not store authoritative object bytes in local files; upstream object storage is authoritative.
+- Do not build cluster/gossip or embedded consensus into the runtime
+  foundation.
+- Do not store authoritative object bytes in local files; upstream object
+  storage is authoritative and local object-shard storage is a non-goal.
 - Persist object visibility, routing, fingerprints, and index status in DB.
 - Use DB transactions and leases for write state, worker queues, rebuilds, and
   recovery.
@@ -46,7 +51,8 @@ Status as of 2026-06-13:
 - Application assembly now lives under `internal/app`; cache and object service
   code have been moved under `internal/cache` and `internal/object` instead of
   root-level public packages.
-- Local object-shard storage is not part of the target default product path.
+- Local object-shard storage is not part of the target product path and should
+  not be reintroduced as a storage-engine fallback.
 
 ## P0: Metadata foundation
 
@@ -58,7 +64,8 @@ Goal: make DB-backed metadata the durable runtime center.
 - Implement SQLite for local development and PostgreSQL for production.
 - Add migrations and startup compatibility checks.
 - Define DB transaction boundaries for PUT, DELETE, COPY, and index enqueue.
-- Make object visibility depend on DB state, not local process state.
+- Make object visibility depend on DB state, not cluster, gossip, or local
+  process state.
 
 Acceptance criteria:
 
@@ -154,8 +161,8 @@ Goal: prepare the proxy runtime for production use.
 
 - Chunk-level dedupe.
 - Cross-region active-active replication.
-- Local object shard storage is not supported in the target product path.
-- Gateway-local consensus as the control plane.
+- Local object-shard storage.
+- Cluster/gossip or gateway-local embedded consensus as the control plane.
 - Treating Bleve as authoritative object state.
 
 ## Immediate next steps
