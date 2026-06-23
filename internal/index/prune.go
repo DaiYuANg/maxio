@@ -106,25 +106,32 @@ func (s *SearchEngine) removeMemoryDocuments(ids *collectionlist.List[string]) {
 func (s *SearchEngine) bleveDocumentIDs() (*collectionlist.List[string], error) {
 	ids := collectionlist.NewList[string]()
 	for offset := 0; ; offset += pruneSearchPageSize {
-		req := bleve.NewSearchRequest(bleve.NewMatchAllQuery())
-		req.Size = pruneSearchPageSize
-		req.From = offset
-		result, err := s.index.Search(req)
+		hitIDs, err := s.bleveDocumentIDsAtOffset(offset)
 		if err != nil {
 			return nil, fmt.Errorf("search indexed document ids: %w", err)
 		}
-		if len(result.Hits) > 0 {
-			hitIDs := collectionlist.FilterMapList(result.Hits, func(_ int, hit *search.DocumentMatch) (string, bool) {
-				if hit == nil {
-					return "", false
-				}
-				return hit.ID, true
-			})
-			ids.MergeSlice(hitIDs.Values())
-		}
-		if len(result.Hits) < pruneSearchPageSize {
-			break
+		ids.MergeSlice(hitIDs.Values())
+		if hitIDs.Len() < pruneSearchPageSize {
+			return ids, nil
 		}
 	}
-	return ids, nil
+}
+
+func (s *SearchEngine) bleveDocumentIDsAtOffset(offset int) (*collectionlist.List[string], error) {
+	req := bleve.NewSearchRequest(bleve.NewMatchAllQuery())
+	req.Size = pruneSearchPageSize
+	req.From = offset
+	result, err := s.index.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("search indexed document IDs: %w", err)
+	}
+	return collectionlist.FilterMapList(
+		collectionlist.NewList(result.Hits...),
+		func(_ int, hit *search.DocumentMatch) (string, bool) {
+			if hit == nil {
+				return "", false
+			}
+			return hit.ID, true
+		},
+	), nil
 }

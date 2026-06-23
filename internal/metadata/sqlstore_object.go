@@ -199,14 +199,14 @@ func (s *SQLMetadata) deleteObjectMetaRow(ctx context.Context, bucket, key, stat
 }
 
 func objectMetaFilter(bucket, prefix, state string) querydsl.Predicate {
-	predicates := []querydsl.Predicate{metadataObjects.state.Eq(state)}
+	predicates := collectionlist.NewList(metadataObjects.state.Eq(state))
 	if bucket != "" {
-		predicates = append(predicates, metadataObjects.bucket.Eq(bucket))
+		predicates.Add(metadataObjects.bucket.Eq(bucket))
 	}
 	if prefix != "" {
-		predicates = append(predicates, querydsl.Like(metadataObjects.key, prefixPattern(prefix)))
+		predicates.Add(querydsl.Like(metadataObjects.key, prefixPattern(prefix)))
 	}
-	return querydsl.And(predicates...)
+	return querydsl.AndList(querydsl.CompactPredicatesList(predicates))
 }
 
 func prepareObjectMeta(meta model.ObjectMeta, state string) (model.ObjectMeta, error) {

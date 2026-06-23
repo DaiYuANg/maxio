@@ -83,18 +83,17 @@ func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix str
 }
 
 func indexDocumentFilter(bucket, prefix string) querydsl.Predicate {
-	bucketFilter := metadataIndexDocuments.bucket.Eq(bucket)
-	prefixFilter := querydsl.Like(metadataIndexDocuments.key, prefixPattern(prefix))
-	switch {
-	case bucket != "" && prefix != "":
-		return querydsl.And(bucketFilter, prefixFilter)
-	case bucket != "":
-		return bucketFilter
-	case prefix != "":
-		return prefixFilter
-	default:
+	predicates := collectionlist.NewList[querydsl.Predicate]()
+	if bucket != "" {
+		predicates.Add(metadataIndexDocuments.bucket.Eq(bucket))
+	}
+	if prefix != "" {
+		predicates.Add(querydsl.Like(metadataIndexDocuments.key, prefixPattern(prefix)))
+	}
+	if predicates.IsEmpty() {
 		return nil
 	}
+	return querydsl.AndList(querydsl.CompactPredicatesList(predicates))
 }
 
 func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool, error) {
