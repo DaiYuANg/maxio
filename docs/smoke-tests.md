@@ -29,10 +29,10 @@ curl --fail "$MAXIO_URL/readyz"
 Readiness should include checks such as:
 
 ```text
-object_service
-engine
-storage_writable
-repair_backlog
+metadata_db
+upstream_routes
+index_worker
+index_queue
 ```
 
 ## Metrics
@@ -104,6 +104,9 @@ curl --fail -X POST \
   "$MAXIO_URL/_index/rebuild"
 ```
 
+Expected result: the endpoint accepts the request and enqueues DB-backed
+rebuild work; it must not depend on local object storage.
+
 Search indexed content:
 
 ```sh
@@ -112,6 +115,9 @@ curl --fail \
   "$MAXIO_URL/_search?q=smoke&bucket=$MAXIO_BUCKET"
 ```
 
+Expected result: `/_search` exercises `index.SearchEngine` and returns only
+object versions that remain visible in the metadata DB.
+
 Inspect index status:
 
 ```sh
@@ -119,6 +125,8 @@ curl --fail \
   -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" \
   "$MAXIO_URL/_index/status"
 ```
+
+Expected result: status reflects DB index queue, lease, and document state.
 
 ## Maintenance entry points
 

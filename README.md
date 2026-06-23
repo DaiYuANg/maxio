@@ -13,8 +13,8 @@ dedupe relationships, index state, and operational events.
 - Metadata DB is the source of truth.
 - Bleve is derived state and can be rebuilt.
 - Object-level dedupe starts in observe mode and can evolve to alias mode.
-- Cluster/gossip, embedded consensus, and local object-shard storage are
-  non-goals.
+- Gateway coordination, indexing, rebuild, and recovery are DB-backed; no
+  gateway-local membership or local byte-store is authoritative.
 
 ## Core documents
 
@@ -32,9 +32,9 @@ dedupe relationships, index state, and operational events.
 - `internal/app` owns process assembly and startup wiring.
 - `internal/cache` and `internal/object` are internal implementation packages;
   they are no longer public root-level libraries.
-- Local object-store implementations are legacy/internal compatibility code
-  only; local object-shard storage is not a supported product path or
-  authoritative state.
+- Any legacy local object-store implementation is internal compatibility code
+  only. Proxy mode treats upstream S3 bytes and DB metadata as the durable
+  boundary.
 
 ## Minimal local configuration
 
@@ -67,7 +67,7 @@ Authoritative state:
 Derived or rebuildable state:
 
 - Bleve index under `data_dir/index/bleve`;
-- index queues recreated from committed DB object versions;
+- index queues and rebuild jobs recreated from committed DB object versions;
 - dedupe grouping recreated from fingerprints;
 - process-local temporary files.
 
@@ -81,7 +81,7 @@ Derived or rebuildable state:
 
 ## Implementation status
 
-Status as of 2026-06-13:
+Status as of 2026-06-24:
 
 Implemented:
 
@@ -95,15 +95,16 @@ Implemented:
   lifecycle.
 - S3 upstream registration is stored in metadata and exposed through management
   APIs.
-- Bleve search engine exists, and a first index job state machine plus worker
-  abstraction exists.
+- Scheduler leasing is SQL-backed for DB-owned runtime work.
+- Bleve search exists, `/_search` routes through `index.SearchEngine`, and a
+  first index job state machine plus worker abstraction exists.
 
 Not yet implemented:
 
 - S3 proxy PUT/GET/HEAD/DELETE are not yet fully wired to canonical DB object
   record/version transitions.
-- Index jobs are not yet leased from the metadata DB by the runtime worker.
-- Bleve rebuild, index status APIs, and stale-document repair are not complete.
+- Runtime index worker loop hardening, `/_index/status`, `/_index/rebuild`,
+  and stale-document repair still need code-side confirmation.
 - Dedupe observe reports are not yet connected to the proxy write path.
 - DB migrations, schema compatibility checks, and production PostgreSQL
   validation still need hardening.
@@ -112,11 +113,12 @@ Not yet implemented:
 
 ## Development status
 
-The previous full S3/storage-engine direction is closed. Cluster/gossip
-control planes, embedded consensus, and local object-shard storage are
-non-goals.
+The previous full storage-engine direction is closed. Remaining product work
+should stay within the stateless proxy, DB metadata, upstream S3 bytes, and
+derived Bleve index model.
 
 Remaining gaps are target-architecture work: completing the proxy data path,
-leasing index jobs from the metadata DB in the runtime worker, connecting
-dedupe observe reporting to proxy writes, and hardening migrations,
-PostgreSQL, S3 compatibility, auth, metrics, tracing, and repair workflows.
+hardening DB-leased index workers, confirming `/_index/status` and
+`/_index/rebuild`, connecting dedupe observe reporting to proxy writes, and
+hardening migrations, PostgreSQL, S3 compatibility, auth, metrics, tracing, and
+repair workflows.

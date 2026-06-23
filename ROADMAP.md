@@ -1,9 +1,9 @@
 # MaxIO roadmap
 
 MaxIO targets a stateless S3 proxy with DB metadata and a rebuildable Bleve
-file index. The previous full S3/storage-engine direction is closed;
-cluster/gossip, embedded consensus, and local object-shard storage are
-non-goals.
+file index. The previous full storage-engine direction is closed; local gateway
+state must not become authoritative for object visibility, indexing, or
+recovery.
 
 ## Product target
 
@@ -14,14 +14,14 @@ non-goals.
 - Bleve is a derived index and can be rebuilt.
 - Gateway instances are stateless and horizontally scalable.
 - Object-level dedupe starts with observe-mode reporting; alias mode remains a
-  gated metadata policy, not a local storage engine.
+  gated metadata policy, not a byte-storage engine.
 
 ## Architecture decisions
 
-- Do not build cluster/gossip or embedded consensus into the runtime
-  foundation.
+- Keep gateway coordination in DB transactions and leases; do not add a
+  gateway-local membership or consensus control plane.
 - Do not store authoritative object bytes in local files; upstream object
-  storage is authoritative and local object-shard storage is a non-goal.
+  storage is authoritative.
 - Persist object visibility, routing, fingerprints, and index status in DB.
 - Use DB transactions and leases for write state, worker queues, rebuilds, and
   recovery.
@@ -32,7 +32,7 @@ non-goals.
 
 ## Current implementation status
 
-Status as of 2026-06-13:
+Status as of 2026-06-24:
 
 - P0 metadata foundation is partially implemented: repository interfaces,
   canonical object/version/digest/index/outbox models, SQLite schema, in-memory
@@ -42,17 +42,19 @@ Status as of 2026-06-13:
 - S3 upstream metadata registration and management APIs exist.
 - S3 data-path metadata capture is not complete: proxy PUT/GET/HEAD/DELETE are
   not yet fully committed through DB object-version transitions.
-- File indexing is partially implemented: Bleve search exists, and the first
-  index job state machine plus worker abstraction exists.
-- Index queue execution is not complete: jobs are not yet leased from metadata
-  DB and wired into the runtime worker loop.
+- File indexing is partially implemented: Bleve search exists, `/_search`
+  routes through `index.SearchEngine`, and the first index job state machine
+  plus worker abstraction exists.
+- Scheduler/index queue leasing is SQL-backed; the runtime index worker loop,
+  `/_index/status`, and `/_index/rebuild` still need code-side confirmation and
+  hardening.
 - Dedupe is still metadata-first: digest reference structures exist, but
   observe-mode reporting is not yet connected to the proxy write path.
-- Application assembly now lives under `internal/app`; cache and object service
-  code have been moved under `internal/cache` and `internal/object` instead of
-  root-level public packages.
-- Local object-shard storage is not part of the target product path and should
-  not be reintroduced as a storage-engine fallback.
+- Application assembly now lives under `internal/app`; cache and legacy object
+  internals have been moved under `internal/cache` and `internal/object`
+  instead of root-level public packages.
+- No local byte-storage fallback should be reintroduced into the proxy product
+  path.
 
 ## P0: Metadata foundation
 
@@ -64,8 +66,7 @@ Goal: make DB-backed metadata the durable runtime center.
 - Implement SQLite for local development and PostgreSQL for production.
 - Add migrations and startup compatibility checks.
 - Define DB transaction boundaries for PUT, DELETE, COPY, and index enqueue.
-- Make object visibility depend on DB state, not cluster, gossip, or local
-  process state.
+- Make object visibility depend on DB state, not local process state.
 
 Acceptance criteria:
 
@@ -99,15 +100,17 @@ Goal: make content search an asynchronous, rebuildable capability.
 - Store index jobs, leases, attempts, schema version, and document state in DB.
 - Build Bleve documents from object metadata and upstream bytes.
 - Make workers idempotent and lease-based.
-- Add index status and rebuild APIs.
+- Expose `/_index/status` from DB index queue, lease, and document state.
+- Make `/_index/rebuild` mark stale documents and enqueue DB rebuild jobs.
 - Implement schema-version-aware rebuild.
-- Ensure search results resolve back through DB visibility checks.
+- Route `/_search` through `index.SearchEngine`, then resolve results back
+  through DB visibility checks.
 
 Acceptance criteria:
 
-- Deleting the Bleve directory and triggering rebuild restores searchable
-  documents from DB and upstream bytes.
-- Failed jobs retry with backoff and expose last error.
+- Deleting the Bleve directory and calling `/_index/rebuild` restores
+  searchable documents from DB and upstream bytes.
+- Failed DB-leased jobs retry with backoff and expose last error.
 - Search never returns objects that DB marks deleted or invisible.
 
 ## P3: Object-level dedupe
@@ -161,14 +164,15 @@ Goal: prepare the proxy runtime for production use.
 
 - Chunk-level dedupe.
 - Cross-region active-active replication.
-- Local object-shard storage.
-- Cluster/gossip or gateway-local embedded consensus as the control plane.
+- Local byte-storage fallback inside MaxIO gateways.
+- Gateway-local membership or embedded consensus as the control plane.
 - Treating Bleve as authoritative object state.
 
 ## Immediate next steps
 
 1. Finalize metadata schema and migration plan.
 2. Wire S3 proxy PUT/GET/HEAD/DELETE to DB object-version transitions.
-3. Implement DB-backed index queue and Bleve rebuild.
+3. Harden the SQL-backed index worker loop, `/_index/status`, and
+   `/_index/rebuild`.
 4. Ship observe-mode dedupe reporting.
 5. Add consistency scanner for DB, upstream S3, and Bleve drift.

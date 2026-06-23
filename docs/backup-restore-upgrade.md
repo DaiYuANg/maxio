@@ -53,6 +53,9 @@ curl --fail -X POST \
   "$MAXIO_URL/_index/rebuild"
 ```
 
+The rebuild should be driven from DB object_versions and upstream bytes. Local
+disk is not an object source for restore.
+
 ## Upgrade
 
 1. Read release notes for metadata schema compatibility.

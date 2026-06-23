@@ -2,8 +2,8 @@
 
 MaxIO's target runtime is a stateless S3 proxy backed by an external metadata
 database and upstream S3-compatible storage. Local disk is not authoritative for
-object bytes, and cluster/gossip or embedded consensus services are not part of
-the deployment target.
+object bytes. Gateways coordinate through DB state and leases, not local
+membership or consensus services.
 
 ## Required services
 
@@ -67,7 +67,7 @@ Multiple MaxIO instances can serve the same logical service when they share:
 - the same admin/API credential policy;
 - independent or shared Bleve rebuild strategy.
 
-The gateway must not depend on cluster/gossip membership, embedded consensus
+The gateway must not depend on local membership state, embedded consensus
 state, or process-local object state in the target architecture. New
 deployments should treat gateway instances as replaceable stateless processes.
 
@@ -125,7 +125,7 @@ Operational expectations:
 - gateways fail readiness when DB connectivity or migration compatibility fails;
 - write paths use DB transactions for visible object state;
 - background workers use DB leases for index and dedupe jobs;
-- recovery scans DB state, not local disk, after crashes.
+- recovery enumerates DB state, not local disk, after crashes.
 
 ## Upstream S3 operations
 
@@ -146,13 +146,13 @@ Alias mode:
 
 ## Bleve index operations
 
-Inspect index worker status:
+Inspect DB-backed index worker status:
 
 ```sh
 curl -H "Authorization: Bearer $MAXIO_ADMIN_TOKEN" http://127.0.0.1:8080/_index/status
 ```
 
-Rebuild the derived Bleve index:
+Request a DB-driven rebuild of the derived Bleve index:
 
 ```sh
 curl -X POST \
@@ -163,6 +163,11 @@ curl -X POST \
 Bleve can be stored on a persistent volume to avoid rebuild time, but it remains
 derived. If index state is suspected to be corrupt, rebuild from DB rather than
 treating the local index as authoritative.
+
+`/_index/status` should reflect metadata DB queue, lease, and document state.
+`/_index/rebuild` should enqueue DB rebuild jobs that workers lease and process.
+`/_search` should query through `index.SearchEngine` and resolve results back
+through DB-visible object versions.
 
 ## Admin protection
 

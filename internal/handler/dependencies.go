@@ -5,7 +5,6 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
-	"github.com/lyonbrown4d/maxio/internal/object"
 )
 
 type proxyReloader interface {
@@ -14,10 +13,10 @@ type proxyReloader interface {
 
 // Dependencies groups handler dependencies to keep dix providers shallow.
 type Dependencies struct {
-	objects  *object.Service
-	metadata metadata.MetadataStore
-	search   *index.SearchEngine
-	proxy    proxyReloader
+	metadata     metadata.MetadataStore
+	search       *index.SearchEngine
+	indexManager *index.Manager
+	proxy        proxyReloader
 }
 
 // NewDependencies wires the handler dependency set.
@@ -37,5 +36,10 @@ func newDependencies(
 	if len(proxyRuntime) > 0 {
 		reloader = proxyRuntime[0]
 	}
-	return Dependencies{metadata: metadataStore, search: searchEngine, proxy: reloader}
+	return Dependencies{
+		metadata:     metadataStore,
+		search:       searchEngine,
+		indexManager: index.NewManager(metadataStore, searchEngine, index.ManagerOptions{}),
+		proxy:        reloader,
+	}
 }

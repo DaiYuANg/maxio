@@ -7,7 +7,8 @@ S3 proxy architecture.
 
 - Metadata DB is the source of truth.
 - Upstream S3 is the source of truth for bytes.
-- Bleve is a derived, rebuildable file index.
+- Bleve is a derived, rebuildable file index accessed through
+  `index.SearchEngine`.
 - Gateway instances are stateless and can process the same work through DB
   leases and idempotent writes.
 - Object-level dedupe starts in observe mode and can evolve to alias mode behind
@@ -309,6 +310,9 @@ Worker rules:
 - Back off and retry transient upstream, extraction, or Bleve errors.
 - Mark permanent unsupported file types as `skipped`, not `failed`.
 
+`/_index/status` should report the DB-owned job, lease, and document state used
+by these workers.
+
 ## File index schema
 
 Bleve documents should include:
@@ -341,14 +345,16 @@ against DB rows at query time.
 ## Search path
 
 ```text
-1. Query Bleve for candidate document IDs.
+1. Query `index.SearchEngine` for candidate document IDs.
 2. Load matching object_versions from DB.
 3. Filter by tenant, bucket policy, visible status, delete markers, and caller
    authorization.
 4. Return object metadata from DB, optionally with Bleve highlights.
 ```
 
-Bleve must never return an object that DB no longer considers visible.
+The `/_search` endpoint is a caller of `index.SearchEngine`; it must not bypass
+DB visibility checks. Bleve must never return an object that DB no longer
+considers visible.
 
 ## Dedupe modes
 
@@ -399,11 +405,11 @@ default until reconciliation tooling is mature.
 
 ## Rebuild strategy
 
-### Rebuild Bleve
+### Rebuild Bleve through `/_index/rebuild`
 
 ```text
 1. Mark all active index_documents stale for the target schema version.
-2. Scan visible object_versions from DB by tenant/bucket/key/version cursor.
+2. Page through visible object_versions from DB by tenant/bucket/key/version cursor.
 3. Insert rebuild index_jobs idempotently.
 4. Workers recreate Bleve documents from DB metadata and upstream bytes.
 5. Missing or failed upstream objects become repair_fault candidates.
@@ -450,7 +456,7 @@ default until reconciliation tooling is mature.
 | --- | --- |
 | Gateway crashes before DB commit | pending row expires or recovery marks it failed |
 | Gateway crashes after upstream PUT before DB visible commit | recovery checks idempotency key and upstream result |
-| DB commit succeeds but index enqueue fails | outbox or rebuild scan recreates index job |
+| DB commit succeeds but index enqueue fails | outbox or rebuild enumeration recreates index job |
 | Bleve write fails | job retries with backoff |
 | Upstream HEAD fails during index | mark job failed and create repair signal |
 | Alias canonical object missing | mark all dependent versions repair_fault until restored |

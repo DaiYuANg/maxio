@@ -8,8 +8,9 @@ events.
 ## Product boundary
 
 MaxIO is not a full object storage engine in the current product direction.
-Cluster/gossip, embedded consensus, and local object-shard storage are outside
-the target product boundary.
+The product boundary is the stateless proxy, DB metadata, upstream S3 bytes,
+and derived indexing. Gateway-local membership, consensus, or byte-store
+ownership are outside that boundary.
 
 It does:
 
@@ -23,8 +24,9 @@ It does:
 
 It does not:
 
-- store authoritative object bytes locally or maintain local object shards;
-- use cluster/gossip membership or embedded consensus as the control plane;
+- store authoritative object bytes locally or use local byte stores to decide
+  object visibility;
+- use gateway-local membership or embedded consensus as the control plane;
 - treat Bleve as authoritative state;
 - require gateway-local state for horizontal scaling.
 
@@ -64,14 +66,14 @@ logs, and transient upload buffers.
   audit events.
 - **Upstream registry:** DB-backed list of S3 endpoints, bucket mappings,
   credentials references, health state, and routing policy.
-- **Indexer:** asynchronous worker that reads committed object metadata, fetches
-  bytes from upstream S3 when needed, extracts text/file metadata, and writes a
-  Bleve document.
+- **Indexer:** asynchronous worker that leases DB index jobs, reads committed
+  object metadata, fetches bytes from upstream S3 when needed, extracts
+  text/file metadata, and writes a Bleve document.
 - **Dedupe coordinator:** records object-level fingerprints and either observes
   duplicate candidates or aliases object metadata to a canonical blob identity,
   depending on bucket policy.
-- **Management plane:** exposes health, readiness, metrics, index rebuild,
-  dedupe inspection, and repair/reconciliation endpoints.
+- **Management plane:** exposes health, readiness, metrics, `/_index/status`,
+  `/_index/rebuild`, dedupe inspection, and repair/reconciliation endpoints.
 
 ## API planes
 
@@ -157,14 +159,15 @@ fully exercised.
 
 ## Indexing model
 
-Bleve is a derived local index. It stores searchable documents built from:
+Bleve is a derived local index behind `index.SearchEngine`. It stores
+searchable documents built from:
 
 - DB object metadata;
 - file metadata extracted from object content;
 - optional text extraction from upstream object bytes;
 - index schema version and source object-version identity.
 
-The DB owns queueing and status:
+The DB owns queueing and status reported by `/_index/status`:
 
 ```text
 pending -> leased -> indexed
@@ -176,19 +179,24 @@ indexed -> stale -> pending
 Workers must be idempotent. Re-indexing the same object-version with the same
 schema version should replace the same Bleve document ID.
 
+`/_search` should query `index.SearchEngine` for candidates, then resolve those
+candidates back through DB object-version visibility before returning object
+references to callers.
+
 See `docs/metadata-indexing.md` for the detailed table and consistency design.
 
 ## Rebuild and consistency
 
-Because DB is authoritative and Bleve is derived, MaxIO supports destructive
-Bleve rebuilds:
+Because DB is authoritative and Bleve is derived, MaxIO supports DB-driven
+Bleve rebuilds through `/_index/rebuild`:
 
-1. stop or pause index workers;
+1. stop or pause index workers when a disruptive local index replacement is
+   required;
 2. delete or replace the local Bleve index directory;
-3. scan committed DB object versions;
-4. enqueue rebuild jobs;
-5. let workers repopulate Bleve;
-6. compare DB index status and Bleve document counts.
+3. enumerate visible DB object versions by cursor;
+4. enqueue rebuild jobs in the metadata DB;
+5. let DB-leased workers repopulate Bleve from DB metadata and upstream bytes;
+6. compare `/_index/status` DB state and Bleve document counts.
 
 Consistency checks compare DB object-version rows, upstream HEAD results, blob
 fingerprints, and Bleve documents. The repair loop should favor DB state and

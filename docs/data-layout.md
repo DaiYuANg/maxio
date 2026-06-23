@@ -63,7 +63,8 @@ Keep DB backups transactionally aligned with upstream operational recovery.
 ## Local runtime directories
 
 `data_dir` is still useful, but it is not an object storage root in proxy mode.
-It must not become a cluster shard or storage-engine root.
+It must stay limited to derived index files, temporary scratch, and optional
+logs.
 
 Default values:
 
@@ -82,8 +83,8 @@ Expected proxy-mode layout:
   logs/               # optional local logs if file logging is enabled
 ```
 
-Local object-shard or blob directories are non-goals in the proxy-only
-architecture and should not be introduced into new deployments.
+Do not add proxy-mode directories for authoritative object bytes. Upstream S3
+and the metadata DB remain the durable boundary for object state.
 
 ## Metadata DB
 
@@ -135,8 +136,8 @@ Safe rebuild:
 ```text
 1. Pause index workers or put the node in maintenance.
 2. Remove or move <data_dir>/index/bleve.
-3. Start MaxIO and trigger an index rebuild.
-4. Rebuild scans DB object_versions and enqueues index_jobs.
+3. Start MaxIO and trigger `/_index/rebuild`.
+4. Rebuild enumerates DB object_versions and enqueues index_jobs.
 5. Workers fetch bytes from upstream S3 and repopulate Bleve.
 ```
 

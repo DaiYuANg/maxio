@@ -33,7 +33,7 @@ func (s *Service) collectMetrics(ctx context.Context) string {
 	collector.addReadiness(s)
 	collector.addObjectCounts(ctx, s)
 	collector.addDedupeStatus(s)
-	collector.addIndexStatus(s)
+	collector.addIndexStatus(ctx, s)
 	collector.gauge("maxio_metrics_collection_errors", "Number of metric collection failures.", collector.collectionErrors)
 	return collector.String()
 }
@@ -101,15 +101,20 @@ func (collector *metricsCollector) addDedupeStatus(s *Service) {
 	collector.gauge("maxio_dedupe_last_limited", "Whether the last dedupe job was limited by configured thresholds.", boolInt(result.Limited))
 }
 
-func (collector *metricsCollector) addIndexStatus(s *Service) {
-	if s == nil || s.objects == nil {
+func (collector *metricsCollector) addIndexStatus(ctx context.Context, s *Service) {
+	if s == nil || s.indexManager == nil {
 		collector.gauge("maxio_index_rebuilding", "Whether the content index rebuild is running.", 0)
 		return
 	}
-	status := s.objects.IndexStatus()
+	status, err := s.indexManager.Status(ctx)
+	if err != nil {
+		collector.collectionErrors++
+		collector.gauge("maxio_index_rebuilding", "Whether the content index rebuild is running.", 0)
+		return
+	}
 	collector.gauge("maxio_index_rebuilding", "Whether the content index rebuild is running.", boolInt(status.Rebuilding))
-	collector.gauge("maxio_index_queue_size", "Configured content index queue size.", status.QueueSize)
-	collector.gauge("maxio_index_queued_objects", "Objects waiting in the content index queue.", status.QueuedObjects)
+	collector.gauge("maxio_index_queue_size", "Content index jobs queued in metadata.", status.QueueSize)
+	collector.gauge("maxio_index_queued_objects", "Objects waiting for content indexing in metadata.", status.QueuedObjects)
 	collector.gauge("maxio_index_dropped_objects", "Object index events dropped because the queue was full.", status.DroppedObjects)
 	collector.gauge("maxio_index_retried_objects", "Object index tasks retried after failures.", status.RetriedObjects)
 	collector.gauge("maxio_index_indexed_objects", "Objects successfully indexed by the content index worker.", status.IndexedObjects)
