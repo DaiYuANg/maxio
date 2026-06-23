@@ -6,6 +6,7 @@ import (
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/collectionx/set"
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
 
@@ -52,7 +53,7 @@ func (s *SearchEngine) indexedDocumentIDs() (*set.Set[string], error) {
 	if err != nil {
 		return nil, err
 	}
-	ids.MergeSlice(bleveIDs)
+	ids.MergeSlice(bleveIDs.Values())
 	return ids, nil
 }
 
@@ -66,9 +67,10 @@ func (s *SearchEngine) memoryDocumentIDs() *set.Set[string] {
 
 func (s *SearchEngine) deleteStaleDocuments(indexedIDs, validIDs *set.Set[string]) (*collectionlist.List[string], error) {
 	staleSet := indexedIDs.Difference(validIDs)
-	staleIDs := collectionlist.NewListWithCapacity[string](staleSet.Len(), staleSet.Values()...)
+	staleIDs := collectionlist.NewListWithCapacity[string](staleSet.Len())
 	var deleteErr error
-	staleIDs.Range(func(_ int, id string) bool {
+	staleSet.Range(func(id string) bool {
+		staleIDs.Add(id)
 		if err := s.deleteStaleDocument(id); err != nil {
 			deleteErr = err
 			return false
@@ -101,8 +103,8 @@ func (s *SearchEngine) removeMemoryDocuments(ids *collectionlist.List[string]) {
 	})
 }
 
-func (s *SearchEngine) bleveDocumentIDs() ([]string, error) {
-	ids := make([]string, 0)
+func (s *SearchEngine) bleveDocumentIDs() (*collectionlist.List[string], error) {
+	ids := collectionlist.NewList[string]()
 	for offset := 0; ; offset += pruneSearchPageSize {
 		req := bleve.NewSearchRequest(bleve.NewMatchAllQuery())
 		req.Size = pruneSearchPageSize
@@ -111,8 +113,14 @@ func (s *SearchEngine) bleveDocumentIDs() ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("search indexed document ids: %w", err)
 		}
-		for _, hit := range result.Hits {
-			ids = append(ids, hit.ID)
+		if len(result.Hits) > 0 {
+			hitIDs := collectionlist.FilterMapList(result.Hits, func(_ int, hit *search.DocumentMatch) (string, bool) {
+				if hit == nil {
+					return "", false
+				}
+				return hit.ID, true
+			})
+			ids.MergeSlice(hitIDs.Values())
 		}
 		if len(result.Hits) < pruneSearchPageSize {
 			break

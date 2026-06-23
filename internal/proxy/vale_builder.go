@@ -211,7 +211,17 @@ func buildServiceAndRoutes(
 	middlewareName := dedupeMiddlewareName(upstreamID)
 	b.MiddlewareNamed(middlewareName, provider.MiddlewareType(dedupeMiddlewareType))
 
-	if len(buckets) == 0 {
+	normalizedBuckets := collectionlist.FilterMapList(
+		collectionlist.NewList(buckets...),
+		func(_ int, bucket string) (string, bool) {
+			cleanBucket := normalizeUpstreamBucket(bucket)
+			if cleanBucket == "" {
+				return "", false
+			}
+			return cleanBucket, true
+		},
+	)
+	if normalizedBuckets == nil || normalizedBuckets.Len() == 0 {
 		b.RouteTo(
 			serviceName+"-default",
 			entrypointName,
@@ -222,22 +232,26 @@ func buildServiceAndRoutes(
 		return
 	}
 
-	uniqueBuckets := collectionset.NewOrderedSetWithCapacity[string](len(buckets))
-	for _, bucket := range buckets {
-		cleanBucket := strings.TrimSpace(prefixNormalized(strings.TrimSpace(bucket)))
-		if cleanBucket == "" {
-			continue
-		}
-		uniqueBuckets.Add(cleanBucket)
-	}
-	candidates := collectionlist.NewList(uniqueBuckets.Values()...)
-	candidates = candidates.Sort(strings.Compare)
+	candidates := uniqueSortedBuckets(normalizedBuckets)
 	candidates.Range(func(_ int, cleanBucket string) bool {
 		pathPrefix := "/" + cleanBucket + "/"
 		routeName := serviceName + "-" + strings.ReplaceAll(cleanBucket, "/", "-")
 		b.RouteTo(routeName, entrypointName, serviceName, provider.RoutePathPrefix(pathPrefix), provider.RouteMiddlewares(middlewareName))
 		return true
 	})
+}
+
+func uniqueSortedBuckets(buckets *collectionlist.List[string]) *collectionlist.List[string] {
+	if buckets == nil || buckets.Len() == 0 {
+		return collectionlist.NewList[string]()
+	}
+	sortedBuckets := buckets.Sort(strings.Compare)
+	uniqueBuckets := collectionset.NewOrderedSetWithCapacity[string](sortedBuckets.Len(), sortedBuckets.Values()...)
+	return collectionlist.NewList(uniqueBuckets.Values()...)
+}
+
+func normalizeUpstreamBucket(value string) string {
+	return prefixNormalized(strings.TrimSpace(value))
 }
 
 func upstreamIdentity(upstream model.Upstream) string {

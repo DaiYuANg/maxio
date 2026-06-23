@@ -4,7 +4,7 @@ package cache
 import (
 	"context"
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"maps"
+	"github.com/arcgolabs/collectionx/mapping"
 	"time"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -153,7 +153,5 @@ func cloneStringMap(input map[string]string) map[string]string {
 	if len(input) == 0 {
 		return nil
 	}
-	output := make(map[string]string, len(input))
-	maps.Copy(output, input)
-	return output
+	return mapping.NewMapFrom(input).All()
 }
