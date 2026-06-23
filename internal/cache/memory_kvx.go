@@ -127,17 +127,24 @@ func (adapter *memoryKVAdapter) scanKeys(pattern string) (*collectionlist.List[s
 		return nil, fmt.Errorf("match memory cache key pattern: %w", err)
 	}
 
-	row := adapter.keys.Row(memoryKVKeyRow)
-	matched := collectionlist.NewListWithCapacity[string](len(row))
-	for key := range row {
-		ok, err := path.Match(pattern, key)
-		if err != nil {
-			return nil, fmt.Errorf("match memory cache key pattern: %w", err)
-		}
-		if !ok {
-			continue
-		}
-		matched.Add(key)
+	row := mapping.NewMapFrom(adapter.keys.Row(memoryKVKeyRow))
+	var matchErr error
+	matched := collectionlist.FilterMapList(
+		collectionlist.NewList(row.Keys()...),
+		func(_ int, key string) (string, bool) {
+			if matchErr != nil {
+				return "", false
+			}
+			ok, err := path.Match(pattern, key)
+			if err != nil {
+				matchErr = fmt.Errorf("match memory cache key pattern: %w", err)
+				return "", false
+			}
+			return key, ok
+		},
+	)
+	if matchErr != nil {
+		return nil, matchErr
 	}
 	return matched, nil
 }

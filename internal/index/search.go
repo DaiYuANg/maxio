@@ -100,43 +100,49 @@ func (s *SearchEngine) UpsertDocuments(docs []IndexDocument) (int, error) {
 	if s == nil || len(docs) == 0 {
 		return 0, nil
 	}
+	validDocs := listFilterDocuments(docs)
 	if !s.ready {
-		s.upsertMemoryDocuments(docs)
+		s.upsertMemoryDocuments(validDocs)
+		return len(docs), nil
+	}
+	if validDocs.IsEmpty() {
 		return len(docs), nil
 	}
 
 	batch := s.index.NewBatch()
-	for i := range docs {
-		doc := docs[i]
+	var prepareErr error
+	validDocs.Range(func(_ int, doc IndexDocument) bool {
 		id := objectID(doc.Meta.Bucket, doc.Meta.Key)
 		if err := batch.Index(id, documentFromMeta(doc.Meta, doc.Text)); err != nil {
-			return 0, fmt.Errorf("prepare search index batch: %w", err)
+			prepareErr = fmt.Errorf("prepare search index batch: %w", err)
+			return false
 		}
+		return true
+	})
+	if prepareErr != nil {
+		return 0, prepareErr
 	}
 
 	if err := s.index.Batch(batch); err != nil {
 		s.logger.Warn("upsert search index batch failed", "error", err)
-		return s.indexSingleDocuments(docs, err)
+		return s.indexSingleDocuments(validDocs, err)
 	}
 
-	s.upsertMemoryDocuments(docs)
+	s.upsertMemoryDocuments(validDocs)
 	return len(docs), nil
 }
 
-func (s *SearchEngine) indexSingleDocuments(docs []IndexDocument, batchErr error) (int, error) {
+func (s *SearchEngine) indexSingleDocuments(docs *list.List[IndexDocument], batchErr error) (int, error) {
 	successes := 0
-	for i := range docs {
-		doc := docs[i]
-		if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
-			continue
-		}
+	docs.Range(func(_ int, doc IndexDocument) bool {
 		id := objectID(doc.Meta.Bucket, doc.Meta.Key)
 		if err := s.index.Index(id, documentFromMeta(doc.Meta, doc.Text)); err != nil {
 			batchErr = errors.Join(batchErr, fmt.Errorf("upsert search document %s: %w", id, err))
-			continue
+		} else {
+			successes++
 		}
-		successes++
-	}
+		return true
+	})
 	s.upsertMemoryDocuments(docs)
 	if batchErr != nil {
 		return successes, batchErr
@@ -144,17 +150,26 @@ func (s *SearchEngine) indexSingleDocuments(docs []IndexDocument, batchErr error
 	return successes, nil
 }
 
-func (s *SearchEngine) upsertMemoryDocuments(docs []IndexDocument) {
+func (s *SearchEngine) upsertMemoryDocuments(docs *list.List[IndexDocument]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i := range docs {
-		doc := docs[i]
-		if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
-			continue
-		}
+	docs.Range(func(_ int, doc IndexDocument) bool {
 		meta := doc.Meta
 		s.items[objectID(doc.Meta.Bucket, doc.Meta.Key)] = &meta
-	}
+		return true
+	})
+}
+
+func listFilterDocuments(docs []IndexDocument) *list.List[IndexDocument] {
+	return list.FilterMapList(
+		list.NewList(docs...),
+		func(_ int, doc IndexDocument) (IndexDocument, bool) {
+			if doc.Meta.Bucket == "" || doc.Meta.Key == "" {
+				return IndexDocument{}, false
+			}
+			return doc, true
+		},
+	)
 }
 
 func (s *SearchEngine) Remove(bucket, key string) {

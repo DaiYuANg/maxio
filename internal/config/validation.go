@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/samber/mo"
 )
 
@@ -66,10 +67,18 @@ func validateMetadataConfig(cfg Config) error {
 }
 
 func validateDurationConfigs(configs []durationConfig) error {
-	for _, cfgValue := range configs {
-		if err := validateDuration(cfgValue.name, cfgValue.value); err != nil {
-			return err
-		}
+	_, err := collectionlist.ReduceErrList(
+		collectionlist.NewList(configs...),
+		struct{}{},
+		func(_ struct{}, _ int, cfgValue durationConfig) (struct{}, error) {
+			if err := validateDuration(cfgValue.name, cfgValue.value); err != nil {
+				return struct{}{}, err
+			}
+			return struct{}{}, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("validate duration configs: %w", err)
 	}
 	return nil
 }
@@ -88,10 +97,18 @@ func integerConfigs(cfg Config) []intConfig {
 }
 
 func validateIntegerConfigs(configs []intConfig) error {
-	for _, cfgValue := range configs {
-		if err := validateNonNegativeInt(cfgValue.name, cfgValue.value, cfgValue.minimum); err != nil {
-			return err
-		}
+	_, err := collectionlist.ReduceErrList(
+		collectionlist.NewList(configs...),
+		struct{}{},
+		func(_ struct{}, _ int, cfgValue intConfig) (struct{}, error) {
+			if err := validateNonNegativeInt(cfgValue.name, cfgValue.value, cfgValue.minimum); err != nil {
+				return struct{}{}, err
+			}
+			return struct{}{}, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("validate integer configs: %w", err)
 	}
 	return nil
 }
