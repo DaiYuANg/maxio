@@ -84,7 +84,12 @@ func (s *SQLMetadata) queryObjectMetas(ctx context.Context, query *querydsl.Sele
 	if err != nil {
 		return nil, err
 	}
-	return objectMetaRowsToList(rows), nil
+	return collectionlist.MapList(
+		rows,
+		func(_ int, row objectMetaRow) model.ObjectMeta {
+			return row.objectMeta()
+		},
+	), nil
 }
 
 func (s *SQLMetadata) getObjectMeta(ctx context.Context, bucket, key, state string) (model.ObjectMeta, bool, error) {

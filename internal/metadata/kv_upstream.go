@@ -99,6 +99,6 @@ func compareUpstream(left, right model.Upstream) int {
 }
 
 func cloneUpstream(upstream model.Upstream) model.Upstream {
-	upstream.Buckets = append([]string(nil), upstream.Buckets...)
+	upstream.Buckets = list.NewList(upstream.Buckets...).Values()
 	return upstream
 }

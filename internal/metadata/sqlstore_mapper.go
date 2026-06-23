@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	collectionlist "github.com/arcgolabs/collectionx/list"
 	dbxmapper "github.com/arcgolabs/dbx/mapper"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -32,15 +31,6 @@ func newMetadataProjectionMapper[T any]() dbxmapper.StructMapper[T] {
 	return dbxmapper.MustStructMapperWithOptions[T](
 		dbxmapper.WithMapperCodecs(metadataBoolIntCodec),
 	)
-}
-
-func objectMetaRowsToList(rows *collectionlist.List[objectMetaRow]) *collectionlist.List[model.ObjectMeta] {
-	if rows == nil {
-		return collectionlist.NewList[model.ObjectMeta]()
-	}
-	return collectionlist.MapList(rows, func(_ int, row objectMetaRow) model.ObjectMeta {
-		return row.objectMeta()
-	})
 }
 
 func (row objectMetaRow) objectMeta() model.ObjectMeta {
