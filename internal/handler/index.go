@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	searchindex "github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/internal/indexcontrol"
 )
 
 func (s *Service) handleIndexStatus(w http.ResponseWriter, r *http.Request) {
@@ -44,9 +44,9 @@ func (s *Service) handleIndexRebuild(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) writeIndexManagerError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, searchindex.ErrManagerUnavailable):
+	case errors.Is(err, indexcontrol.ErrManagerUnavailable):
 		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "index manager is unavailable"})
-	case errors.Is(err, searchindex.ErrRebuildInProgress):
+	case errors.Is(err, indexcontrol.ErrRebuildInProgress):
 		s.writeJSON(w, http.StatusConflict, map[string]string{"error": "index rebuild already running"})
 	default:
 		s.writeError(w, err)

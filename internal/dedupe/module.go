@@ -126,6 +126,17 @@ func (runtime *Runtime) RunOnce(ctx context.Context) (object.DedupeResult, error
 	return result, err
 }
 
+func (runtime *Runtime) PlanOnce(ctx context.Context) (object.DedupeResult, error) {
+	if runtime == nil || runtime.objects == nil {
+		return object.DedupeResult{}, errors.New("dedupe runtime unavailable")
+	}
+	result, err := runtime.objects.PlanDedupe(ctx)
+	if err != nil {
+		return object.DedupeResult{}, fmt.Errorf("plan object dedupe: %w", err)
+	}
+	return result, nil
+}
+
 func (runtime *Runtime) runOnce(ctx context.Context) (object.DedupeResult, error) {
 	if runtime == nil || runtime.objects == nil {
 		return object.DedupeResult{}, errors.New("dedupe runtime unavailable")

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lyonbrown4d/maxio/internal/index"
+	"github.com/lyonbrown4d/maxio/internal/indexcontrol"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 )
 
@@ -15,7 +16,7 @@ type proxyReloader interface {
 type Dependencies struct {
 	metadata     metadata.MetadataStore
 	search       *index.SearchEngine
-	indexManager *index.Manager
+	indexManager *indexcontrol.Manager
 	proxy        proxyReloader
 }
 
@@ -39,7 +40,7 @@ func newDependencies(
 	return Dependencies{
 		metadata:     metadataStore,
 		search:       searchEngine,
-		indexManager: index.NewManager(metadataStore, searchEngine, index.ManagerOptions{}),
+		indexManager: indexcontrol.NewManager(metadataStore, searchEngine, indexcontrol.ManagerOptions{}),
 		proxy:        reloader,
 	}
 }

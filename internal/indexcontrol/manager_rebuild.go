@@ -1,4 +1,4 @@
-package index
+package indexcontrol
 
 import (
 	"context"
@@ -7,13 +7,23 @@ import (
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	searchindex "github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
+
+const maxIndexManagerErrorLength = 2048
+
+type objectRebuildResult struct {
+	indexed bool
+	failed  bool
+	stop    bool
+	message string
+}
 
 func (manager *Manager) listCommittedObjectMetas(ctx context.Context) (*collectionlist.List[model.ObjectMeta], error) {
 	buckets, err := manager.metadata.ListBuckets(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list buckets for index rebuild: %w", err)
 	}
 	objects := collectionlist.NewList[model.ObjectMeta]()
 	if buckets == nil {
@@ -49,37 +59,51 @@ func (manager *Manager) rebuildObjects(
 	failed := 0
 	message := ""
 	objects.Range(func(_ int, meta model.ObjectMeta) bool {
-		if err := ctx.Err(); err != nil {
-			message = firstErrorMessage(message, err)
-			return false
+		result := manager.rebuildObject(ctx, meta, now)
+		if result.indexed {
+			indexed++
 		}
-		versionID, err := manager.currentVersionID(ctx, meta)
-		if err != nil {
+		if result.failed {
 			failed++
-			message = firstErrorMessage(message, err)
-			return true
 		}
-		count, err := manager.search.UpsertDocuments([]IndexDocument{{Meta: meta}})
-		if err != nil || count == 0 {
-			failed++
-			if err == nil {
-				err = fmt.Errorf("search index accepted no documents for %s/%s", meta.Bucket, meta.Key)
-			}
-			message = firstErrorMessage(message, err)
-			if recordErr := manager.recordIndexDocument(ctx, meta, versionID, model.IndexDocumentStateFailed, time.Time{}, err); recordErr != nil {
-				message = firstErrorMessage(message, recordErr)
-			}
-			return true
-		}
-		if err := manager.recordIndexDocument(ctx, meta, versionID, model.IndexDocumentStateIndexed, now(), nil); err != nil {
-			failed++
-			message = firstErrorMessage(message, err)
-			return true
-		}
-		indexed++
-		return true
+		message = firstMessage(message, result.message)
+		return !result.stop
 	})
 	return indexed, failed, message
+}
+
+func (manager *Manager) rebuildObject(ctx context.Context, meta model.ObjectMeta, now func() time.Time) objectRebuildResult {
+	if err := ctx.Err(); err != nil {
+		return objectRebuildResult{stop: true, message: failureMessage(err)}
+	}
+	versionID, err := manager.currentVersionID(ctx, meta)
+	if err != nil {
+		return objectRebuildResult{failed: true, message: failureMessage(err)}
+	}
+	count, err := manager.search.UpsertDocuments([]searchindex.IndexDocument{{Meta: meta}})
+	if err != nil || count == 0 {
+		return manager.failedObjectRebuild(ctx, meta, versionID, err)
+	}
+	if err := manager.recordIndexDocument(ctx, meta, versionID, model.IndexDocumentStateIndexed, now(), nil); err != nil {
+		return objectRebuildResult{failed: true, message: failureMessage(err)}
+	}
+	return objectRebuildResult{indexed: true}
+}
+
+func (manager *Manager) failedObjectRebuild(
+	ctx context.Context,
+	meta model.ObjectMeta,
+	versionID string,
+	cause error,
+) objectRebuildResult {
+	if cause == nil {
+		cause = fmt.Errorf("search index accepted no documents for %s/%s", meta.Bucket, meta.Key)
+	}
+	message := failureMessage(cause)
+	if err := manager.recordIndexDocument(ctx, meta, versionID, model.IndexDocumentStateFailed, time.Time{}, cause); err != nil {
+		message = firstErrorMessage(message, err)
+	}
+	return objectRebuildResult{failed: true, message: message}
 }
 
 func (manager *Manager) currentVersionID(ctx context.Context, meta model.ObjectMeta) (string, error) {
@@ -90,25 +114,33 @@ func (manager *Manager) currentVersionID(ctx context.Context, meta model.ObjectM
 	if found && strings.TrimSpace(record.CurrentVersionID) != "" {
 		return strings.TrimSpace(record.CurrentVersionID), nil
 	}
+	return manager.currentVersionIDFromVersions(ctx, meta)
+}
 
+func (manager *Manager) currentVersionIDFromVersions(ctx context.Context, meta model.ObjectMeta) (string, error) {
 	versions, err := manager.metadata.ListObjectVersions(ctx, meta.Bucket, meta.Key)
 	if err != nil {
 		return "", fmt.Errorf("list object versions %s/%s: %w", meta.Bucket, meta.Key, err)
 	}
-	if versions != nil {
-		versionID := ""
-		versions.Range(func(_ int, version model.ObjectVersion) bool {
-			if version.DeleteMarker || strings.TrimSpace(version.VersionID) == "" {
-				return true
-			}
-			versionID = strings.TrimSpace(version.VersionID)
-			return false
-		})
-		if versionID != "" {
-			return versionID, nil
-		}
+	if versionID := firstVisibleVersionID(versions); versionID != "" {
+		return versionID, nil
 	}
 	return fallbackVersionID(meta), nil
+}
+
+func firstVisibleVersionID(versions *collectionlist.List[model.ObjectVersion]) string {
+	if versions == nil {
+		return ""
+	}
+	versionID := ""
+	versions.Range(func(_ int, version model.ObjectVersion) bool {
+		if version.DeleteMarker || strings.TrimSpace(version.VersionID) == "" {
+			return true
+		}
+		versionID = strings.TrimSpace(version.VersionID)
+		return false
+	})
+	return versionID
 }
 
 func fallbackVersionID(meta model.ObjectMeta) string {
@@ -144,6 +176,14 @@ func (manager *Manager) recordIndexDocument(
 	}
 	if _, err := manager.metadata.UpsertIndexDocument(ctx, document); err != nil {
 		return fmt.Errorf("upsert index document %s/%s: %w", meta.Bucket, meta.Key, err)
+	}
+	return nil
+}
+
+func (manager *Manager) pruneObjects(objects *collectionlist.List[model.ObjectMeta], result *RebuildResult) error {
+	if err := manager.search.PruneExcept(objects); err != nil {
+		result.Failed++
+		return fmt.Errorf("prune stale search index documents: %w", err)
 	}
 	return nil
 }
@@ -196,10 +236,17 @@ func firstMessage(current, message string) string {
 	return truncateMessage(message)
 }
 
+func failureMessage(cause error) string {
+	if cause == nil {
+		return ""
+	}
+	return truncateMessage(cause.Error())
+}
+
 func truncateMessage(message string) string {
 	message = strings.TrimSpace(message)
-	if len(message) > maxIndexJobErrorLength {
-		return message[:maxIndexJobErrorLength]
+	if len(message) > maxIndexManagerErrorLength {
+		return message[:maxIndexManagerErrorLength]
 	}
 	return message
 }

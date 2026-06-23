@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
@@ -46,20 +47,20 @@ func CollectIndexSnapshot(ctx context.Context, store Repository, limit int) (Ind
 	snapshot := IndexSnapshot{}
 	documents, err := store.ListIndexDocuments(ctx, "", "")
 	if err != nil {
-		return snapshot, err
+		return snapshot, fmt.Errorf("list index documents for snapshot: %w", err)
 	}
 	snapshot.addIndexDocuments(documents)
 
 	limit = normalizeListLimit(limit)
 	jobs, err := store.ListIndexJobs(ctx, "", limit)
 	if err != nil {
-		return snapshot, err
+		return snapshot, fmt.Errorf("list index jobs for snapshot: %w", err)
 	}
 	snapshot.addIndexJobs(jobs)
 
 	events, err := store.ListIndexOutboxEvents(ctx, "", limit)
 	if err != nil {
-		return snapshot, err
+		return snapshot, fmt.Errorf("list index outbox events for snapshot: %w", err)
 	}
 	snapshot.addIndexOutboxEvents(events)
 	return snapshot, nil

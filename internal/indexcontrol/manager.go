@@ -1,4 +1,6 @@
-package index
+// Package indexcontrol provides metadata-backed control operations for the
+// search index HTTP endpoints.
+package indexcontrol
 
 import (
 	"context"
@@ -7,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	searchindex "github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
 )
@@ -53,7 +56,7 @@ type ManagerOptions struct {
 
 type Manager struct {
 	metadata metadata.Repository
-	search   *SearchEngine
+	search   *searchindex.SearchEngine
 	options  ManagerOptions
 	mu       sync.RWMutex
 	rebuild  rebuildState
@@ -65,7 +68,7 @@ type rebuildState struct {
 	lastError string
 }
 
-func NewManager(store metadata.Repository, search *SearchEngine, options ManagerOptions) *Manager {
+func NewManager(store metadata.Repository, search *searchindex.SearchEngine, options ManagerOptions) *Manager {
 	return &Manager{
 		metadata: store,
 		search:   search,
@@ -99,21 +102,10 @@ func (manager *Manager) Rebuild(ctx context.Context) (result RebuildResult, err 
 		return RebuildResult{}, ErrRebuildInProgress
 	}
 
-	rebuildError := ""
 	jobID := rebuildJobID(result.StartedAt)
-	if markErr := manager.markRebuildJob(ctx, jobID, model.IndexJobStatusRunning, result, ""); markErr != nil {
-		rebuildError = firstErrorMessage(rebuildError, markErr)
-	}
+	rebuildError := manager.startRebuildJob(ctx, jobID, result)
 	defer func() {
-		result.FinishedAt = options.now()
-		if err != nil {
-			rebuildError = firstErrorMessage(rebuildError, err)
-		}
-		manager.finishRebuild(result, rebuildError)
-		status := rebuildJobStatus(result, err, rebuildError)
-		if markErr := manager.markRebuildJob(ctx, jobID, status, result, rebuildError); markErr != nil && err == nil {
-			err = markErr
-		}
+		result, err = manager.completeRebuild(ctx, jobID, result, err, rebuildError, options.now)
 	}()
 
 	objects, err := manager.listCommittedObjectMetas(ctx)
@@ -124,12 +116,33 @@ func (manager *Manager) Rebuild(ctx context.Context) (result RebuildResult, err 
 	result.Objects = indexed
 	result.Failed = failed
 	rebuildError = firstMessage(rebuildError, message)
-
-	if pruneErr := manager.search.PruneExcept(objects); pruneErr != nil {
-		result.Failed++
-		rebuildError = firstErrorMessage(rebuildError, pruneErr)
-	}
+	rebuildError = firstErrorMessage(rebuildError, manager.pruneObjects(objects, &result))
 	return result, nil
+}
+
+func (manager *Manager) startRebuildJob(ctx context.Context, jobID string, result RebuildResult) string {
+	if err := manager.markRebuildJob(ctx, jobID, model.IndexJobStatusRunning, result, ""); err != nil {
+		return failureMessage(err)
+	}
+	return ""
+}
+
+func (manager *Manager) completeRebuild(
+	ctx context.Context,
+	jobID string,
+	result RebuildResult,
+	rebuildErr error,
+	rebuildMessage string,
+	now func() time.Time,
+) (RebuildResult, error) {
+	result.FinishedAt = now()
+	rebuildMessage = firstErrorMessage(rebuildMessage, rebuildErr)
+	manager.finishRebuild(result, rebuildMessage)
+	status := rebuildJobStatus(result, rebuildErr, rebuildMessage)
+	if markErr := manager.markRebuildJob(ctx, jobID, status, result, rebuildMessage); markErr != nil && rebuildErr == nil {
+		return result, markErr
+	}
+	return result, rebuildErr
 }
 
 func (manager *Manager) beginRebuild(startedAt time.Time) bool {
@@ -178,5 +191,5 @@ func (options ManagerOptions) normalized() ManagerOptions {
 }
 
 func (options ManagerOptions) now() time.Time {
-	return jobTime(options.Now())
+	return options.Now().UTC()
 }

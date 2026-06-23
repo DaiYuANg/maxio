@@ -19,11 +19,11 @@ func (s *Service) handleDedupePlan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.objects == nil {
-		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "object service unavailable"})
+	if s.dedupe == nil {
+		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "dedupe runtime unavailable"})
 		return
 	}
-	result, err := s.objects.PlanDedupe(r.Context())
+	result, err := s.dedupe.PlanOnce(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return
@@ -36,11 +36,11 @@ func (s *Service) handleDedupeRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.objects == nil {
-		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "object service unavailable"})
+	if s.dedupe == nil {
+		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "dedupe runtime unavailable"})
 		return
 	}
-	result, err := s.objects.RunDedupe(r.Context())
+	result, err := s.dedupe.RunOnce(r.Context())
 	if err != nil {
 		s.writeError(w, err)
 		return

@@ -1,4 +1,4 @@
-package index
+package indexcontrol
 
 import "github.com/lyonbrown4d/maxio/internal/metadata"
 
