@@ -1,0 +1,138 @@
+name: maxio-seaweed
+
+services:
+  seaweed-a:
+    image: chrislusf/seaweedfs:latest
+    command: >
+      server
+      -ip=seaweed-a
+      -dir=/data
+      -master.port=9333
+      -volume.port=8080
+      -filer
+      -filer.port=8888
+      -s3
+      -s3.port=8333
+    ports:
+      - "9331:9333"
+      - "8881:8888"
+      - "8331:8333"
+    volumes:
+      - seaweed-a-data:/data
+
+  seaweed-b:
+    image: chrislusf/seaweedfs:latest
+    command: >
+      server
+      -ip=seaweed-b
+      -dir=/data
+      -master.port=9333
+      -volume.port=8080
+      -filer
+      -filer.port=8888
+      -s3
+      -s3.port=8333
+    ports:
+      - "9332:9333"
+      - "8882:8888"
+      - "8332:8333"
+    volumes:
+      - seaweed-b-data:/data
+
+  seaweed-c:
+    image: chrislusf/seaweedfs:latest
+    command: >
+      server
+      -ip=seaweed-c
+      -dir=/data
+      -master.port=9333
+      -volume.port=8080
+      -filer
+      -filer.port=8888
+      -s3
+      -s3.port=8333
+    ports:
+      - "9333:9333"
+      - "8883:8888"
+      - "8333:8333"
+    volumes:
+      - seaweed-c-data:/data
+
+  maxio:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: maxio:dev
+    depends_on:
+      - seaweed-a
+      - seaweed-b
+      - seaweed-c
+    user: "0:0"
+    working_dir: /app/data
+    environment:
+      MAXIO_HTTP_ADDRESS: ":8080"
+      MAXIO_HTTP_BODY_LIMIT: "1073741824"
+      MAXIO_STORAGE_ADDRESS: "maxio:8080"
+      MAXIO_ADMIN_TOKEN: ${MAXIO_ADMIN_TOKEN:-dev-admin-token}
+      MAXIO_API_TOKEN: ${MAXIO_API_TOKEN:-dev-api-token}
+      MAXIO_METADATA_BACKEND: sqlite
+      MAXIO_METADATA_DSN: /app/data/maxio.db
+      MAXIO_METADATA_AUTO_MIGRATE: "true"
+      MAXIO_ENABLE_S3_PROXY: "true"
+      MAXIO_S3_PROXY_ENTRYPOINT: ":8081"
+      MAXIO_S3_PROXY_ADMIN_ADDRESS: ":19090"
+      MAXIO_S3_PROXY_HEALTH_INTERVAL: 5s
+      MAXIO_S3_PROXY_HEALTH_TIMEOUT: 2s
+      MAXIO_CACHE_BACKEND: memory
+      MAXIO_CACHE_TTL: 1m
+      MAXIO_CACHE_MAX_COST: "100000"
+      MAXIO_DATA_DIR: /app/data
+      MAXIO_LOG_LEVEL: info
+      MAXIO_PENDING_OBJECT_TTL: 1h
+      MAXIO_REPAIR_INTERVAL: 10m
+      MAXIO_REPAIR_ON_START: "false"
+      MAXIO_REPAIR_MAX_BATCH: "100"
+      MAXIO_REPAIR_MAX_RETRIES: "2"
+      MAXIO_REPAIR_RATE_LIMIT: "0"
+      MAXIO_REPAIR_RETRY_BACKOFF: 1s
+      MAXIO_REPAIR_RETRY_MAX_BACKOFF: 10s
+      MAXIO_REPAIR_RETRY_MULTIPLIER: "2"
+      MAXIO_DEDUPE_INTERVAL: 30m
+      MAXIO_DEDUPE_ON_START: "false"
+      MAXIO_DEDUPE_MAX_FIXES: "100"
+      MAXIO_INDEX_TIMEOUT: 30s
+      MAXIO_INDEX_RETRY_BACKOFF: 1s
+      MAXIO_INDEX_MAX_RETRIES: "2"
+      MAXIO_INDEX_QUEUE_SIZE: "1024"
+      MAXIO_INDEX_RATE_LIMIT: "0"
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "19090:19090"
+    volumes:
+      - maxio-seaweed-data:/app/data
+
+  k6:
+    image: grafana/k6:latest
+    depends_on:
+      - maxio
+    environment:
+      BASE_URL: http://maxio:8080
+      S3_URL: http://maxio:8081
+      ADMIN_TOKEN: ${MAXIO_ADMIN_TOKEN:-dev-admin-token}
+      BUCKETS: maxio-a,maxio-b,maxio-c
+      VUS: ${K6_VUS:-4}
+      DURATION: ${K6_DURATION:-30s}
+      S3_OBJECT_BYTES: ${S3_OBJECT_BYTES:-1024}
+    volumes:
+      - ../k6:/scripts:ro
+    profiles:
+      - perf
+    entrypoint: ["k6"]
+    command: ["run", "/scripts/seaweed-smoke.js"]
+
+volumes:
+  maxio-seaweed-data:
+  seaweed-a-data:
+  seaweed-b-data:
+  seaweed-c-data:

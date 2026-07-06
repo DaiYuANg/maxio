@@ -24,6 +24,8 @@ dedupe relationships, index state, and operational events.
 - `docs/data-layout.md` - authoritative vs derived state and local runtime
   directories.
 - `docs/deployment.md` - deployment and configuration guidance.
+- `docs/seaweed-k6.md` - local multi-upstream SeaweedFS S3 topology
+  and k6 load-test entrypoint.
 - `ROADMAP.md` - staged implementation roadmap.
 
 ## Code layout
@@ -122,3 +124,4 @@ hardening DB-leased index workers, confirming `/_index/status` and
 `/_index/rebuild`, connecting dedupe observe reporting to proxy writes, and
 hardening migrations, PostgreSQL, S3 compatibility, auth, metrics, tracing, and
 repair workflows.
+
