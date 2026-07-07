@@ -19,6 +19,8 @@ const defaultDedupePlanPath = "/_dedupe/plan"
 const defaultDedupeRunPath = "/_dedupe/run"
 const defaultIndexStatusPath = "/_index/status"
 const defaultIndexRebuildPath = "/_index/rebuild"
+const defaultProcessingStatusPath = "/_processing/status"
+const defaultProcessingRecordsPath = "/_processing/records"
 
 type Service struct {
 	logger *slog.Logger

@@ -178,3 +178,17 @@ type IndexOutboxEvent struct {
 	CreatedAt   time.Time `dbx:"created_at,codec=unix_nano_time"   json:"created_at"`
 	UpdatedAt   time.Time `dbx:"updated_at,codec=unix_nano_time"   json:"updated_at"`
 }
+
+type ProcessingRecord struct {
+	ID        string    `dbx:"record_id"                       json:"id"`
+	Bucket    string    `dbx:"bucket"                          json:"bucket"`
+	Key       string    `dbx:"object_key"                      json:"key"`
+	VersionID string    `dbx:"version_id"                      json:"version_id,omitempty"`
+	Digest    string    `dbx:"digest"                          json:"digest,omitempty"`
+	Mode      string    `dbx:"mode"                            json:"mode"`
+	Status    string    `dbx:"status"                          json:"status"`
+	Error     string    `dbx:"error"                           json:"error,omitempty"`
+	Results   string    `dbx:"results"                         json:"results,omitempty"`
+	CreatedAt time.Time `dbx:"created_at,codec=unix_nano_time" json:"created_at"`
+	UpdatedAt time.Time `dbx:"updated_at,codec=unix_nano_time" json:"updated_at"`
+}

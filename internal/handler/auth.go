@@ -38,7 +38,7 @@ func (s *Service) requiresAdminAuth(route string, parts []string) bool {
 		return false
 	}
 	switch parts[0] {
-	case "_dedupe", "_index", "_s3":
+	case "_dedupe", "_index", "_processing", "_s3":
 		return true
 	default:
 		return false

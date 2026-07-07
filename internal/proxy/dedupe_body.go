@@ -88,6 +88,13 @@ func writeCapturedChunk(hasher io.Writer, spooler *requestBodySpooler, data []by
 	return nil
 }
 
+func (s *requestBodySpooler) Write(data []byte) (int, error) {
+	if err := s.write(data); err != nil {
+		return 0, err
+	}
+	return len(data), nil
+}
+
 func (s *requestBodySpooler) write(data []byte) error {
 	s.size += int64(len(data))
 	if s.tempFile == nil && int64(s.buffer.Len()+len(data)) <= defaultPutSpoolMemoryLimit {
@@ -168,6 +175,31 @@ func (b *capturedRequestBody) Open() (io.ReadCloser, error) {
 		return nil, oops.Wrapf(err, "open request body spool file")
 	}
 	return file, nil
+}
+
+func (b *capturedRequestBody) Clone() (*capturedRequestBody, error) {
+	if b == nil {
+		err := oops.New("captured request body is nil")
+		return nil, oops.Wrapf(err, "clone captured request body")
+	}
+	if b.tempPath == "" {
+		memory := make([]byte, len(b.memory))
+		copy(memory, b.memory)
+		return &capturedRequestBody{digest: b.digest, size: b.size, memory: memory}, nil
+	}
+	reader, err := b.Open()
+	if err != nil {
+		return nil, oops.Wrapf(err, "open captured request body for clone")
+	}
+	defer reader.Close()
+	spooler := &requestBodySpooler{}
+	if _, err := io.Copy(spooler, reader); err != nil {
+		return nil, closeCaptureWithError(nil, spooler, oops.Wrapf(err, "copy captured request body"))
+	}
+	if err := spooler.close(); err != nil {
+		return nil, closeCaptureWithError(nil, spooler, err)
+	}
+	return spooler.captured(b.digest), nil
 }
 
 func closeCaptureWithError(body io.Closer, spooler *requestBodySpooler, cause error) error {

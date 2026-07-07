@@ -1,0 +1,122 @@
+package metadata
+
+import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
+	"github.com/lyonbrown4d/maxio/internal/model"
+)
+
+func (s *SQLMetadata) UpsertProcessingRecord(ctx context.Context, record model.ProcessingRecord) (model.ProcessingRecord, error) {
+	record, err := prepareProcessingRecord(record)
+	if err != nil {
+		return model.ProcessingRecord{}, err
+	}
+	assignments, err := s.repos.processingRecords.Mapper().InsertAssignmentsWithID(ctx, metadataProcessingRecords.schema, &record, nil)
+	if err != nil {
+		return model.ProcessingRecord{}, fmt.Errorf("map processing record insert assignments: %w", err)
+	}
+	query := querydsl.InsertInto(metadataProcessingRecords.schema).
+		ValuesList(assignments).
+		OnConflict(metadataProcessingRecords.id).
+		DoUpdateSet(
+			metadataProcessingRecords.bucket.SetExcluded(),
+			metadataProcessingRecords.key.SetExcluded(),
+			metadataProcessingRecords.versionID.SetExcluded(),
+			metadataProcessingRecords.digest.SetExcluded(),
+			metadataProcessingRecords.mode.SetExcluded(),
+			metadataProcessingRecords.status.SetExcluded(),
+			metadataProcessingRecords.errorText.SetExcluded(),
+			metadataProcessingRecords.results.SetExcluded(),
+			metadataProcessingRecords.updatedAt.SetExcluded(),
+		)
+	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
+		return model.ProcessingRecord{}, fmt.Errorf("upsert processing record: %w", execErr)
+	}
+	stored, found, err := s.GetProcessingRecord(ctx, record.Bucket, record.Key, record.VersionID, record.Digest)
+	if err != nil {
+		return model.ProcessingRecord{}, err
+	}
+	if !found {
+		return model.ProcessingRecord{}, ErrObjectNotFound
+	}
+	return stored, nil
+}
+
+func (s *SQLMetadata) GetProcessingRecord(ctx context.Context, bucket, key, versionID, digest string) (model.ProcessingRecord, bool, error) {
+	id := processingRecordID(bucket, key, versionID, digest)
+	if id == "" {
+		return model.ProcessingRecord{}, false, ErrBadRequest
+	}
+	option, err := s.repos.processingRecords.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataProcessingRecords.id, id)))
+	if err != nil {
+		return model.ProcessingRecord{}, false, fmt.Errorf("query processing record: %w", err)
+	}
+	record, found := option.Get()
+	return record, found, nil
+}
+
+func (s *SQLMetadata) ListProcessingRecords(ctx context.Context, status string, limit int) (*collectionlist.List[model.ProcessingRecord], error) {
+	status = strings.TrimSpace(status)
+	limit = normalizeListLimit(limit)
+	specs := []repositoryx.Spec{
+		repositoryx.OrderBy(metadataProcessingRecords.updatedAt.Desc(), metadataProcessingRecords.id.Asc()),
+		repositoryx.Limit(limit),
+	}
+	if status != "" {
+		specs = append([]repositoryx.Spec{repositoryx.Where(metadataProcessingRecords.status.Eq(status))}, specs...)
+	}
+	records, err := s.repos.processingRecords.ListSpec(ctx, specs...)
+	if err != nil {
+		return nil, fmt.Errorf("list processing records: %w", err)
+	}
+	return records, nil
+}
+
+func (s *SQLMetadata) DeleteProcessingRecord(ctx context.Context, bucket, key, versionID, digest string) (bool, error) {
+	id := processingRecordID(bucket, key, versionID, digest)
+	if id == "" {
+		return false, ErrBadRequest
+	}
+	result, err := s.repos.processingRecords.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataProcessingRecords.id, id)))
+	if err != nil {
+		return false, fmt.Errorf("delete processing record: %w", err)
+	}
+	return hasAffectedRow(result, "delete processing record")
+}
+
+func prepareProcessingRecord(record model.ProcessingRecord) (model.ProcessingRecord, error) {
+	record.Mode = strings.TrimSpace(strings.ToLower(record.Mode))
+	record.Status = strings.TrimSpace(strings.ToLower(record.Status))
+	record.ID = processingRecordID(record.Bucket, record.Key, record.VersionID, record.Digest)
+	if record.ID == "" || record.Mode == "" || record.Status == "" {
+		return model.ProcessingRecord{}, ErrBadRequest
+	}
+	now := time.Now().UTC()
+	if record.CreatedAt.IsZero() {
+		record.CreatedAt = now
+	}
+	record.UpdatedAt = now
+	return record, nil
+}
+
+func processingRecordID(bucket, key, versionID, digest string) string {
+	identity := versionID
+	if identity == "" {
+		identity = digest
+	}
+	if strings.TrimSpace(bucket) == "" || key == "" || identity == "" {
+		return ""
+	}
+	return processingRecordIDPart(bucket) + "." + processingRecordIDPart(key) + "." + processingRecordIDPart(identity)
+}
+
+func processingRecordIDPart(value string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(value))
+}

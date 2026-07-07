@@ -31,5 +31,19 @@
   "index_retry_backoff": "1s",
   "index_max_retries": 2,
   "index_queue_size": 1024,
-  "index_rate_limit": 0
+  "index_rate_limit": 0,
+  "processing_enabled": false,
+  "processing_mode": "async_permissive",
+  "processing_timeout": "30s",
+  "processing_fail_open": false,
+  "processing_clamav_enabled": false,
+  "processing_clamav_mode": "inline_strict",
+  "processing_clamav_address": "clamav:3310",
+  "processing_tika_enabled": false,
+  "processing_tika_mode": "async_permissive",
+  "processing_tika_fail_open": false,
+  "processing_tika_url": "http://tika:9998",
+  "processing_tika_max_bytes": 104857600
 }
+
+

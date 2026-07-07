@@ -33,7 +33,10 @@ func validateDurations(cfg Config) error {
 	if err := validateMultiplier("repair_retry_multiplier", cfg.RepairRetryBackoffMultiplier); err != nil {
 		return err
 	}
-	return validateIndexConfig(cfg)
+	if err := validateIndexConfig(cfg); err != nil {
+		return err
+	}
+	return validateProcessingConfig(cfg)
 }
 
 func durationConfigs(cfg Config) []durationConfig {
@@ -46,6 +49,7 @@ func durationConfigs(cfg Config) []durationConfig {
 		{name: "index_timeout", value: cfg.IndexTimeout},
 		{name: "index_retry_backoff", value: cfg.IndexRetryBackoff},
 		{name: "cache_ttl", value: cfg.CacheTTL},
+		{name: "processing_timeout", value: cfg.ProcessingTimeout},
 	}
 	if cfg.EnableS3Proxy {
 		configs = append(configs,

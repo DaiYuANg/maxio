@@ -12,6 +12,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/index"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
+	"github.com/lyonbrown4d/maxio/internal/processing"
 	"github.com/lyonbrown4d/maxio/internal/proxy"
 	"github.com/samber/mo"
 )
@@ -22,7 +23,7 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider1(newLogger),
 			dix.Provider1(newEventBus),
-			dix.Provider3(newGatewayDependencies),
+			dix.Provider4(newGatewayDependencies),
 			dix.Provider3(newGatewayService),
 		),
 		dix.Hooks(
@@ -38,9 +39,10 @@ func newEventBus(logger *slog.Logger) eventx.BusRuntime {
 func newGatewayDependencies(
 	metadataStore metadata.MetadataStore,
 	searchEngine *index.SearchEngine,
+	processor *processing.Service,
 	proxyRuntime *proxy.ValeRuntime,
 ) Dependencies {
-	return newDependencies(metadataStore, searchEngine, proxyRuntime)
+	return newDependenciesWithProcessing(metadataStore, searchEngine, processor, proxyRuntime)
 }
 
 func newGatewayService(deps Dependencies, logger *slog.Logger, cfg config.Config) *Service {

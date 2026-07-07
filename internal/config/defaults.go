@@ -1,6 +1,7 @@
 package config
 
 func Default() Config {
+	processing := processingDefaults()
 	return Config{
 		HTTPAddress:                  ":8080",
 		HTTPBodyLimit:                1 << 30,
@@ -34,6 +35,17 @@ func Default() Config {
 		IndexRetryBackoff:            "1s",
 		IndexMaxRetries:              2,
 		IndexQueueSize:               1024,
+		ProcessingEnabled:            false,
+		ProcessingMode:               processing.ProcessingMode,
+		ProcessingTimeout:            processing.ProcessingTimeout,
+		ProcessingFailOpen:           false,
+		ProcessingClamAVEnabled:      false,
+		ProcessingClamAVMode:         processing.ProcessingClamAVMode,
+		ProcessingClamAVAddress:      processing.ProcessingClamAVAddress,
+		ProcessingTikaEnabled:        false,
+		ProcessingTikaMode:           processing.ProcessingTikaMode,
+		ProcessingTikaURL:            processing.ProcessingTikaURL,
+		ProcessingTikaMaxBytes:       processing.ProcessingTikaMaxBytes,
 	}
 }
 
@@ -43,7 +55,8 @@ func applyZeroDefaults(cfg Config) Config {
 	cfg = applyCacheZeroDefaults(cfg)
 	cfg = applyRepairZeroDefaults(cfg)
 	cfg = applyDedupeZeroDefaults(cfg)
-	return applyIndexZeroDefaults(cfg)
+	cfg = applyIndexZeroDefaults(cfg)
+	return applyProcessingZeroDefaults(cfg)
 }
 
 func applyRuntimeZeroDefaults(cfg Config) Config {

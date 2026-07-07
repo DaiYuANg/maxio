@@ -136,6 +136,32 @@ updated_at
 
 The latest visible version is resolved from DB state, not from Bleve.
 
+### Processing record
+
+Tracks optional object processing state for antivirus, text extraction, metadata
+extraction, classification, and policy processors. Strict read gates consult
+this DB state rather than process-local memory.
+
+Suggested fields:
+
+```text
+record_id            # stable encoded bucket/key/version_or_digest identity
+bucket
+object_key
+version_id           # final committed version when available
+digest               # pre-commit digest identity for inline strict preflight
+mode                 # async_permissive | async_strict | inline_strict
+status               # queued | running | succeeded | skipped | failed | blocked
+error
+results_json         # per-processor status, metadata, and completion time
+created_at
+updated_at
+```
+
+The implementation stores these rows in `metadata_processing_records` and looks them up by stable `record_id`, avoiding long composite object-key indexes on MySQL. Inline
+strict proxy misses may create a digest-only preflight record before upstream
+write, then promote it to the committed version record after metadata commit.
+
 ### Blob fingerprint
 
 Object-level content identity used for dedupe grouping.
@@ -476,3 +502,5 @@ dedupe alias reference count
 upstream HEAD/GET/PUT error rate
 repair_fault count by reason
 ```
+
+

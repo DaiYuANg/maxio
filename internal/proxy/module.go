@@ -14,6 +14,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/config"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/internal/processing"
 	"github.com/samber/oops"
 )
 
@@ -42,7 +43,7 @@ func Module() dix.Module {
 	return dix.NewModule(
 		"proxy",
 		dix.WithModuleProviders(
-			dix.ProviderErr5(newValeGateway),
+			dix.ProviderErr6(newValeGateway),
 		),
 		dix.Hooks(
 			dix.OnStart(startValeGateway),
@@ -57,6 +58,7 @@ func newValeGateway(
 	store metadata.MetadataStore,
 	bus eventx.BusRuntime,
 	metadataCache cache.MetadataCache,
+	processor *processing.Service,
 ) (*ValeRuntime, error) {
 	if !cfg.EnableS3Proxy {
 		return &ValeRuntime{}, nil
@@ -93,7 +95,7 @@ func newValeGateway(
 	if err != nil {
 		return nil, oops.Wrapf(err, "new vale config provider")
 	}
-	gateway, err := BuildValeGatewayFromProvider(configProvider, logger, NewDedupeMiddlewareRegistry(bus, store, metadataCache, logger))
+	gateway, err := BuildValeGatewayFromProvider(configProvider, logger, NewDedupeMiddlewareRegistry(bus, store, metadataCache, processor, logger))
 	if err != nil {
 		return nil, oops.Wrapf(err, "new vale gateway")
 	}

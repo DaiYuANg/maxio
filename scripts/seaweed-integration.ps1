@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('up', 'down', 'restart', 'k6', 'logs', 'clean', 'status')]
+    [ValidateSet('up', 'down', 'restart', 'k6', 'processing-k6', 'logs', 'clean', 'status')]
     [string]$Action = 'up',
     [int]$Vus = 4,
     [string]$Duration = '30s',
@@ -17,6 +17,44 @@ function Invoke-Compose {
     docker compose -p $Project -f $ComposeFile @Args
 }
 
+function Test-EnvEnabled {
+    param([string]$Name)
+    $value = [string](Get-Item -Path "Env:$Name" -ErrorAction SilentlyContinue).Value
+    return @('1', 'true', 'yes', 'on') -contains $value.Trim().ToLowerInvariant()
+}
+
+function Set-DefaultEnv {
+    param([string]$Name, [string]$Value)
+    $current = [string](Get-Item -Path "Env:$Name" -ErrorAction SilentlyContinue).Value
+    if (-not $current) { Set-Item -Path "Env:$Name" -Value $Value }
+}
+
+function Wait-ComposeServiceReady {
+    param([string]$Service, [int]$TimeoutSeconds = 180)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $containerId = (Invoke-Compose ps -q $Service 2>$null) -join ''
+        if ($containerId) {
+            $status = (docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' $containerId 2>$null) -join ''
+            if (@('healthy', 'running') -contains $status) { return }
+            if (@('unhealthy', 'exited', 'dead') -contains $status) { throw "Service $Service is $status" }
+        }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+    throw "Timed out waiting for service $Service"
+}
+
+function Start-OptionalProcessors {
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_CLAMAV_ENABLED') {
+        Invoke-Compose --profile av up -d clamav
+        Wait-ComposeServiceReady -Service 'clamav' -TimeoutSeconds 180
+    }
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_TIKA_ENABLED') {
+        Invoke-Compose --profile tika up -d tika
+        Wait-HttpOk -Url 'http://127.0.0.1:9998/version' -TimeoutSeconds 120
+    }
+}
+
 function Wait-HttpOk {
     param([string]$Url, [int]$TimeoutSeconds = 120)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -24,7 +62,8 @@ function Wait-HttpOk {
         try {
             $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
             if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) { return }
-        } catch { Start-Sleep -Seconds 2 }
+        } catch {}
+        Start-Sleep -Seconds 2
     } while ((Get-Date) -lt $deadline)
     throw "Timed out waiting for $Url"
 }
@@ -62,6 +101,7 @@ function Register-Upstreams {
 
 function Start-Environment {
     Invoke-Compose up -d seaweed-a seaweed-b seaweed-c
+    Start-OptionalProcessors
     Initialize-SeaweedBuckets
     $args = @('up', '-d')
     if ($Build) { $args += '--build' }
@@ -81,12 +121,87 @@ function Run-K6 {
     Invoke-Compose --profile perf run --rm k6 run /scripts/seaweed-smoke.js
 }
 
+function Run-ProcessingK6 {
+    Set-DefaultEnv -Name 'MAXIO_PROCESSING_ENABLED' -Value 'true'
+    Set-DefaultEnv -Name 'MAXIO_PROCESSING_MODE' -Value 'async_permissive'
+    Set-DefaultEnv -Name 'MAXIO_PROCESSING_CLAMAV_ENABLED' -Value 'true'
+    Set-DefaultEnv -Name 'MAXIO_PROCESSING_CLAMAV_MODE' -Value 'inline_strict'
+    Set-DefaultEnv -Name 'MAXIO_PROCESSING_TIKA_ENABLED' -Value 'true'
+    Set-DefaultEnv -Name 'MAXIO_PROCESSING_TIKA_MODE' -Value 'async_permissive'
+
+    $clamavMode = [string](Get-Item -Path 'Env:MAXIO_PROCESSING_CLAMAV_MODE' -ErrorAction SilentlyContinue).Value
+    $tikaMode = [string](Get-Item -Path 'Env:MAXIO_PROCESSING_TIKA_MODE' -ErrorAction SilentlyContinue).Value
+    $clamavMode = $clamavMode.Trim().ToLowerInvariant()
+    $tikaMode = $tikaMode.Trim().ToLowerInvariant()
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_TIKA_ENABLED') {
+        if ($tikaMode -eq 'async_permissive') {
+            Set-DefaultEnv -Name 'MAXIO_PROCESSING_TIKA_FAIL_OPEN' -Value 'true'
+        } else {
+            Set-DefaultEnv -Name 'MAXIO_PROCESSING_TIKA_FAIL_OPEN' -Value 'false'
+        }
+    }
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_TIKA_FAIL_OPEN') {
+        $tikaFailOpen = 'true'
+    } else {
+        $tikaFailOpen = 'false'
+    }
+
+    $processors = @()
+    $processorModes = @()
+    $processorFailOpen = @()
+    $capabilities = @()
+    $resultMetadata = @()
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_CLAMAV_ENABLED') {
+        $processors += 'clamav'
+        $processorModes += "clamav:$clamavMode"
+        $capabilities += 'antivirus'
+        $resultMetadata += 'clamav:verdict=clean'
+        $resultMetadata += 'clamav:response'
+    }
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_TIKA_ENABLED') {
+        $processors += 'tika'
+        $processorModes += "tika:$tikaMode"
+        $processorFailOpen += "tika:$tikaFailOpen"
+        $capabilities += 'text_extraction'
+        $capabilities += 'metadata_extract'
+        $resultMetadata += 'tika:endpoint'
+        $resultMetadata += 'tika:text_bytes'
+        $resultMetadata += 'tika:document_count'
+    }
+
+    if ($processors.Count -eq 0) {
+        $processingMode = [string](Get-Item -Path 'Env:MAXIO_PROCESSING_MODE' -ErrorAction SilentlyContinue).Value
+        $processingMode = $processingMode.Trim().ToLowerInvariant()
+        $processors += 'noop'
+        $processorModes += "noop:$processingMode"
+    }
+
+    Set-DefaultEnv -Name 'PROCESSING_RECORD_CHECK' -Value 'true'
+    Set-DefaultEnv -Name 'PROCESSING_EXPECT_PROCESSORS' -Value ($processors -join ',')
+    Set-DefaultEnv -Name 'PROCESSING_EXPECT_PROCESSOR_MODES' -Value ($processorModes -join ',')
+    Set-DefaultEnv -Name 'PROCESSING_EXPECT_PROCESSOR_FAIL_OPEN' -Value ($processorFailOpen -join ',')
+    Set-DefaultEnv -Name 'PROCESSING_EXPECT_CAPABILITIES' -Value ($capabilities -join ',')
+    Set-DefaultEnv -Name 'PROCESSING_EXPECT_RESULT_METADATA' -Value ($resultMetadata -join ',')
+    Set-DefaultEnv -Name 'PROCESSING_RECORD_RETRIES' -Value '30'
+    Set-DefaultEnv -Name 'PROCESSING_RECORD_RETRY_SLEEP' -Value '0.5'
+    if ((Test-EnvEnabled -Name 'MAXIO_PROCESSING_CLAMAV_ENABLED') -and $clamavMode -eq 'inline_strict') {
+        Set-DefaultEnv -Name 'CLAMAV_BLOCK_CHECK' -Value 'true'
+    } else {
+        Set-DefaultEnv -Name 'CLAMAV_BLOCK_CHECK' -Value 'false'
+    }
+    Start-Environment
+    Run-K6
+}
+
 switch ($Action) {
     'up' { Start-Environment }
     'restart' { Invoke-Compose down --remove-orphans; Start-Environment }
     'k6' { Start-Environment; Run-K6 }
+    'processing-k6' { Run-ProcessingK6 }
     'logs' { Invoke-Compose logs -f --tail 200 }
     'status' { Invoke-Compose ps }
     'down' { Invoke-Compose down --remove-orphans }
     'clean' { Invoke-Compose down --remove-orphans --volumes }
 }
+
+

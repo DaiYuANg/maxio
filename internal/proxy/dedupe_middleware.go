@@ -13,6 +13,7 @@ import (
 	"github.com/lyonbrown4d/maxio/internal/cache"
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/internal/processing"
 )
 
 const (
@@ -56,23 +57,25 @@ func (event ObjectDeleteSucceededEvent) Name() string {
 }
 
 type dedupeMiddleware struct {
-	bus    eventx.BusRuntime
-	store  metadata.MetadataStore
-	cache  cache.MetadataCache
-	logger *slog.Logger
+	bus       eventx.BusRuntime
+	store     metadata.MetadataStore
+	cache     cache.MetadataCache
+	processor *processing.Service
+	logger    *slog.Logger
 }
 
 func NewDedupeMiddlewareRegistry(
 	bus eventx.BusRuntime,
 	store metadata.MetadataStore,
 	metadataCache cache.MetadataCache,
+	processor *processing.Service,
 	logger *slog.Logger,
 ) *vale.MiddlewareRegistry {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	registry := vale.DefaultMiddlewareRegistry()
-	middleware := &dedupeMiddleware{bus: bus, store: store, cache: metadataCache, logger: logger}
+	middleware := &dedupeMiddleware{bus: bus, store: store, cache: metadataCache, processor: processor, logger: logger}
 	if err := registry.Register(dedupeMiddlewareType, middleware.wrap); err != nil {
 		logger.Error("register vale dedupe middleware", "error", err)
 	}
@@ -158,8 +161,12 @@ func (m *dedupeMiddleware) handlePutDedupeHit(
 	ref model.DigestRef,
 ) {
 	event := newObjectPutEventFromDigestHit(r, bucket, key, captured, ref)
+	if !m.processPutBeforeCommit(r.Context(), w, event, captured) {
+		return
+	}
 	version, err := m.commitObjectPut(r.Context(), event)
 	if err != nil {
+		m.discardPutProcessingRecord(r.Context(), event)
 		writeS3ProxyInternalError(w, "failed to commit deduplicated object metadata")
 		m.logger.ErrorContext(r.Context(), "commit deduplicated s3 put metadata", "bucket", bucket, "key", key, "error", err)
 		return
@@ -169,6 +176,7 @@ func (m *dedupeMiddleware) handlePutDedupeHit(
 	w.Header().Set("X-Maxio-Dedupe", "hit")
 	w.Header().Set("X-Maxio-Canonical-Bucket", ref.UpstreamBucket)
 	w.Header().Set("X-Maxio-Canonical-Key", ref.UpstreamKey)
+	m.processPutAfterCommit(r.Context(), event, captured)
 	w.WriteHeader(http.StatusOK)
 	m.publishObjectPut(r.Context(), event)
 }
@@ -182,8 +190,13 @@ func (m *dedupeMiddleware) handlePutMiss(
 	key string,
 	captured *capturedRequestBody,
 ) {
+	preflight := newObjectPutEventFromRequest(r, upstreamID, bucket, key, captured)
+	if !m.processPutBeforeCommit(r.Context(), w, preflight, captured) {
+		return
+	}
 	body, ok := m.openCapturedPutBody(w, r, bucket, key, captured)
 	if !ok {
+		m.discardPutProcessingRecord(r.Context(), preflight)
 		return
 	}
 	defer closeReplayedPutBody(r.Context(), m.logger, body)
@@ -193,12 +206,14 @@ func (m *dedupeMiddleware) handlePutMiss(
 	response := newProxyResponseBuffer()
 	next.ServeHTTP(response, r)
 	if !isSuccessfulProxyStatus(response.statusCode()) {
+		m.discardPutProcessingRecord(r.Context(), preflight)
 		m.sendBufferedPutResponse(r.Context(), w, response, bucket, key, false)
 		return
 	}
 	event := newObjectPutEventFromUpstreamResponse(r, upstreamID, bucket, key, captured, response)
 	version, err := m.commitObjectPut(r.Context(), event)
 	if err != nil {
+		m.discardPutProcessingRecord(r.Context(), preflight)
 		writeS3ProxyInternalError(w, "failed to commit object metadata")
 		m.logger.ErrorContext(r.Context(), "commit s3 put metadata", "bucket", bucket, "key", key, "error", err)
 		return
@@ -208,6 +223,7 @@ func (m *dedupeMiddleware) handlePutMiss(
 	if response.Header().Get("ETag") == "" {
 		response.Header().Set("ETag", digestETag(captured.digest))
 	}
+	m.processPutAfterCommit(r.Context(), event, captured)
 	if m.sendBufferedPutResponse(r.Context(), w, response, bucket, key, true) {
 		m.publishObjectPut(r.Context(), event)
 	}

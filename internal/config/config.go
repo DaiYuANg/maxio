@@ -57,6 +57,18 @@ type Config struct {
 	IndexMaxRetries              int              `json:"index_max_retries"        koanf:"index_max_retries"`
 	IndexQueueSize               int              `json:"index_queue_size"         koanf:"index_queue_size"`
 	IndexRateLimit               int              `json:"index_rate_limit"         koanf:"index_rate_limit"`
+	ProcessingEnabled            bool             `json:"processing_enabled"        koanf:"processing_enabled"`
+	ProcessingMode               string           `json:"processing_mode"           koanf:"processing_mode"           validate:"required,min=1"`
+	ProcessingTimeout            string           `json:"processing_timeout"        koanf:"processing_timeout"        validate:"required,min=1"`
+	ProcessingFailOpen           bool             `json:"processing_fail_open"      koanf:"processing_fail_open"`
+	ProcessingClamAVEnabled      bool             `json:"processing_clamav_enabled" koanf:"processing_clamav_enabled"`
+	ProcessingClamAVMode         string           `json:"processing_clamav_mode"    koanf:"processing_clamav_mode"`
+	ProcessingClamAVAddress      string           `json:"processing_clamav_address" koanf:"processing_clamav_address"`
+	ProcessingTikaEnabled        bool             `json:"processing_tika_enabled"    koanf:"processing_tika_enabled"`
+	ProcessingTikaMode           string           `json:"processing_tika_mode"       koanf:"processing_tika_mode"`
+	ProcessingTikaFailOpen       bool             `json:"processing_tika_fail_open"  koanf:"processing_tika_fail_open"`
+	ProcessingTikaURL            string           `json:"processing_tika_url"        koanf:"processing_tika_url"`
+	ProcessingTikaMaxBytes       int64            `json:"processing_tika_max_bytes"  koanf:"processing_tika_max_bytes"`
 }
 
 func Load(opts ...configx.Option) (Config, error) {
@@ -158,6 +170,12 @@ func trim(cfg Config) Config {
 	cfg.DedupeInterval = strings.TrimSpace(cfg.DedupeInterval)
 	cfg.IndexTimeout = strings.TrimSpace(cfg.IndexTimeout)
 	cfg.IndexRetryBackoff = strings.TrimSpace(cfg.IndexRetryBackoff)
+	cfg.ProcessingMode = strings.TrimSpace(strings.ToLower(cfg.ProcessingMode))
+	cfg.ProcessingClamAVMode = strings.TrimSpace(strings.ToLower(cfg.ProcessingClamAVMode))
+	cfg.ProcessingTikaMode = strings.TrimSpace(strings.ToLower(cfg.ProcessingTikaMode))
+	cfg.ProcessingTimeout = strings.TrimSpace(cfg.ProcessingTimeout)
+	cfg.ProcessingClamAVAddress = strings.TrimSpace(cfg.ProcessingClamAVAddress)
+	cfg.ProcessingTikaURL = strings.TrimSpace(cfg.ProcessingTikaURL)
 	return cfg
 }
 

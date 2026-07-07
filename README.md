@@ -15,19 +15,25 @@ dedupe relationships, index state, and operational events.
 - Object-level dedupe starts in observe mode and can evolve to alias mode.
 - Gateway coordination, indexing, rebuild, and recovery are DB-backed; no
   gateway-local membership or local byte-store is authoritative.
+- Object processing is an optional pipeline boundary. The default mode is
+  disabled; deployments can later enable post-commit or inline-strict processors
+  such as Tika, ClamAV, OCR, DLP, or policy engines without making them hard
+  dependencies of the S3 proxy. Built-in optional processors include ClamAV
+  over clamd TCP and Apache Tika over the Tika Server HTTP API.
 
 ## Core documents
 
 - `docs/architecture.md` - proxy-only architecture and component boundaries.
 - `docs/metadata-indexing.md` - metadata tables/entities, write path, async
   indexing, dedupe modes, rebuild, and consistency strategy.
+- `docs/processing.md` - optional object processing pipeline, modes, and
+  ClamAV/Tika processor configuration.
 - `docs/data-layout.md` - authoritative vs derived state and local runtime
   directories.
 - `docs/deployment.md` - deployment and configuration guidance.
-- `docs/seaweed-k6.md` - local multi-upstream SeaweedFS S3 topology
-  and k6 load-test entrypoint.
+- `docs/seaweed-k6.md` - local multi-upstream SeaweedFS S3 topology,
+  k6 load-test entrypoint, and `processing-k6` smoke preset for ClamAV/Tika.
 - `ROADMAP.md` - staged implementation roadmap.
-
 ## Code layout
 
 - `cmd/maxio` is the executable entrypoint.
@@ -51,7 +57,17 @@ Key settings:
   "metadata_dsn": "./data/maxio.db",
   "metadata_auto_migrate": true,
   "enable_s3_proxy": true,
-  "s3_proxy_entrypoint": ":8080"
+  "s3_proxy_entrypoint": ":8080",
+  "processing_enabled": false,
+  "processing_mode": "async_permissive",
+  "processing_clamav_enabled": false,
+  "processing_clamav_mode": "inline_strict",
+  "processing_clamav_address": "clamav:3310",
+  "processing_tika_enabled": false,
+  "processing_tika_mode": "async_permissive",
+  "processing_tika_fail_open": false,
+  "processing_tika_url": "http://tika:9998",
+  "processing_tika_max_bytes": 104857600
 }
 ```
 
@@ -124,4 +140,5 @@ hardening DB-leased index workers, confirming `/_index/status` and
 `/_index/rebuild`, connecting dedupe observe reporting to proxy writes, and
 hardening migrations, PostgreSQL, S3 compatibility, auth, metrics, tracing, and
 repair workflows.
+
 

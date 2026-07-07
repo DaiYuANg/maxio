@@ -13,6 +13,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/metadata"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/lyonbrown4d/maxio/internal/processing"
 )
 
 func TestDedupeMiddlewarePutHitShortCircuitsUpstream(t *testing.T) {
@@ -102,6 +103,33 @@ func TestDedupeMiddlewarePutMissForwardsAndCommitsMetadata(t *testing.T) {
 	}
 }
 
+func TestDedupeMiddlewarePutMissCleansInlinePreflightRecordOnUpstreamFailure(t *testing.T) {
+	ctx := context.Background()
+	store := metadata.NewInMemoryMetadata()
+	body := []byte("rejected upstream")
+	digest := testDigest(body)
+	processor := processing.NewService(
+		slog.Default(),
+		processing.Config{Enabled: true, Mode: processing.ModeInlineStrict},
+		processing.NewNoopProcessor(),
+	)
+	middleware := &dedupeMiddleware{store: store, processor: processor, logger: slog.Default()}
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	req := httptest.NewRequestWithContext(ctx, http.MethodPut, "/photos/new.txt", bytes.NewReader(body))
+	recorder := httptest.NewRecorder()
+
+	middleware.handlePut(next, "up", recorder, req)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, recorder.Code)
+	}
+	if _, found := processor.Record(ctx, processing.ObjectRef{Bucket: "photos", Key: "new.txt", Digest: digest}); found {
+		t.Fatal("did not expect inline preflight processing record after upstream failure")
+	}
+}
+
 func TestDedupeMiddlewareReadRewritesToCanonicalObject(t *testing.T) {
 	ctx := context.Background()
 	store := metadata.NewInMemoryMetadata()
@@ -131,6 +159,32 @@ func TestDedupeMiddlewareReadRewritesToCanonicalObject(t *testing.T) {
 	}
 }
 
+func TestProcessingSnapshotNeedsAsyncBodyUsesProcessorModes(t *testing.T) {
+	snapshot := processing.Snapshot{
+		Enabled: true,
+		Mode:    processing.ModeInlineStrict,
+		ProcessorModes: map[string]string{
+			"clamav": processing.ModeInlineStrict,
+			"tika":   processing.ModeAsyncPermissive,
+		},
+	}
+	if !processingSnapshotNeedsAsyncBody(snapshot) {
+		t.Fatal("expected async processor mode to require retained request body")
+	}
+}
+
+func TestProcessingSnapshotNeedsAsyncBodyIgnoresPureInlineProcessors(t *testing.T) {
+	snapshot := processing.Snapshot{
+		Enabled: true,
+		Mode:    processing.ModeAsyncPermissive,
+		ProcessorModes: map[string]string{
+			"clamav": processing.ModeInlineStrict,
+		},
+	}
+	if processingSnapshotNeedsAsyncBody(snapshot) {
+		t.Fatal("did not expect pure inline processors to require retained request body")
+	}
+}
 func testDigest(body []byte) string {
 	sum := sha256.Sum256(body)
 	return "sha256:" + hex.EncodeToString(sum[:])

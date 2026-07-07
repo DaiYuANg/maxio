@@ -22,13 +22,15 @@ func (s *Service) handleControlRoute(w http.ResponseWriter, r *http.Request, rou
 
 func (s *Service) handleNamedControlRoute(w http.ResponseWriter, r *http.Request, route string, parts []string) bool {
 	routes := map[string]func(){
-		strings.Trim(defaultSearchPath, "/"):       func() { s.handleSearch(w, r) },
-		strings.Trim(defaultS3UpstreamsPath, "/"):  func() { s.handleS3Upstreams(w, r) },
-		strings.Trim(defaultDedupeStatusPath, "/"): func() { s.handleDedupeStatus(w, r) },
-		strings.Trim(defaultDedupePlanPath, "/"):   func() { s.handleDedupePlan(w, r) },
-		strings.Trim(defaultDedupeRunPath, "/"):    func() { s.handleDedupeRun(w, r) },
-		strings.Trim(defaultIndexStatusPath, "/"):  func() { s.handleIndexStatus(w, r) },
-		strings.Trim(defaultIndexRebuildPath, "/"): func() { s.handleIndexRebuild(w, r) },
+		strings.Trim(defaultSearchPath, "/"):            func() { s.handleSearch(w, r) },
+		strings.Trim(defaultS3UpstreamsPath, "/"):       func() { s.handleS3Upstreams(w, r) },
+		strings.Trim(defaultDedupeStatusPath, "/"):      func() { s.handleDedupeStatus(w, r) },
+		strings.Trim(defaultDedupePlanPath, "/"):        func() { s.handleDedupePlan(w, r) },
+		strings.Trim(defaultDedupeRunPath, "/"):         func() { s.handleDedupeRun(w, r) },
+		strings.Trim(defaultIndexStatusPath, "/"):       func() { s.handleIndexStatus(w, r) },
+		strings.Trim(defaultIndexRebuildPath, "/"):      func() { s.handleIndexRebuild(w, r) },
+		strings.Trim(defaultProcessingStatusPath, "/"):  func() { s.handleProcessingStatus(w, r) },
+		strings.Trim(defaultProcessingRecordsPath, "/"): func() { s.handleProcessingRecord(w, r) },
 	}
 	if routeHandler, ok := routes[route]; ok {
 		routeHandler()

@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
-	"path"
+
 	"strings"
 	"time"
 
@@ -74,18 +74,17 @@ func (r *proxyResponseBuffer) Send(w http.ResponseWriter) error {
 }
 
 func parseS3ObjectPath(rawPath string) (string, string, bool) {
-	cleanPath := strings.Trim(path.Clean("/"+rawPath), "/")
-	bucket, key, ok := strings.Cut(cleanPath, "/")
+	objectPath := strings.TrimLeft(rawPath, "/")
+	bucket, key, ok := strings.Cut(objectPath, "/")
 	if !ok {
 		return "", "", false
 	}
 	bucket = strings.TrimSpace(bucket)
-	key = strings.TrimSpace(key)
 	return bucket, key, bucket != "" && key != ""
 }
 
 func s3ObjectPath(bucket, key string) string {
-	return "/" + strings.Trim(strings.TrimSpace(bucket), "/") + "/" + strings.TrimLeft(key, "/")
+	return "/" + strings.Trim(strings.TrimSpace(bucket), "/") + "/" + key
 }
 
 func isSuccessfulProxyStatus(status int) bool {
@@ -129,6 +128,28 @@ func userMetadataFromHeader(header http.Header) map[string]string {
 		return nil
 	}
 	return metadataValues
+}
+
+func newObjectPutEventFromRequest(
+	r *http.Request,
+	upstreamID string,
+	bucket string,
+	key string,
+	captured *capturedRequestBody,
+) ObjectPutSucceededEvent {
+	return ObjectPutSucceededEvent{
+		Bucket:         bucket,
+		Key:            key,
+		Digest:         captured.digest,
+		Size:           captured.size,
+		ETag:           digestETag(captured.digest),
+		ContentType:    r.Header.Get("Content-Type"),
+		UpstreamID:     upstreamID,
+		UpstreamBucket: bucket,
+		UpstreamKey:    key,
+		UserMetadata:   userMetadataFromHeader(r.Header),
+		DedupeHit:      false,
+	}
 }
 
 func newObjectPutEventFromDigestHit(
@@ -179,12 +200,16 @@ func newObjectPutEventFromUpstreamResponse(
 }
 
 func writeS3ProxyInternalError(w http.ResponseWriter, message string) {
-	payload, err := xml.Marshal(s3ErrorResponse{Code: "InternalError", Message: message})
+	writeS3ProxyError(w, http.StatusInternalServerError, "InternalError", message)
+}
+
+func writeS3ProxyError(w http.ResponseWriter, status int, code, message string) {
+	payload, err := xml.Marshal(s3ErrorResponse{Code: code, Message: message})
 	if err != nil {
 		payload = []byte("<Error><Code>InternalError</Code><Message>internal error</Message></Error>")
 	}
 	w.Header().Set("Content-Type", "application/xml")
-	w.WriteHeader(http.StatusInternalServerError)
+	w.WriteHeader(status)
 	if _, err := w.Write(payload); err != nil {
 		return
 	}

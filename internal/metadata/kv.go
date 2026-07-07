@@ -73,6 +73,10 @@ type Repository interface {
 	GetIndexOutboxEvent(ctx context.Context, id string) (model.IndexOutboxEvent, bool, error)
 	ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*list.List[model.IndexOutboxEvent], error)
 	DeleteIndexOutboxEvent(ctx context.Context, id string) (bool, error)
+	UpsertProcessingRecord(ctx context.Context, record model.ProcessingRecord) (model.ProcessingRecord, error)
+	GetProcessingRecord(ctx context.Context, bucket, key, versionID, digest string) (model.ProcessingRecord, bool, error)
+	ListProcessingRecords(ctx context.Context, status string, limit int) (*list.List[model.ProcessingRecord], error)
+	DeleteProcessingRecord(ctx context.Context, bucket, key, versionID, digest string) (bool, error)
 
 	ListBlobRefs(ctx context.Context) (*list.List[BlobRef], error)
 	GetBlobRef(ctx context.Context, hash string) (BlobRef, bool, error)
@@ -91,12 +95,13 @@ type InMemoryMetadata struct {
 	staged    map[string]model.ObjectMeta
 	blobs     map[string]BlobRef
 
-	objectRecords  map[string]model.ObjectRecord
-	objectVersions map[string]model.ObjectVersion
-	digestRefs     map[string]model.DigestRef
-	indexDocuments map[string]model.IndexDocument
-	indexJobs      map[string]model.IndexJob
-	indexOutbox    map[string]model.IndexOutboxEvent
+	objectRecords     map[string]model.ObjectRecord
+	objectVersions    map[string]model.ObjectVersion
+	digestRefs        map[string]model.DigestRef
+	indexDocuments    map[string]model.IndexDocument
+	indexJobs         map[string]model.IndexJob
+	indexOutbox       map[string]model.IndexOutboxEvent
+	processingRecords map[string]model.ProcessingRecord
 }
 
 func NewInMemoryMetadata() *InMemoryMetadata {
@@ -107,12 +112,13 @@ func NewInMemoryMetadata() *InMemoryMetadata {
 		staged:    make(map[string]model.ObjectMeta),
 		blobs:     make(map[string]BlobRef),
 
-		objectRecords:  make(map[string]model.ObjectRecord),
-		objectVersions: make(map[string]model.ObjectVersion),
-		digestRefs:     make(map[string]model.DigestRef),
-		indexDocuments: make(map[string]model.IndexDocument),
-		indexJobs:      make(map[string]model.IndexJob),
-		indexOutbox:    make(map[string]model.IndexOutboxEvent),
+		objectRecords:     make(map[string]model.ObjectRecord),
+		objectVersions:    make(map[string]model.ObjectVersion),
+		digestRefs:        make(map[string]model.DigestRef),
+		indexDocuments:    make(map[string]model.IndexDocument),
+		indexJobs:         make(map[string]model.IndexJob),
+		indexOutbox:       make(map[string]model.IndexOutboxEvent),
+		processingRecords: make(map[string]model.ProcessingRecord),
 	}
 }
 

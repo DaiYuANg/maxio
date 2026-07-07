@@ -1,8 +1,6 @@
 package proxy
 
-import (
-	"net/http"
-)
+import "net/http"
 
 func (m *dedupeMiddleware) handleDelete(next http.Handler, w http.ResponseWriter, r *http.Request) {
 	bucket, key, ok := parseS3ObjectPath(r.URL.Path)
@@ -10,7 +8,7 @@ func (m *dedupeMiddleware) handleDelete(next http.Handler, w http.ResponseWriter
 		next.ServeHTTP(w, r)
 		return
 	}
-	digest, found, err := m.currentDigest(r.Context(), bucket, key)
+	version, found, err := m.currentObjectVersion(r.Context(), bucket, key)
 	if err != nil {
 		writeS3ProxyInternalError(w, "failed to lookup object metadata")
 		m.logger.ErrorContext(r.Context(), "lookup s3 delete object metadata", "bucket", bucket, "key", key, "error", err)
@@ -26,11 +24,12 @@ func (m *dedupeMiddleware) handleDelete(next http.Handler, w http.ResponseWriter
 		return
 	}
 	m.deleteCachedObjectVersion(r.Context(), bucket, key)
-	if err := m.releaseDigest(r.Context(), digest); err != nil {
+	if err := m.releaseDigest(r.Context(), version.Digest); err != nil {
 		writeS3ProxyInternalError(w, "failed to release object digest")
-		m.logger.ErrorContext(r.Context(), "release s3 object digest", "bucket", bucket, "key", key, "digest", digest, "error", err)
+		m.logger.ErrorContext(r.Context(), "release s3 object digest", "bucket", bucket, "key", key, "digest", version.Digest, "error", err)
 		return
 	}
+	m.discardProcessingRecord(r.Context(), version)
 	w.Header().Set("X-Maxio-Dedupe", "delete-ref")
 	w.WriteHeader(http.StatusNoContent)
 	m.publishObjectDelete(r.Context(), ObjectDeleteSucceededEvent{Bucket: bucket, Key: key, Digest: digest, Deleted: true})
@@ -50,6 +49,9 @@ func (m *dedupeMiddleware) handleRead(next http.Handler, upstreamID string, w ht
 	}
 	if !found || version.UpstreamBucket == "" || version.UpstreamKey == "" {
 		next.ServeHTTP(w, r)
+		return
+	}
+	if !m.ensureProcessingReadAllowed(r.Context(), w, version) {
 		return
 	}
 	if version.UpstreamID != "" && version.UpstreamID != upstreamID {

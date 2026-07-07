@@ -144,6 +144,47 @@ Alias mode:
 - should use upstream versioning or protected prefixes;
 - needs explicit repair and lifecycle checks before deleting canonical bytes.
 
+## Object processing operations
+
+Object processing is optional and should be enabled per deployment policy. Keep
+processors explicit rather than relying on the global processing mode alone.
+
+Recommended placement matrix:
+
+| Use case | Processor | Mode | Failure policy |
+| --- | --- | --- | --- |
+| Antivirus gate | `clamav` | `inline_strict` | fail closed; reject infected or scan-failed writes |
+| Text and metadata enrichment | `tika` | `async_permissive` | fail open for local smoke or best-effort enrichment |
+| Compliance enrichment required before read | `tika` or policy processor | `async_strict` | fail closed on reads until processing succeeds |
+| Development smoke | `clamav` + `tika` | `inline_strict` + `async_permissive` | use `processing-k6` preset |
+
+Operational expectations:
+
+- enabling a processor requires `processing_enabled=true`;
+- processor modes should be configured independently with
+  `processing_clamav_mode` and `processing_tika_mode`;
+- `processing_fail_open=true` is rejected for enabled strict processor gates and should not be used for security controls;
+- `processing_tika_fail_open=true` is acceptable only for permissive best-effort enrichment;
+- `/_processing/status` should expose active processors, modes, and capabilities;
+- `/_processing/records` should expose processor metadata and read-gate decisions
+  without exposing extracted text payloads;
+- ClamAV and Tika should be monitored as external dependencies when enabled;
+- stateless gateways rely on DB-backed processing records for cross-instance read
+  gates.
+
+Local Docker smoke:
+
+```sh
+BUILD=1 ./scripts/seaweed-integration.sh processing-k6
+```
+
+```powershell
+.\scripts\seaweed-integration.ps1 processing-k6 -Build
+```
+
+The preset starts the optional ClamAV and Tika services, checks ClamAV clean and
+EICAR block behavior, checks Tika result metadata and processor-local fail-open
+status, and keeps all settings overridable through environment variables.
 ## Bleve index operations
 
 Inspect DB-backed index worker status:
