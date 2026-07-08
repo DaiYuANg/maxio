@@ -45,35 +45,46 @@ func (s *Service) handleProcessingStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if s == nil || s.processing == nil {
-		s.writeJSON(w, http.StatusOK, processingStatusResponse{
-			Mode:              processing.ModeDisabled,
-			Timeout:           (0 * time.Second).String(),
-			Processors:        []string{},
-			ProcessorModes:    map[string]string{},
-			ProcessorFailOpen: map[string]bool{},
-			Capabilities:      []string{},
-		})
+		s.writeJSON(w, http.StatusOK, emptyProcessingStatusResponse())
 		return
 	}
-	snapshot := s.processing.Snapshot()
-	processors := []string{}
-	if snapshot.Processors != nil {
-		processors = snapshot.Processors.Values()
+	s.writeJSON(w, http.StatusOK, processingStatusFromSnapshot(s.processing.Snapshot()))
+}
+
+func emptyProcessingStatusResponse() processingStatusResponse {
+	return processingStatusResponse{
+		Mode:              processing.ModeDisabled,
+		Timeout:           (0 * time.Second).String(),
+		Processors:        []string{},
+		ProcessorModes:    map[string]string{},
+		ProcessorFailOpen: map[string]bool{},
+		Capabilities:      []string{},
 	}
-	capabilities := []string{}
-	if snapshot.Capabilities != nil {
-		capabilities = snapshot.Capabilities.Values()
-	}
-	s.writeJSON(w, http.StatusOK, processingStatusResponse{
+}
+
+func processingStatusFromSnapshot(snapshot processing.Snapshot) processingStatusResponse {
+	return processingStatusResponse{
 		Enabled:           snapshot.Enabled,
 		Mode:              snapshot.Mode,
 		FailOpen:          snapshot.FailOpen,
 		Timeout:           snapshot.Timeout.Round(time.Millisecond).String(),
-		Processors:        processors,
+		Processors:        stringListValues(snapshot.Processors),
 		ProcessorModes:    snapshot.ProcessorModes,
 		ProcessorFailOpen: snapshot.ProcessorFailOpen,
-		Capabilities:      capabilities,
-	})
+		Capabilities:      stringListValues(snapshot.Capabilities),
+	}
+}
+
+func stringListValues[T ~string](values interface{ Values() []T }) []string {
+	if values == nil {
+		return []string{}
+	}
+	items := values.Values()
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		result = append(result, string(item))
+	}
+	return result
 }
 
 func (s *Service) handleProcessingRecord(w http.ResponseWriter, r *http.Request) {
@@ -85,19 +96,30 @@ func (s *Service) handleProcessingRecord(w http.ResponseWriter, r *http.Request)
 		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "processing record not found"})
 		return
 	}
-	status := processing.NormalizeStatus(r.URL.Query().Get("status"))
-	if status != "" {
-		if !processing.ValidStatus(status) {
-			s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "status must be one of skipped, queued, running, succeeded, failed, blocked"})
-			return
-		}
-		if processingRecordHasIdentityParams(r) {
-			s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "status cannot be combined with bucket, key, version_id, or digest"})
-			return
-		}
-		s.handleProcessingRecordList(w, r, status)
+	if s.handleProcessingRecordStatusQuery(w, r) {
 		return
 	}
+	s.handleProcessingRecordLookup(w, r)
+}
+
+func (s *Service) handleProcessingRecordStatusQuery(w http.ResponseWriter, r *http.Request) bool {
+	status := processing.NormalizeStatus(r.URL.Query().Get("status"))
+	if status == "" {
+		return false
+	}
+	if !processing.ValidStatus(status) {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "status must be one of skipped, queued, running, succeeded, failed, blocked"})
+		return true
+	}
+	if processingRecordHasIdentityParams(r) {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "status cannot be combined with bucket, key, version_id, or digest"})
+		return true
+	}
+	s.handleProcessingRecordList(w, r, status)
+	return true
+}
+
+func (s *Service) handleProcessingRecordLookup(w http.ResponseWriter, r *http.Request) {
 	object, ok := processingRecordObjectFromRequest(r)
 	if !ok {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bucket, key, and version_id or digest are required"})
@@ -133,16 +155,6 @@ func (s *Service) handleProcessingRecordList(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Service) processingRecordToResponse(record processing.Record) processingRecordResponse {
-	results := []processing.ProcessorResult{}
-	if record.Results != nil {
-		results = append(results, record.Results.Values()...)
-		sort.Slice(results, func(i, j int) bool {
-			if results[i].Processor == results[j].Processor {
-				return results[i].Mode < results[j].Mode
-			}
-			return results[i].Processor < results[j].Processor
-		})
-	}
 	decision := processing.ReadDecision{Allowed: true}
 	if s != nil && s.processing != nil {
 		decision = s.processing.ReadDecision(record)
@@ -158,8 +170,24 @@ func (s *Service) processingRecordToResponse(record processing.Record) processin
 		ReadAllowed:     decision.Allowed,
 		ReadBlockReason: decision.Reason,
 		UpdatedAt:       record.UpdatedAt,
-		Results:         results,
+		Results:         sortedProcessingResults(record.Results),
 	}
+}
+
+func sortedProcessingResults(results interface {
+	Values() []processing.ProcessorResult
+}) []processing.ProcessorResult {
+	if results == nil {
+		return []processing.ProcessorResult{}
+	}
+	items := append([]processing.ProcessorResult{}, results.Values()...)
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Processor == items[j].Processor {
+			return items[i].Mode < items[j].Mode
+		}
+		return items[i].Processor < items[j].Processor
+	})
+	return items
 }
 
 func processingRecordHasIdentityParams(r *http.Request) bool {

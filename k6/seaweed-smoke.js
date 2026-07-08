@@ -76,9 +76,14 @@ const clamavBlockCheck = boolEnv(__ENV.CLAMAV_BLOCK_CHECK);
 const eicarBody = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
 const eicarDigest = `sha256:${crypto.sha256(eicarBody, 'hex')}`;
 
+const expectedHTTPStatuses = [{ min: 200, max: 399 }];
 if (clamavBlockCheck) {
-  http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 403, 423));
+  expectedHTTPStatuses.push(403, 423);
 }
+if (processingRecordCheck || clamavBlockCheck) {
+  expectedHTTPStatuses.push(404);
+}
+http.setResponseCallback(http.expectedStatuses(...expectedHTTPStatuses));
 
 export const options = {
   vus: Number.parseInt(__ENV.VUS || '4', 10),

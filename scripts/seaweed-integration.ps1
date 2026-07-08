@@ -13,8 +13,8 @@ $Project = if ($env:COMPOSE_PROJECT_NAME) { $env:COMPOSE_PROJECT_NAME } else { '
 $AdminToken = if ($env:MAXIO_ADMIN_TOKEN) { $env:MAXIO_ADMIN_TOKEN } else { 'dev-admin-token' }
 
 function Invoke-Compose {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-    docker compose -p $Project -f $ComposeFile @Args
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ComposeArgs)
+    & docker compose -p $Project -f $ComposeFile @ComposeArgs
 }
 
 function Test-EnvEnabled {

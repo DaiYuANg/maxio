@@ -18,7 +18,35 @@ func TestDefaultRuntimeWiresProcessingService(t *testing.T) {
 	if service == nil {
 		t.Fatal("expected processing service to be wired")
 	}
-	snapshot := service.Snapshot()
+	assertDisabledProcessingSnapshot(t, service.Snapshot())
+}
+
+func TestDefaultRuntimeWiresEnabledProcessingProcessors(t *testing.T) {
+	setEnabledProcessingRuntimeEnv(t)
+	app := newTestApp(t)
+	service := dix.MustResolveAs[*processing.Service](app.Container())
+	if service == nil {
+		t.Fatal("expected processing service to be wired")
+	}
+	assertEnabledProcessingSnapshot(t, service.Snapshot())
+}
+
+func setEnabledProcessingRuntimeEnv(t *testing.T) {
+	t.Helper()
+	setRuntimeTestEnv(t)
+	t.Setenv("MAXIO_PROCESSING_ENABLED", "true")
+	t.Setenv("MAXIO_PROCESSING_MODE", processing.ModeAsyncPermissive)
+	t.Setenv("MAXIO_PROCESSING_CLAMAV_ENABLED", "true")
+	t.Setenv("MAXIO_PROCESSING_CLAMAV_MODE", processing.ModeInlineStrict)
+	t.Setenv("MAXIO_PROCESSING_CLAMAV_ADDRESS", "127.0.0.1:3310")
+	t.Setenv("MAXIO_PROCESSING_TIKA_ENABLED", "true")
+	t.Setenv("MAXIO_PROCESSING_TIKA_MODE", processing.ModeAsyncPermissive)
+	t.Setenv("MAXIO_PROCESSING_TIKA_FAIL_OPEN", "true")
+	t.Setenv("MAXIO_PROCESSING_TIKA_URL", "http://127.0.0.1:9998")
+}
+
+func assertDisabledProcessingSnapshot(t *testing.T, snapshot processing.Snapshot) {
+	t.Helper()
 	if snapshot.Mode != processing.ModeDisabled {
 		t.Fatalf("processing mode = %q, want %q", snapshot.Mode, processing.ModeDisabled)
 	}
@@ -30,27 +58,17 @@ func TestDefaultRuntimeWiresProcessingService(t *testing.T) {
 	}
 }
 
-func TestDefaultRuntimeWiresEnabledProcessingProcessors(t *testing.T) {
-	setRuntimeTestEnv(t)
-	t.Setenv("MAXIO_PROCESSING_ENABLED", "true")
-	t.Setenv("MAXIO_PROCESSING_MODE", processing.ModeAsyncPermissive)
-	t.Setenv("MAXIO_PROCESSING_CLAMAV_ENABLED", "true")
-	t.Setenv("MAXIO_PROCESSING_CLAMAV_MODE", processing.ModeInlineStrict)
-	t.Setenv("MAXIO_PROCESSING_CLAMAV_ADDRESS", "127.0.0.1:3310")
-	t.Setenv("MAXIO_PROCESSING_TIKA_ENABLED", "true")
-	t.Setenv("MAXIO_PROCESSING_TIKA_MODE", processing.ModeAsyncPermissive)
-	t.Setenv("MAXIO_PROCESSING_TIKA_FAIL_OPEN", "true")
-	t.Setenv("MAXIO_PROCESSING_TIKA_URL", "http://127.0.0.1:9998")
-
-	app := newTestApp(t)
-	service := dix.MustResolveAs[*processing.Service](app.Container())
-	if service == nil {
-		t.Fatal("expected processing service to be wired")
-	}
-	snapshot := service.Snapshot()
+func assertEnabledProcessingSnapshot(t *testing.T, snapshot processing.Snapshot) {
+	t.Helper()
 	if !snapshot.Enabled {
 		t.Fatal("expected processing snapshot to be enabled")
 	}
+	assertProcessingProcessorModes(t, snapshot)
+	assertProcessingCapabilities(t, snapshot)
+}
+
+func assertProcessingProcessorModes(t *testing.T, snapshot processing.Snapshot) {
+	t.Helper()
 	if snapshot.ProcessorModes["clamav"] != processing.ModeInlineStrict {
 		t.Fatalf("clamav mode = %q, want %q", snapshot.ProcessorModes["clamav"], processing.ModeInlineStrict)
 	}
@@ -63,6 +81,10 @@ func TestDefaultRuntimeWiresEnabledProcessingProcessors(t *testing.T) {
 	if !snapshotHasProcessor(snapshot, "clamav") || !snapshotHasProcessor(snapshot, "tika") {
 		t.Fatalf("processors = %#v, want clamav and tika", snapshot.Processors.Values())
 	}
+}
+
+func assertProcessingCapabilities(t *testing.T, snapshot processing.Snapshot) {
+	t.Helper()
 	if !snapshotHasCapability(snapshot, processing.CapabilityAntivirus) {
 		t.Fatalf("capabilities = %#v, want antivirus", snapshot.Capabilities.Values())
 	}

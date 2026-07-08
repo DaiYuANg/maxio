@@ -20,6 +20,11 @@ type intConfig struct {
 	minimum int
 }
 
+func Validate(cfg Config) error {
+	_, err := normalize(cfg)
+	return err
+}
+
 func validateDurations(cfg Config) error {
 	if err := validateMetadataConfig(cfg); err != nil {
 		return err

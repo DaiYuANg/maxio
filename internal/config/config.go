@@ -16,47 +16,47 @@ import (
 const defaultConfigPath = "./config.json"
 
 type Config struct {
-	HTTPAddress                  string           `json:"http_address"             koanf:"http_address"             validate:"required,min=1"`
-	HTTPBodyLimit                int              `json:"http_body_limit"          koanf:"http_body_limit"`
-	StorageAddress               string           `json:"storage_address"          koanf:"storage_address"`
-	AdminToken                   string           `json:"admin_token"              koanf:"admin_token"`
-	APIToken                     string           `json:"api_token"                koanf:"api_token"`
-	MetadataBackend              string           `json:"metadata_backend"         koanf:"metadata_backend"         validate:"required,oneof=sqlite postgres mysql"`
-	MetadataDSN                  string           `json:"metadata_dsn"             koanf:"metadata_dsn"`
-	MetadataAutoMigrate          bool             `json:"metadata_auto_migrate"    koanf:"metadata_auto_migrate"`
-	EnableS3Proxy                bool             `json:"enable_s3_proxy"          koanf:"enable_s3_proxy"`
-	S3ProxyUpstreams             []model.Upstream `json:"s3_proxy_upstreams"       koanf:"s3_proxy_upstreams"`
-	S3ProxyEntrypoint            string           `json:"s3_proxy_entrypoint"      koanf:"s3_proxy_entrypoint"`
-	S3ProxyAdminAddress          string           `json:"s3_proxy_admin_address"   koanf:"s3_proxy_admin_address"`
-	S3ProxyHealthInterval        string           `json:"s3_proxy_health_interval" koanf:"s3_proxy_health_interval"`
-	S3ProxyHealthTimeout         string           `json:"s3_proxy_health_timeout"  koanf:"s3_proxy_health_timeout"`
-	CacheBackend                 string           `json:"cache_backend"            koanf:"cache_backend"            validate:"required,oneof=none memory redis"`
-	CacheTTL                     string           `json:"cache_ttl"                koanf:"cache_ttl"                validate:"required,min=1"`
-	CacheMaxCost                 int              `json:"cache_max_cost"           koanf:"cache_max_cost"`
-	CacheRedisAddress            string           `json:"cache_redis_address"      koanf:"cache_redis_address"`
-	CacheRedisUsername           string           `json:"cache_redis_username"     koanf:"cache_redis_username"`
-	CacheRedisPassword           string           `json:"cache_redis_password"     koanf:"cache_redis_password"`
-	CacheRedisDB                 int              `json:"cache_redis_db"           koanf:"cache_redis_db"`
-	CacheKeyPrefix               string           `json:"cache_key_prefix"         koanf:"cache_key_prefix"`
-	DataDir                      string           `json:"data_dir"                 koanf:"data_dir"                 validate:"required,min=1"`
-	LogLevel                     string           `json:"log_level"                koanf:"log_level"                validate:"required,oneof=debug info warn error"`
-	PendingObjectTTL             string           `json:"pending_object_ttl"       koanf:"pending_object_ttl"       validate:"required,min=1"`
-	RepairInterval               string           `json:"repair_interval"          koanf:"repair_interval"          validate:"required,min=1"`
-	RepairOnStart                bool             `json:"repair_on_start"          koanf:"repair_on_start"`
-	RepairMaxBatch               int              `json:"repair_max_batch"         koanf:"repair_max_batch"`
-	RepairMaxRetries             int              `json:"repair_max_retries"       koanf:"repair_max_retries"`
-	RepairRateLimit              int              `json:"repair_rate_limit"        koanf:"repair_rate_limit"`
-	RepairRetryBackoff           string           `json:"repair_retry_backoff"     koanf:"repair_retry_backoff"     validate:"required,min=1"`
-	RepairRetryMaxBackoff        string           `json:"repair_retry_max_backoff" koanf:"repair_retry_max_backoff"`
-	RepairRetryBackoffMultiplier float64          `json:"repair_retry_multiplier"  koanf:"repair_retry_multiplier"`
-	DedupeInterval               string           `json:"dedupe_interval"          koanf:"dedupe_interval"          validate:"required,min=1"`
-	DedupeOnStart                bool             `json:"dedupe_on_start"          koanf:"dedupe_on_start"`
-	DedupeMaxFixes               int              `json:"dedupe_max_fixes"         koanf:"dedupe_max_fixes"`
-	IndexTimeout                 string           `json:"index_timeout"            koanf:"index_timeout"            validate:"required,min=1"`
-	IndexRetryBackoff            string           `json:"index_retry_backoff"      koanf:"index_retry_backoff"      validate:"required,min=1"`
-	IndexMaxRetries              int              `json:"index_max_retries"        koanf:"index_max_retries"`
-	IndexQueueSize               int              `json:"index_queue_size"         koanf:"index_queue_size"`
-	IndexRateLimit               int              `json:"index_rate_limit"         koanf:"index_rate_limit"`
+	HTTPAddress                  string           `json:"http_address"              koanf:"http_address"              validate:"required,min=1"`
+	HTTPBodyLimit                int              `json:"http_body_limit"           koanf:"http_body_limit"`
+	StorageAddress               string           `json:"storage_address"           koanf:"storage_address"`
+	AdminToken                   string           `json:"admin_token"               koanf:"admin_token"`
+	APIToken                     string           `json:"api_token"                 koanf:"api_token"`
+	MetadataBackend              string           `json:"metadata_backend"          koanf:"metadata_backend"          validate:"required,oneof=sqlite postgres mysql"`
+	MetadataDSN                  string           `json:"metadata_dsn"              koanf:"metadata_dsn"`
+	MetadataAutoMigrate          bool             `json:"metadata_auto_migrate"     koanf:"metadata_auto_migrate"`
+	EnableS3Proxy                bool             `json:"enable_s3_proxy"           koanf:"enable_s3_proxy"`
+	S3ProxyUpstreams             []model.Upstream `json:"s3_proxy_upstreams"        koanf:"s3_proxy_upstreams"`
+	S3ProxyEntrypoint            string           `json:"s3_proxy_entrypoint"       koanf:"s3_proxy_entrypoint"`
+	S3ProxyAdminAddress          string           `json:"s3_proxy_admin_address"    koanf:"s3_proxy_admin_address"`
+	S3ProxyHealthInterval        string           `json:"s3_proxy_health_interval"  koanf:"s3_proxy_health_interval"`
+	S3ProxyHealthTimeout         string           `json:"s3_proxy_health_timeout"   koanf:"s3_proxy_health_timeout"`
+	CacheBackend                 string           `json:"cache_backend"             koanf:"cache_backend"             validate:"required,oneof=none memory redis"`
+	CacheTTL                     string           `json:"cache_ttl"                 koanf:"cache_ttl"                 validate:"required,min=1"`
+	CacheMaxCost                 int              `json:"cache_max_cost"            koanf:"cache_max_cost"`
+	CacheRedisAddress            string           `json:"cache_redis_address"       koanf:"cache_redis_address"`
+	CacheRedisUsername           string           `json:"cache_redis_username"      koanf:"cache_redis_username"`
+	CacheRedisPassword           string           `json:"cache_redis_password"      koanf:"cache_redis_password"`
+	CacheRedisDB                 int              `json:"cache_redis_db"            koanf:"cache_redis_db"`
+	CacheKeyPrefix               string           `json:"cache_key_prefix"          koanf:"cache_key_prefix"`
+	DataDir                      string           `json:"data_dir"                  koanf:"data_dir"                  validate:"required,min=1"`
+	LogLevel                     string           `json:"log_level"                 koanf:"log_level"                 validate:"required,oneof=debug info warn error"`
+	PendingObjectTTL             string           `json:"pending_object_ttl"        koanf:"pending_object_ttl"        validate:"required,min=1"`
+	RepairInterval               string           `json:"repair_interval"           koanf:"repair_interval"           validate:"required,min=1"`
+	RepairOnStart                bool             `json:"repair_on_start"           koanf:"repair_on_start"`
+	RepairMaxBatch               int              `json:"repair_max_batch"          koanf:"repair_max_batch"`
+	RepairMaxRetries             int              `json:"repair_max_retries"        koanf:"repair_max_retries"`
+	RepairRateLimit              int              `json:"repair_rate_limit"         koanf:"repair_rate_limit"`
+	RepairRetryBackoff           string           `json:"repair_retry_backoff"      koanf:"repair_retry_backoff"      validate:"required,min=1"`
+	RepairRetryMaxBackoff        string           `json:"repair_retry_max_backoff"  koanf:"repair_retry_max_backoff"`
+	RepairRetryBackoffMultiplier float64          `json:"repair_retry_multiplier"   koanf:"repair_retry_multiplier"`
+	DedupeInterval               string           `json:"dedupe_interval"           koanf:"dedupe_interval"           validate:"required,min=1"`
+	DedupeOnStart                bool             `json:"dedupe_on_start"           koanf:"dedupe_on_start"`
+	DedupeMaxFixes               int              `json:"dedupe_max_fixes"          koanf:"dedupe_max_fixes"`
+	IndexTimeout                 string           `json:"index_timeout"             koanf:"index_timeout"             validate:"required,min=1"`
+	IndexRetryBackoff            string           `json:"index_retry_backoff"       koanf:"index_retry_backoff"       validate:"required,min=1"`
+	IndexMaxRetries              int              `json:"index_max_retries"         koanf:"index_max_retries"`
+	IndexQueueSize               int              `json:"index_queue_size"          koanf:"index_queue_size"`
+	IndexRateLimit               int              `json:"index_rate_limit"          koanf:"index_rate_limit"`
 	ProcessingEnabled            bool             `json:"processing_enabled"        koanf:"processing_enabled"`
 	ProcessingMode               string           `json:"processing_mode"           koanf:"processing_mode"           validate:"required,min=1"`
 	ProcessingTimeout            string           `json:"processing_timeout"        koanf:"processing_timeout"        validate:"required,min=1"`
@@ -64,11 +64,11 @@ type Config struct {
 	ProcessingClamAVEnabled      bool             `json:"processing_clamav_enabled" koanf:"processing_clamav_enabled"`
 	ProcessingClamAVMode         string           `json:"processing_clamav_mode"    koanf:"processing_clamav_mode"`
 	ProcessingClamAVAddress      string           `json:"processing_clamav_address" koanf:"processing_clamav_address"`
-	ProcessingTikaEnabled        bool             `json:"processing_tika_enabled"    koanf:"processing_tika_enabled"`
-	ProcessingTikaMode           string           `json:"processing_tika_mode"       koanf:"processing_tika_mode"`
-	ProcessingTikaFailOpen       bool             `json:"processing_tika_fail_open"  koanf:"processing_tika_fail_open"`
-	ProcessingTikaURL            string           `json:"processing_tika_url"        koanf:"processing_tika_url"`
-	ProcessingTikaMaxBytes       int64            `json:"processing_tika_max_bytes"  koanf:"processing_tika_max_bytes"`
+	ProcessingTikaEnabled        bool             `json:"processing_tika_enabled"   koanf:"processing_tika_enabled"`
+	ProcessingTikaMode           string           `json:"processing_tika_mode"      koanf:"processing_tika_mode"`
+	ProcessingTikaFailOpen       bool             `json:"processing_tika_fail_open" koanf:"processing_tika_fail_open"`
+	ProcessingTikaURL            string           `json:"processing_tika_url"       koanf:"processing_tika_url"`
+	ProcessingTikaMaxBytes       int64            `json:"processing_tika_max_bytes" koanf:"processing_tika_max_bytes"`
 }
 
 func Load(opts ...configx.Option) (Config, error) {

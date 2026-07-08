@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 const (
 	defaultClamAVAddress          = "clamav:3310"
 	defaultClamAVResponseMaxBytes = int64(4 << 10)
+	maxClamAVInstreamChunkSize    = 32 << 10
 )
 
 type ClamAVConfig struct {
@@ -59,10 +61,10 @@ func (p *ClamAVProcessor) Process(ctx context.Context, input Input) (ProcessorRe
 	if err != nil {
 		return p.failureResult("connect", fmt.Errorf("connect clamav: %w", err))
 	}
-	defer conn.Close()
+	defer closeResource(conn)
 	if deadline, ok := ctx.Deadline(); ok {
-		if err := conn.SetDeadline(deadline); err != nil {
-			return p.failureResult("set deadline", fmt.Errorf("set clamav deadline: %w", err))
+		if deadlineErr := conn.SetDeadline(deadline); deadlineErr != nil {
+			return p.failureResult("set deadline", fmt.Errorf("set clamav deadline: %w", deadlineErr))
 		}
 	}
 
@@ -70,13 +72,13 @@ func (p *ClamAVProcessor) Process(ctx context.Context, input Input) (ProcessorRe
 	if err != nil {
 		return p.failureResult("open content", fmt.Errorf("open content for clamav: %w", err))
 	}
-	defer content.Close()
+	defer closeResource(content)
 
-	if err := writeFull(conn, []byte("zINSTREAM\x00")); err != nil {
-		return p.failureResult("start instream", fmt.Errorf("start clamav instream: %w", err))
+	if startErr := writeFull(conn, []byte("zINSTREAM\x00")); startErr != nil {
+		return p.failureResult("start instream", fmt.Errorf("start clamav instream: %w", startErr))
 	}
-	if err := writeClamAVStream(conn, content); err != nil {
-		return p.failureResult("stream content", err)
+	if streamErr := writeClamAVStream(conn, content); streamErr != nil {
+		return p.failureResult("stream content", streamErr)
 	}
 	response, err := readClamAVResponse(conn)
 	if err != nil {
@@ -86,17 +88,11 @@ func (p *ClamAVProcessor) Process(ctx context.Context, input Input) (ProcessorRe
 }
 
 func (p *ClamAVProcessor) failureResult(reason string, err error) (ProcessorResult, error) {
-	return ProcessorResult{
-		Processor: p.Name(),
-		Status:    StatusFailed,
-		Metadata: map[string]string{
-			"address": p.address,
-			"reason":  reason,
-		},
-	}, err
+	return ProcessorResult{Processor: p.Name(), Status: StatusFailed, Metadata: map[string]string{"address": p.address, "reason": reason}}, err
 }
+
 func writeClamAVStream(writer io.Writer, reader io.Reader) error {
-	chunk := make([]byte, 32<<10)
+	chunk := make([]byte, maxClamAVInstreamChunkSize)
 	for {
 		n, readErr := reader.Read(chunk)
 		if n > 0 {
@@ -115,8 +111,15 @@ func writeClamAVStream(writer io.Writer, reader io.Reader) error {
 }
 
 func writeClamAVChunk(writer io.Writer, chunk []byte) error {
+	if len(chunk) > maxClamAVInstreamChunkSize {
+		return fmt.Errorf("clamav chunk exceeds %d bytes", maxClamAVInstreamChunkSize)
+	}
 	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, uint32(len(chunk)))
+	size, err := safeClamAVChunkSize(len(chunk))
+	if err != nil {
+		return err
+	}
+	binary.BigEndian.PutUint32(header, size)
 	if err := writeFull(writer, header); err != nil {
 		return fmt.Errorf("write clamav chunk header: %w", err)
 	}
@@ -129,11 +132,21 @@ func writeClamAVChunk(writer io.Writer, chunk []byte) error {
 	return nil
 }
 
+func safeClamAVChunkSize(size int) (uint32, error) {
+	if size < 0 || size > maxClamAVInstreamChunkSize {
+		return 0, fmt.Errorf("clamav chunk exceeds %d bytes", maxClamAVInstreamChunkSize)
+	}
+	parsed, err := strconv.ParseUint(strconv.Itoa(size), 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse clamav chunk size: %w", err)
+	}
+	return uint32(parsed), nil
+}
 func writeFull(writer io.Writer, data []byte) error {
 	for len(data) > 0 {
 		n, err := writer.Write(data)
 		if err != nil {
-			return err
+			return fmt.Errorf("write bytes: %w", err)
 		}
 		if n == 0 {
 			return io.ErrShortWrite

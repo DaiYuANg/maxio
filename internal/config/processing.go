@@ -56,40 +56,73 @@ func processingDefaults() Config {
 
 func validateProcessingConfig(cfg Config) error {
 	cfg = applyProcessingZeroDefaults(cfg)
-	mode := strings.TrimSpace(strings.ToLower(cfg.ProcessingMode))
-	if err := validateProcessingMode("processing_mode", mode); err != nil {
+	if err := validateProcessingModes(cfg); err != nil {
 		return err
 	}
-	if err := validateProcessingMode("processing_clamav_mode", cfg.ProcessingClamAVMode); err != nil {
+	if err := validateProcessingRuntime(cfg); err != nil {
 		return err
 	}
-	if err := validateProcessingMode("processing_tika_mode", cfg.ProcessingTikaMode); err != nil {
+	if err := validateProcessingEnabledState(cfg); err != nil {
 		return err
 	}
+	if err := validateProcessingFailOpen(cfg); err != nil {
+		return err
+	}
+	return validateProcessingEndpoints(cfg)
+}
+
+func validateProcessingModes(cfg Config) error {
+	modeChecks := map[string]string{
+		"processing_mode":        cfg.ProcessingMode,
+		"processing_clamav_mode": cfg.ProcessingClamAVMode,
+		"processing_tika_mode":   cfg.ProcessingTikaMode,
+	}
+	for name, mode := range modeChecks {
+		if err := validateProcessingMode(name, mode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateProcessingRuntime(cfg Config) error {
 	if _, err := parseDuration(cfg.ProcessingTimeout); err != nil {
 		return fmt.Errorf("invalid config: processing_timeout: %w", err)
 	}
+	if cfg.ProcessingTikaMaxBytes < 0 {
+		return errors.New("invalid config: processing_tika_max_bytes must be non-negative")
+	}
+	return nil
+}
+
+func validateProcessingEnabledState(cfg Config) error {
+	mode := normalizeProcessingMode(cfg.ProcessingMode)
 	if cfg.ProcessingEnabled && mode == ProcessingModeDisabled {
 		return errors.New("invalid config: processing_mode cannot be disabled when processing_enabled is true")
 	}
 	if !cfg.ProcessingEnabled && (cfg.ProcessingClamAVEnabled || cfg.ProcessingTikaEnabled) {
 		return errors.New("invalid config: processing_enabled must be true when a processing processor is enabled")
 	}
-	if cfg.ProcessingClamAVEnabled && strings.TrimSpace(strings.ToLower(cfg.ProcessingClamAVMode)) == ProcessingModeDisabled {
+	if cfg.ProcessingClamAVEnabled && normalizeProcessingMode(cfg.ProcessingClamAVMode) == ProcessingModeDisabled {
 		return errors.New("invalid config: processing_clamav_mode cannot be disabled when processing_clamav_enabled is true")
 	}
-	if cfg.ProcessingTikaEnabled && strings.TrimSpace(strings.ToLower(cfg.ProcessingTikaMode)) == ProcessingModeDisabled {
+	if cfg.ProcessingTikaEnabled && normalizeProcessingMode(cfg.ProcessingTikaMode) == ProcessingModeDisabled {
 		return errors.New("invalid config: processing_tika_mode cannot be disabled when processing_tika_enabled is true")
 	}
+	return nil
+}
+
+func validateProcessingFailOpen(cfg Config) error {
 	if cfg.ProcessingFailOpen && hasStrictEnabledProcessingProcessor(cfg) {
 		return errors.New("invalid config: processing_fail_open cannot be true when an enabled processor runs in a strict mode")
 	}
 	if cfg.ProcessingTikaEnabled && cfg.ProcessingTikaFailOpen && isStrictProcessingMode(cfg.ProcessingTikaMode) {
 		return errors.New("invalid config: processing_tika_fail_open cannot be true when tika runs in a strict mode")
 	}
-	if cfg.ProcessingTikaMaxBytes < 0 {
-		return errors.New("invalid config: processing_tika_max_bytes must be non-negative")
-	}
+	return nil
+}
+
+func validateProcessingEndpoints(cfg Config) error {
 	if cfg.ProcessingClamAVEnabled {
 		if err := validateProcessingTCPAddress("processing_clamav_address", cfg.ProcessingClamAVAddress); err != nil {
 			return err
@@ -105,22 +138,27 @@ func hasStrictEnabledProcessingProcessor(cfg Config) bool {
 	return (cfg.ProcessingClamAVEnabled && isStrictProcessingMode(cfg.ProcessingClamAVMode)) ||
 		(cfg.ProcessingTikaEnabled && isStrictProcessingMode(cfg.ProcessingTikaMode))
 }
+
 func isStrictProcessingMode(mode string) bool {
-	switch strings.TrimSpace(strings.ToLower(mode)) {
+	switch normalizeProcessingMode(mode) {
 	case ProcessingModeAsyncStrict, ProcessingModeInlineStrict:
 		return true
 	default:
 		return false
 	}
 }
+
 func validateProcessingMode(name, mode string) error {
-	mode = strings.TrimSpace(strings.ToLower(mode))
-	switch mode {
+	switch normalizeProcessingMode(mode) {
 	case ProcessingModeDisabled, ProcessingModeAsyncPermissive, ProcessingModeAsyncStrict, ProcessingModeInlineStrict:
 		return nil
 	default:
 		return fmt.Errorf("invalid config: %s must be one of %s, %s, %s, %s", name, ProcessingModeDisabled, ProcessingModeAsyncPermissive, ProcessingModeAsyncStrict, ProcessingModeInlineStrict)
 	}
+}
+
+func normalizeProcessingMode(mode string) string {
+	return strings.TrimSpace(strings.ToLower(mode))
 }
 
 func validateProcessingTCPAddress(name, value string) error {

@@ -19,7 +19,7 @@ func (m *dedupeMiddleware) processPutBeforeCommit(
 	if m == nil || m.processor == nil {
 		return true
 	}
-	input := processingInputFromPutEvent(event, captured)
+	input := processingPreCommitInputFromPutEvent(event, captured)
 	if err := m.processor.ProcessBeforeCommit(ctx, input); err != nil {
 		writeS3ProxyProcessingError(w, err)
 		m.logger.WarnContext(ctx, "s3 put rejected by object processing", "bucket", event.Bucket, "key", event.Key, "version_id", event.VersionID, "error", err)
@@ -94,6 +94,12 @@ func processingSnapshotNeedsAsyncBody(snapshot processing.Snapshot) bool {
 		return false
 	}
 }
+func processingPreCommitInputFromPutEvent(event ObjectPutSucceededEvent, captured *capturedRequestBody) processing.Input {
+	input := processingInputFromPutEvent(event, captured)
+	input.Object.VersionID = ""
+	return input
+}
+
 func processingInputFromPutEvent(event ObjectPutSucceededEvent, captured *capturedRequestBody) processing.Input {
 	input := processing.Input{Object: processingObjectRefFromPutEvent(event)}
 	if captured != nil {

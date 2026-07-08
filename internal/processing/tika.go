@@ -3,7 +3,6 @@ package processing
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -72,12 +71,15 @@ func (p *TikaProcessor) Process(ctx context.Context, input Input) (ProcessorResu
 	if input.Object.Size > p.maxBytes {
 		return p.oversizedResult(), nil
 	}
+	return p.processContent(contextOrBackground(ctx), input)
+}
+
+func (p *TikaProcessor) processContent(ctx context.Context, input Input) (ProcessorResult, error) {
 	content, err := input.OpenContent(ctx)
 	if err != nil {
 		return p.failureResult("open content", fmt.Errorf("open content for tika: %w", err))
 	}
-	defer content.Close()
-
+	defer closeResource(content)
 	requestBody, oversized, err := p.requestBody(content, input.Object.Size)
 	if err != nil {
 		return p.failureResult("read request body", fmt.Errorf("read content for tika: %w", err))
@@ -85,11 +87,35 @@ func (p *TikaProcessor) Process(ctx context.Context, input Input) (ProcessorResu
 	if oversized {
 		return p.oversizedResult(), nil
 	}
+	return p.call(ctx, input, requestBody)
+}
 
+func (p *TikaProcessor) call(ctx context.Context, input Input, requestBody io.Reader) (ProcessorResult, error) {
 	endpoint := tikaEndpoint(p.url)
-	request, err := http.NewRequestWithContext(contextOrBackground(ctx), http.MethodPut, endpoint, requestBody)
+	request, err := p.request(ctx, endpoint, input, requestBody)
 	if err != nil {
-		return p.failureResult("build request", fmt.Errorf("build tika request: %w", err))
+		return p.failureResult("build request", err)
+	}
+	response, err := p.client.Do(request)
+	if err != nil {
+		return p.failureResult("call tika", fmt.Errorf("call tika: %w", err))
+	}
+	defer closeResource(response.Body)
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return p.failureResult("bad status", fmt.Errorf("tika returned status %d", response.StatusCode))
+	}
+	metadata, err := readTikaRMeta(response.Body, defaultTikaResponseMaxBytes)
+	if err != nil {
+		return p.failureResult("read response", fmt.Errorf("read tika response: %w", err))
+	}
+	metadata["endpoint"] = endpoint
+	return ProcessorResult{Processor: p.Name(), Status: StatusSucceeded, Metadata: metadata}, nil
+}
+
+func (p *TikaProcessor) request(ctx context.Context, endpoint string, input Input, requestBody io.Reader) (*http.Request, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("build tika request: %w", err)
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("maxEmbeddedResources", "0")
@@ -100,24 +126,7 @@ func (p *TikaProcessor) Process(ctx context.Context, input Input) (ProcessorResu
 	if input.Object.Key != "" {
 		request.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": input.Object.Key}))
 	}
-	response, err := p.client.Do(request)
-	if err != nil {
-		return p.failureResult("call tika", fmt.Errorf("call tika: %w", err))
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return p.failureResult("bad status", fmt.Errorf("tika returned status %d", response.StatusCode))
-	}
-	metadata, err := readTikaRMeta(response.Body, defaultTikaResponseMaxBytes)
-	if err != nil {
-		return p.failureResult("read response", fmt.Errorf("read tika response: %w", err))
-	}
-	metadata["endpoint"] = endpoint
-	return ProcessorResult{
-		Processor: p.Name(),
-		Status:    StatusSucceeded,
-		Metadata:  metadata,
-	}, nil
+	return request, nil
 }
 
 func (p *TikaProcessor) requestBody(content io.Reader, size int64) (io.Reader, bool, error) {
@@ -146,20 +155,11 @@ func (p *TikaProcessor) oversizedResult() ProcessorResult {
 }
 
 func (p *TikaProcessor) failureResult(reason string, err error) (ProcessorResult, error) {
-	metadata := map[string]string{
-		"endpoint":  tikaEndpoint(p.url),
-		"fail_open": strconv.FormatBool(p.failOpen),
-		"reason":    reason,
-	}
+	metadata := map[string]string{"endpoint": tikaEndpoint(p.url), "fail_open": strconv.FormatBool(p.failOpen), "reason": reason}
 	if !p.failOpen {
 		return ProcessorResult{Processor: p.Name(), Status: StatusFailed, Metadata: metadata}, err
 	}
-	return ProcessorResult{
-		Processor: p.Name(),
-		Status:    StatusSkipped,
-		Error:     err.Error(),
-		Metadata:  metadata,
-	}, nil
+	return ProcessorResult{Processor: p.Name(), Status: StatusSkipped, Error: err.Error(), Metadata: metadata}, nil
 }
 
 func tikaEndpoint(baseURL string) string {
@@ -171,133 +171,4 @@ func tikaEndpoint(baseURL string) string {
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	return parsed.String()
-}
-
-func readTikaRMeta(reader io.Reader, limit int64) (map[string]string, error) {
-	data, truncated, err := readLimitedBytes(reader, limit)
-	if err != nil {
-		return nil, err
-	}
-	if truncated {
-		return nil, fmt.Errorf("tika response exceeds %d bytes", limit)
-	}
-	if len(bytes.TrimSpace(data)) == 0 {
-		return map[string]string{"document_count": "0", "text_bytes": "0", "text_truncated": "false"}, nil
-	}
-	documents := []map[string]any{}
-	if err := json.Unmarshal(data, &documents); err != nil {
-		document := map[string]any{}
-		if objectErr := json.Unmarshal(data, &document); objectErr != nil {
-			return nil, err
-		}
-		documents = append(documents, document)
-	}
-	return summarizeTikaRMeta(documents), nil
-}
-
-func summarizeTikaRMeta(documents []map[string]any) map[string]string {
-	metadata := map[string]string{"document_count": strconv.Itoa(len(documents))}
-	var textBytes int64
-	textTruncated := false
-	for index, document := range documents {
-		content := tikaMetadataString(document["X-TIKA:content"])
-		textBytes += int64(len(content))
-		if strings.EqualFold(tikaMetadataString(document["X-TIKA:Exception:write_limit_reached"]), "true") {
-			textTruncated = true
-		}
-		if index == 0 {
-			copyTikaMetadata(metadata, document, "detected_content_type", "Content-Type")
-			copyTikaMetadata(metadata, document, "content_encoding", "Content-Encoding")
-			copyTikaMetadata(metadata, document, "content_length", "Content-Length")
-			copyTikaMetadata(metadata, document, "resource_name", "resourceName")
-			copyTikaMetadata(metadata, document, "title", "dc:title", "title")
-			copyTikaMetadata(metadata, document, "author", "dc:creator", "creator", "Author")
-			copyTikaMetadata(metadata, document, "language", "language", "dc:language")
-			copyTikaMetadata(metadata, document, "parsed_by", "X-Parsed-By", "X-TIKA:Parsed-By")
-		}
-	}
-	metadata["text_bytes"] = strconv.FormatInt(textBytes, 10)
-	metadata["text_truncated"] = strconv.FormatBool(textTruncated)
-	return metadata
-}
-
-func copyTikaMetadata(metadata map[string]string, document map[string]any, target string, sourceKeys ...string) {
-	for _, sourceKey := range sourceKeys {
-		value := tikaMetadataString(document[sourceKey])
-		if value != "" {
-			metadata[target] = value
-			return
-		}
-	}
-}
-
-func tikaMetadataString(value any) string {
-	switch typed := value.(type) {
-	case nil:
-		return ""
-	case string:
-		return strings.TrimSpace(typed)
-	case []string:
-		items := make([]string, 0, len(typed))
-		for _, item := range typed {
-			if value := strings.TrimSpace(item); value != "" {
-				items = append(items, value)
-			}
-		}
-		return strings.Join(items, ",")
-	case []any:
-		items := make([]string, 0, len(typed))
-		for _, item := range typed {
-			if value := tikaMetadataString(item); value != "" {
-				items = append(items, value)
-			}
-		}
-		return strings.Join(items, ",")
-	case bool:
-		return strconv.FormatBool(typed)
-	case float64:
-		return strconv.FormatFloat(typed, 'f', -1, 64)
-	default:
-		data, err := json.Marshal(typed)
-		if err == nil {
-			return string(data)
-		}
-		return strings.TrimSpace(fmt.Sprint(typed))
-	}
-}
-
-func readLimitedBytes(reader io.Reader, limit int64) ([]byte, bool, error) {
-	var buffer bytes.Buffer
-	count, err := io.Copy(&buffer, io.LimitReader(reader, limit+1))
-	if err != nil {
-		return nil, false, err
-	}
-	if count > limit {
-		return buffer.Bytes()[:limit], true, nil
-	}
-	return buffer.Bytes(), false, nil
-}
-
-func countLimited(reader io.Reader, limit int64) (int64, bool, error) {
-	limited := io.LimitReader(reader, limit+1)
-	count, err := io.Copy(io.Discard, limited)
-	if err != nil {
-		return 0, false, err
-	}
-	if count > limit {
-		return limit, true, nil
-	}
-	return count, false, nil
-}
-
-func readTikaRequestBody(reader io.Reader, maxBytes int64) ([]byte, bool, error) {
-	var buffer bytes.Buffer
-	count, err := io.Copy(&buffer, io.LimitReader(reader, maxBytes+1))
-	if err != nil {
-		return nil, false, err
-	}
-	if count > maxBytes {
-		return nil, true, nil
-	}
-	return buffer.Bytes(), false, nil
 }

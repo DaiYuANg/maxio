@@ -191,7 +191,11 @@ func (b *capturedRequestBody) Clone() (*capturedRequestBody, error) {
 	if err != nil {
 		return nil, oops.Wrapf(err, "open captured request body for clone")
 	}
-	defer reader.Close()
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
 	spooler := &requestBodySpooler{}
 	if _, err := io.Copy(spooler, reader); err != nil {
 		return nil, closeCaptureWithError(nil, spooler, oops.Wrapf(err, "copy captured request body"))

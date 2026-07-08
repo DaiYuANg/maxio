@@ -39,30 +39,34 @@ func (m *InMemoryMetadata) ListProcessingRecords(_ context.Context, status strin
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	records := list.NewListWithCapacity[model.ProcessingRecord](len(m.processingRecords))
-	for _, record := range m.processingRecords {
+	for id := range m.processingRecords {
+		record := m.processingRecords[id]
 		if status == "" || record.Status == status {
 			records.Add(record)
 		}
 	}
-	sorted := records.Sort(func(left, right model.ProcessingRecord) int {
-		if left.UpdatedAt.After(right.UpdatedAt) {
-			return -1
-		}
-		if left.UpdatedAt.Before(right.UpdatedAt) {
-			return 1
-		}
-		if left.ID < right.ID {
-			return -1
-		}
-		if left.ID > right.ID {
-			return 1
-		}
-		return 0
-	})
-	if sorted.Len() <= limit {
-		return sorted, nil
+	return limitProcessingRecords(sortProcessingRecords(records), limit), nil
+}
+
+func sortProcessingRecords(records *list.List[model.ProcessingRecord]) *list.List[model.ProcessingRecord] {
+	return records.Sort(compareProcessingRecords)
+}
+
+func compareProcessingRecords(left, right model.ProcessingRecord) int {
+	if left.UpdatedAt.After(right.UpdatedAt) {
+		return -1
 	}
-	return list.NewList(sorted.Values()[:limit]...), nil
+	if left.UpdatedAt.Before(right.UpdatedAt) {
+		return 1
+	}
+	return strings.Compare(left.ID, right.ID)
+}
+
+func limitProcessingRecords(records *list.List[model.ProcessingRecord], limit int) *list.List[model.ProcessingRecord] {
+	if records.Len() <= limit {
+		return records
+	}
+	return list.NewList(records.Values()[:limit]...)
 }
 
 func (m *InMemoryMetadata) DeleteProcessingRecord(_ context.Context, bucket, key, versionID, digest string) (bool, error) {
