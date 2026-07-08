@@ -32,7 +32,7 @@ func (m *dedupeMiddleware) handleDelete(next http.Handler, w http.ResponseWriter
 	m.discardProcessingRecord(r.Context(), version)
 	w.Header().Set("X-Maxio-Dedupe", "delete-ref")
 	w.WriteHeader(http.StatusNoContent)
-	m.publishObjectDelete(r.Context(), ObjectDeleteSucceededEvent{Bucket: bucket, Key: key, Digest: digest, Deleted: true})
+	m.publishObjectDelete(r.Context(), ObjectDeleteSucceededEvent{Bucket: bucket, Key: key, Digest: version.Digest, Deleted: true})
 }
 
 func (m *dedupeMiddleware) handleRead(next http.Handler, upstreamID string, w http.ResponseWriter, r *http.Request) {
