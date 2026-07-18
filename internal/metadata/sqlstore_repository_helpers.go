@@ -27,6 +27,22 @@ func getRepositoryByKey[E any, S repositoryx.EntitySchema[E]](
 	return entity, found, nil
 }
 
+func deleteRepositoryByKey[E any, S repositoryx.EntitySchema[E]](
+	ctx context.Context,
+	repository *repositoryx.Base[E, S],
+	key repositoryx.TypedKeySet,
+	operation string,
+) (bool, error) {
+	if repository == nil {
+		return false, fmt.Errorf("%s: metadata repository is nil", operation)
+	}
+	result, err := repository.DeleteByKeySet(ctx, key)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", operation, err)
+	}
+	return hasAffectedRow(result, operation)
+}
+
 func requireStoredEntity[E any](entity E, found bool, err error) (E, error) {
 	var zero E
 	if err != nil {

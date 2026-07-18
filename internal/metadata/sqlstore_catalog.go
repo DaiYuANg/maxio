@@ -59,11 +59,12 @@ func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string
 	if bucket == "" || key == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.objectRecords.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectRecords.bucket, bucket), repositoryx.Part(metadataObjectRecords.key, key)))
-	if err != nil {
-		return false, fmt.Errorf("delete object record: %w", err)
-	}
-	return hasAffectedRow(result, "delete object record")
+	return deleteRepositoryByKey[model.ObjectRecord](
+		ctx,
+		s.repos.objectRecords,
+		repositoryx.KeySet(repositoryx.Part(metadataObjectRecords.bucket, bucket), repositoryx.Part(metadataObjectRecords.key, key)),
+		"delete object record",
+	)
 }
 
 func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.ObjectVersion) (model.ObjectVersion, error) {
@@ -144,9 +145,14 @@ func (s *SQLMetadata) DeleteObjectVersion(ctx context.Context, bucket, key, vers
 	if bucket == "" || key == "" || versionID == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.objectVersions.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectVersions.bucket, bucket), repositoryx.Part(metadataObjectVersions.key, key), repositoryx.Part(metadataObjectVersions.versionID, versionID)))
-	if err != nil {
-		return false, fmt.Errorf("delete object version: %w", err)
-	}
-	return hasAffectedRow(result, "delete object version")
+	return deleteRepositoryByKey[model.ObjectVersion](
+		ctx,
+		s.repos.objectVersions,
+		repositoryx.KeySet(
+			repositoryx.Part(metadataObjectVersions.bucket, bucket),
+			repositoryx.Part(metadataObjectVersions.key, key),
+			repositoryx.Part(metadataObjectVersions.versionID, versionID),
+		),
+		"delete object version",
+	)
 }

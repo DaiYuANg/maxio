@@ -79,9 +79,10 @@ func (s *SQLMetadata) DeleteIndexOutboxEvent(ctx context.Context, id string) (bo
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.indexOutbox.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexOutbox.id, id)))
-	if err != nil {
-		return false, fmt.Errorf("delete index outbox event: %w", err)
-	}
-	return hasAffectedRow(result, "delete index outbox event")
+	return deleteRepositoryByKey[model.IndexOutboxEvent](
+		ctx,
+		s.repos.indexOutbox,
+		repositoryx.KeySet(repositoryx.Part(metadataIndexOutbox.id, id)),
+		"delete index outbox event",
+	)
 }

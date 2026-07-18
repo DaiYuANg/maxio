@@ -90,9 +90,10 @@ func (s *SQLMetadata) DeleteIndexJob(ctx context.Context, id string) (bool, erro
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.indexJobs.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexJobs.id, id)))
-	if err != nil {
-		return false, fmt.Errorf("delete index job: %w", err)
-	}
-	return hasAffectedRow(result, "delete index job")
+	return deleteRepositoryByKey[model.IndexJob](
+		ctx,
+		s.repos.indexJobs,
+		repositoryx.KeySet(repositoryx.Part(metadataIndexJobs.id, id)),
+		"delete index job",
+	)
 }

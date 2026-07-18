@@ -133,11 +133,12 @@ func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, erro
 		return false, ErrBadRequest
 	}
 
-	result, err := s.repos.upstreams.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataUpstreams.id, id)))
-	if err != nil {
-		return false, fmt.Errorf("delete upstream: %w", err)
-	}
-	return hasAffectedRow(result, "delete upstream")
+	return deleteRepositoryByKey[model.Upstream](
+		ctx,
+		s.repos.upstreams,
+		repositoryx.KeySet(repositoryx.Part(metadataUpstreams.id, id)),
+		"delete upstream",
+	)
 }
 
 func normalizeUpstream(upstream model.Upstream) (model.Upstream, error) {

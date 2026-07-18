@@ -80,11 +80,12 @@ func (s *SQLMetadata) DeleteProcessingRecord(ctx context.Context, bucket, key, v
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.processingRecords.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataProcessingRecords.id, id)))
-	if err != nil {
-		return false, fmt.Errorf("delete processing record: %w", err)
-	}
-	return hasAffectedRow(result, "delete processing record")
+	return deleteRepositoryByKey[model.ProcessingRecord](
+		ctx,
+		s.repos.processingRecords,
+		repositoryx.KeySet(repositoryx.Part(metadataProcessingRecords.id, id)),
+		"delete processing record",
+	)
 }
 
 func prepareProcessingRecord(record model.ProcessingRecord) (model.ProcessingRecord, error) {

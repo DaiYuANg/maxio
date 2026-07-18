@@ -94,9 +94,10 @@ func (s *SQLMetadata) DeleteIndexDocument(ctx context.Context, id string) (bool,
 	if id == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.indexDocuments.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexDocuments.id, id)))
-	if err != nil {
-		return false, fmt.Errorf("delete index document: %w", err)
-	}
-	return hasAffectedRow(result, "delete index document")
+	return deleteRepositoryByKey[model.IndexDocument](
+		ctx,
+		s.repos.indexDocuments,
+		repositoryx.KeySet(repositoryx.Part(metadataIndexDocuments.id, id)),
+		"delete index document",
+	)
 }

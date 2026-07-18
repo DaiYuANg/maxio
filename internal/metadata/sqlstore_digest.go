@@ -100,11 +100,12 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 	if digest == "" {
 		return false, ErrBadRequest
 	}
-	result, err := s.repos.digestRefs.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)))
-	if err != nil {
-		return false, fmt.Errorf("delete digest ref: %w", err)
-	}
-	return hasAffectedRow(result, "delete digest ref")
+	return deleteRepositoryByKey[model.DigestRef](
+		ctx,
+		s.repos.digestRefs,
+		repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)),
+		"delete digest ref",
+	)
 }
 
 func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *dbx.Tx, digest string) (model.DigestRef, error) {
