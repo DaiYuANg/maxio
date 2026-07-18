@@ -71,21 +71,33 @@ func execRepositoryUpsert[E any, S repositoryx.EntitySchema[E]](
 	conflictTargets *collectionlist.List[querydsl.Expression],
 	updateAssignments ...querydsl.Assignment,
 ) error {
-	if conflictTargets == nil || conflictTargets.IsEmpty() {
-		return fmt.Errorf("%s: upsert conflict target is empty", execOperation)
-	}
 	assignments, err := repositoryInsertAssignments(ctx, repository, schema, entity, assignmentOperation)
 	if err != nil {
 		return err
 	}
-	conflict := querydsl.InsertInto(schema).
+	return execUpsertAssignments(ctx, repository.DB(), schema, assignments, execOperation, conflictTargets, updateAssignments...)
+}
+
+func execUpsertAssignments(
+	ctx context.Context,
+	session *dbx.DB,
+	source querydsl.TableSource,
+	assignments *collectionlist.List[querydsl.Assignment],
+	execOperation string,
+	conflictTargets *collectionlist.List[querydsl.Expression],
+	updateAssignments ...querydsl.Assignment,
+) error {
+	if conflictTargets == nil || conflictTargets.IsEmpty() {
+		return fmt.Errorf("%s: upsert conflict target is empty", execOperation)
+	}
+	conflict := querydsl.InsertInto(source).
 		ValuesList(assignments).
 		OnConflictList(conflictTargets)
 	query := conflict.DoNothing()
 	if len(updateAssignments) > 0 {
 		query = conflict.DoUpdateSetList(collectionlist.NewList(updateAssignments...))
 	}
-	if _, err := dbx.Exec(ensureContext(ctx), repository.DB(), query); err != nil {
+	if _, err := dbx.Exec(ensureContext(ctx), session, query); err != nil {
 		return fmt.Errorf("%s: %w", execOperation, err)
 	}
 	return nil

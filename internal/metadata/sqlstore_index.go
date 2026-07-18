@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -17,32 +16,35 @@ func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.In
 	if err != nil {
 		return model.IndexDocument{}, err
 	}
-	query := querydsl.InsertInto(metadataIndexDocuments.schema).
-		Values(
-			metadataIndexDocuments.id.Set(document.ID),
-			metadataIndexDocuments.bucket.Set(document.Bucket),
-			metadataIndexDocuments.key.Set(document.Key),
-			metadataIndexDocuments.versionID.Set(document.VersionID),
-			metadataIndexDocuments.digest.Set(document.Digest),
-			metadataIndexDocuments.state.Set(document.State),
-			metadataIndexDocuments.errorText.Set(document.Error),
-			metadataIndexDocuments.indexedAt.Set(unixNanoOrNil(document.IndexedAt)),
-			metadataIndexDocuments.createdAt.Set(document.CreatedAt.UnixNano()),
-			metadataIndexDocuments.updatedAt.Set(document.UpdatedAt.UnixNano()),
-		).
-		OnConflict(metadataIndexDocuments.id).
-		DoUpdateSet(
-			metadataIndexDocuments.bucket.SetExcluded(),
-			metadataIndexDocuments.key.SetExcluded(),
-			metadataIndexDocuments.versionID.SetExcluded(),
-			metadataIndexDocuments.digest.SetExcluded(),
-			metadataIndexDocuments.state.SetExcluded(),
-			metadataIndexDocuments.errorText.SetExcluded(),
-			metadataIndexDocuments.indexedAt.SetExcluded(),
-			metadataIndexDocuments.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.IndexDocument{}, fmt.Errorf("upsert index document: %w", execErr)
+	assignments := collectionlist.NewList[querydsl.Assignment](
+		metadataIndexDocuments.id.Set(document.ID),
+		metadataIndexDocuments.bucket.Set(document.Bucket),
+		metadataIndexDocuments.key.Set(document.Key),
+		metadataIndexDocuments.versionID.Set(document.VersionID),
+		metadataIndexDocuments.digest.Set(document.Digest),
+		metadataIndexDocuments.state.Set(document.State),
+		metadataIndexDocuments.errorText.Set(document.Error),
+		metadataIndexDocuments.indexedAt.Set(unixNanoOrNil(document.IndexedAt)),
+		metadataIndexDocuments.createdAt.Set(document.CreatedAt.UnixNano()),
+		metadataIndexDocuments.updatedAt.Set(document.UpdatedAt.UnixNano()),
+	)
+	if err := execUpsertAssignments(
+		ctx,
+		s.dbxDB,
+		metadataIndexDocuments.schema,
+		assignments,
+		"upsert index document",
+		collectionlist.NewList[querydsl.Expression](metadataIndexDocuments.id),
+		metadataIndexDocuments.bucket.SetExcluded(),
+		metadataIndexDocuments.key.SetExcluded(),
+		metadataIndexDocuments.versionID.SetExcluded(),
+		metadataIndexDocuments.digest.SetExcluded(),
+		metadataIndexDocuments.state.SetExcluded(),
+		metadataIndexDocuments.errorText.SetExcluded(),
+		metadataIndexDocuments.indexedAt.SetExcluded(),
+		metadataIndexDocuments.updatedAt.SetExcluded(),
+	); err != nil {
+		return model.IndexDocument{}, err
 	}
 	return requireStoredEntity(s.GetIndexDocument(ctx, document.ID))
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -17,38 +16,41 @@ func (s *SQLMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (m
 	if err != nil {
 		return model.IndexJob{}, err
 	}
-	query := querydsl.InsertInto(metadataIndexJobs.schema).
-		Values(
-			metadataIndexJobs.id.Set(job.ID),
-			metadataIndexJobs.kind.Set(job.Kind),
-			metadataIndexJobs.bucket.Set(job.Bucket),
-			metadataIndexJobs.key.Set(job.Key),
-			metadataIndexJobs.versionID.Set(job.VersionID),
-			metadataIndexJobs.status.Set(job.Status),
-			metadataIndexJobs.attempts.Set(job.Attempts),
-			metadataIndexJobs.errorText.Set(job.Error),
-			metadataIndexJobs.availableAt.Set(job.AvailableAt.UnixNano()),
-			metadataIndexJobs.startedAt.Set(unixNanoOrNil(job.StartedAt)),
-			metadataIndexJobs.finishedAt.Set(unixNanoOrNil(job.FinishedAt)),
-			metadataIndexJobs.createdAt.Set(job.CreatedAt.UnixNano()),
-			metadataIndexJobs.updatedAt.Set(job.UpdatedAt.UnixNano()),
-		).
-		OnConflict(metadataIndexJobs.id).
-		DoUpdateSet(
-			metadataIndexJobs.kind.SetExcluded(),
-			metadataIndexJobs.bucket.SetExcluded(),
-			metadataIndexJobs.key.SetExcluded(),
-			metadataIndexJobs.versionID.SetExcluded(),
-			metadataIndexJobs.status.SetExcluded(),
-			metadataIndexJobs.attempts.SetExcluded(),
-			metadataIndexJobs.errorText.SetExcluded(),
-			metadataIndexJobs.availableAt.SetExcluded(),
-			metadataIndexJobs.startedAt.SetExcluded(),
-			metadataIndexJobs.finishedAt.SetExcluded(),
-			metadataIndexJobs.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.IndexJob{}, fmt.Errorf("upsert index job: %w", execErr)
+	assignments := collectionlist.NewList[querydsl.Assignment](
+		metadataIndexJobs.id.Set(job.ID),
+		metadataIndexJobs.kind.Set(job.Kind),
+		metadataIndexJobs.bucket.Set(job.Bucket),
+		metadataIndexJobs.key.Set(job.Key),
+		metadataIndexJobs.versionID.Set(job.VersionID),
+		metadataIndexJobs.status.Set(job.Status),
+		metadataIndexJobs.attempts.Set(job.Attempts),
+		metadataIndexJobs.errorText.Set(job.Error),
+		metadataIndexJobs.availableAt.Set(job.AvailableAt.UnixNano()),
+		metadataIndexJobs.startedAt.Set(unixNanoOrNil(job.StartedAt)),
+		metadataIndexJobs.finishedAt.Set(unixNanoOrNil(job.FinishedAt)),
+		metadataIndexJobs.createdAt.Set(job.CreatedAt.UnixNano()),
+		metadataIndexJobs.updatedAt.Set(job.UpdatedAt.UnixNano()),
+	)
+	if err := execUpsertAssignments(
+		ctx,
+		s.dbxDB,
+		metadataIndexJobs.schema,
+		assignments,
+		"upsert index job",
+		collectionlist.NewList[querydsl.Expression](metadataIndexJobs.id),
+		metadataIndexJobs.kind.SetExcluded(),
+		metadataIndexJobs.bucket.SetExcluded(),
+		metadataIndexJobs.key.SetExcluded(),
+		metadataIndexJobs.versionID.SetExcluded(),
+		metadataIndexJobs.status.SetExcluded(),
+		metadataIndexJobs.attempts.SetExcluded(),
+		metadataIndexJobs.errorText.SetExcluded(),
+		metadataIndexJobs.availableAt.SetExcluded(),
+		metadataIndexJobs.startedAt.SetExcluded(),
+		metadataIndexJobs.finishedAt.SetExcluded(),
+		metadataIndexJobs.updatedAt.SetExcluded(),
+	); err != nil {
+		return model.IndexJob{}, err
 	}
 	return requireStoredEntity(s.GetIndexJob(ctx, job.ID))
 }
