@@ -19,9 +19,9 @@ func (s *SQLMetadata) UpsertProcessingRecord(ctx context.Context, record model.P
 	if err != nil {
 		return model.ProcessingRecord{}, err
 	}
-	assignments, err := s.repos.processingRecords.Mapper().InsertAssignmentsWithID(ctx, metadataProcessingRecords.schema, &record, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.processingRecords, metadataProcessingRecords.schema, &record, "map processing record insert assignments")
 	if err != nil {
-		return model.ProcessingRecord{}, fmt.Errorf("map processing record insert assignments: %w", err)
+		return model.ProcessingRecord{}, err
 	}
 	query := querydsl.InsertInto(metadataProcessingRecords.schema).
 		ValuesList(assignments).

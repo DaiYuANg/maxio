@@ -16,9 +16,9 @@ func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) 
 	if err != nil {
 		return model.DigestRef{}, err
 	}
-	assignments, err := s.repos.digestRefs.Mapper().InsertAssignmentsWithID(ctx, metadataDigestRefs.schema, &ref, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.digestRefs, metadataDigestRefs.schema, &ref, "map digest ref insert assignments")
 	if err != nil {
-		return model.DigestRef{}, fmt.Errorf("map digest ref insert assignments: %w", err)
+		return model.DigestRef{}, err
 	}
 	query := querydsl.InsertInto(metadataDigestRefs.schema).
 		ValuesList(assignments).

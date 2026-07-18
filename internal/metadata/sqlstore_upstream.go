@@ -102,9 +102,9 @@ func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstrea
 	}
 	upstream.UpdatedAt = now
 
-	assignments, err := s.repos.upstreams.Mapper().InsertAssignmentsWithID(ctx, metadataUpstreams.schema, &upstream, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.upstreams, metadataUpstreams.schema, &upstream, "map upstream insert assignments")
 	if err != nil {
-		return model.Upstream{}, fmt.Errorf("map upstream insert assignments: %w", err)
+		return model.Upstream{}, err
 	}
 	query := querydsl.InsertInto(metadataUpstreams.schema).
 		ValuesList(assignments).

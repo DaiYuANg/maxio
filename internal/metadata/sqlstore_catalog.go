@@ -20,9 +20,9 @@ func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.Objec
 	if ensureErr := s.ensureBucket(ctx, record.Bucket); ensureErr != nil {
 		return model.ObjectRecord{}, ensureErr
 	}
-	assignments, err := s.repos.objectRecords.Mapper().InsertAssignmentsWithID(ctx, metadataObjectRecords.schema, &record, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.objectRecords, metadataObjectRecords.schema, &record, "map object record insert assignments")
 	if err != nil {
-		return model.ObjectRecord{}, fmt.Errorf("map object record insert assignments: %w", err)
+		return model.ObjectRecord{}, err
 	}
 	query := querydsl.InsertInto(metadataObjectRecords.schema).
 		ValuesList(assignments).
@@ -75,9 +75,9 @@ func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.Obj
 	if ensureErr := s.ensureBucket(ctx, version.Bucket); ensureErr != nil {
 		return model.ObjectVersion{}, ensureErr
 	}
-	assignments, err := s.repos.objectVersions.Mapper().InsertAssignmentsWithID(ctx, metadataObjectVersions.schema, &version, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.objectVersions, metadataObjectVersions.schema, &version, "map object version insert assignments")
 	if err != nil {
-		return model.ObjectVersion{}, fmt.Errorf("map object version insert assignments: %w", err)
+		return model.ObjectVersion{}, err
 	}
 	query := querydsl.InsertInto(metadataObjectVersions.schema).
 		ValuesList(assignments).

@@ -46,9 +46,9 @@ func (s *SQLMetadata) CreateBlobRef(
 	}
 
 	ref := BlobRef{Hash: hash, Path: path, Size: size, RefCount: 1}
-	assignments, err := s.repos.blobRefs.Mapper().InsertAssignmentsWithID(ctx, metadataBlobRefs.schema, &ref, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.blobRefs, metadataBlobRefs.schema, &ref, "map blob ref insert assignments")
 	if err != nil {
-		return fmt.Errorf("map blob ref insert assignments: %w", err)
+		return err
 	}
 	query := querydsl.InsertInto(metadataBlobRefs.schema).
 		ValuesList(assignments).

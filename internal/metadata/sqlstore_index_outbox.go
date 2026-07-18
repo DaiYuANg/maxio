@@ -17,9 +17,9 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 	if err != nil {
 		return model.IndexOutboxEvent{}, err
 	}
-	assignments, err := s.repos.indexOutbox.Mapper().InsertAssignmentsWithID(ctx, metadataIndexOutbox.schema, &event, nil)
+	assignments, err := repositoryInsertAssignments(ctx, s.repos.indexOutbox, metadataIndexOutbox.schema, &event, "map index outbox insert assignments")
 	if err != nil {
-		return model.IndexOutboxEvent{}, fmt.Errorf("map index outbox insert assignments: %w", err)
+		return model.IndexOutboxEvent{}, err
 	}
 	query := querydsl.InsertInto(metadataIndexOutbox.schema).
 		ValuesList(assignments).
