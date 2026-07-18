@@ -6,6 +6,7 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/mo"
 )
 
 func objectKey(object ObjectRef) string {
@@ -45,10 +46,7 @@ func marshalResults(results *collectionlist.List[ProcessorResult]) string {
 	if results == nil {
 		return "[]"
 	}
-	data, err := json.Marshal(results.Values())
-	if err != nil {
-		return "[]"
-	}
+	data := mo.TupleToResult(json.Marshal(results.Values())).OrElse([]byte("[]"))
 	return string(data)
 }
 

@@ -183,9 +183,7 @@ func addUpstreamToBuilder(b *provider.ConfigBuilder, upstream model.Upstream, en
 	if endpoint == "" {
 		return oops.Errorf("upstream %q endpoint is required", name)
 	}
-	parsedEndpoint := mo.Try(func() (*url.URL, error) {
-		return url.Parse(endpoint)
-	}).OrElse(nil)
+	parsedEndpoint := mo.TupleToResult(url.Parse(endpoint)).OrElse(nil)
 	if parsedEndpoint == nil || parsedEndpoint.Scheme == "" || parsedEndpoint.Host == "" {
 		return oops.Errorf("upstream %q endpoint invalid: %q", name, endpoint)
 	}
