@@ -69,16 +69,12 @@ func busMiddleware(logger *slog.Logger) eventx.Middleware {
 }
 
 func newLogger(cfg config.Config) *slog.Logger {
-	level := mo.Try(func() (slog.Level, error) {
-		return logx.ParseLevel(cfg.LogLevel)
-	}).OrElse(slog.LevelInfo)
+	level := mo.TupleToResult(logx.ParseLevel(cfg.LogLevel)).OrElse(slog.LevelInfo)
 
-	logger := mo.Try(func() (*slog.Logger, error) {
-		return logx.New(
-			logx.WithLevel(level),
-			logx.WithCaller(true),
-			logx.WithGlobalLogger(),
-		)
-	})
+	logger := mo.TupleToResult(logx.New(
+		logx.WithLevel(level),
+		logx.WithCaller(true),
+		logx.WithGlobalLogger(),
+	))
 	return logger.OrElse(slog.Default())
 }

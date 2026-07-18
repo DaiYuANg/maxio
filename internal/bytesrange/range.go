@@ -114,9 +114,7 @@ func suffixBounds(value string, size int64) (int64, int64, error) {
 }
 
 func parseNonNegative(value string) (int64, error) {
-	result := mo.Try(func() (int64, error) {
-		return strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-	})
+	result := mo.TupleToResult(strconv.ParseInt(strings.TrimSpace(value), 10, 64))
 	if result.IsError() {
 		return 0, fmt.Errorf("%w: invalid number", ErrInvalidRange)
 	}

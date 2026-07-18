@@ -130,9 +130,7 @@ func validateDuration(name, value string) error {
 }
 
 func parseDuration(value string) (time.Duration, error) {
-	result := mo.Try(func() (time.Duration, error) {
-		return time.ParseDuration(value)
-	})
+	result := mo.TupleToResult(time.ParseDuration(value))
 	if result.IsError() {
 		return 0, fmt.Errorf("parse duration %q: %w", value, result.Error())
 	}

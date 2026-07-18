@@ -100,16 +100,12 @@ func int64Field(fields map[string]any, name string) int64 {
 }
 
 func parseInt64Field(value string) int64 {
-	parsed := mo.Try(func() (int64, error) {
-		return strconv.ParseInt(value, 10, 64)
-	})
+	parsed := mo.TupleToResult(strconv.ParseInt(value, 10, 64))
 	return parsed.OrElse(0)
 }
 
 func timeField(fields map[string]any, name string) time.Time {
-	parsed := mo.Try(func() (time.Time, error) {
-		return time.Parse(time.RFC3339Nano, stringField(fields, name))
-	})
+	parsed := mo.TupleToResult(time.Parse(time.RFC3339Nano, stringField(fields, name)))
 	return parsed.OrElse(time.Time{})
 }
 
