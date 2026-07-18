@@ -79,9 +79,10 @@ func (s *SQLMetadata) ReleaseDigestRef(ctx context.Context, digest string) (mode
 
 	var ref model.DigestRef
 	var removed bool
-	err := s.withTx(ctx, "release digest ref", func(tx *dbx.Tx) error {
+	ctx = ensureContext(ctx)
+	err := s.repos.digestRefs.InTx(ctx, nil, func(_ *dbx.Tx, repo *repositoryx.Base[model.DigestRef, metadataDigestRefsSchema]) error {
 		var queryErr error
-		ref, queryErr = s.getDigestRefInTx(ctx, tx, digest)
+		ref, queryErr = s.getDigestRefInTx(ctx, repo, digest)
 		if queryErr != nil {
 			return queryErr
 		}
@@ -89,11 +90,14 @@ func (s *SQLMetadata) ReleaseDigestRef(ctx context.Context, digest string) (mode
 		ref.UpdatedAt = time.Now().UTC()
 		if ref.RefCount <= 0 {
 			removed = true
-			return s.deleteDigestRefInTx(ctx, tx, digest)
+			return s.deleteDigestRefInTx(ctx, repo, digest)
 		}
-		return s.updateDigestRefInTx(ctx, tx, ref)
+		return s.updateDigestRefInTx(ctx, repo, ref)
 	})
-	return ref, removed, err
+	if err != nil {
+		return ref, removed, fmt.Errorf("release digest ref: %w", err)
+	}
+	return ref, removed, nil
 }
 
 func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool, error) {
@@ -109,11 +113,8 @@ func (s *SQLMetadata) DeleteDigestRef(ctx context.Context, digest string) (bool,
 	)
 }
 
-func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *dbx.Tx, digest string) (model.DigestRef, error) {
-	query := querydsl.SelectFrom(metadataDigestRefs.schema, metadataDigestRefs.selectItems()...).
-		Where(metadataDigestRefs.digest.Eq(digest)).
-		Limit(1)
-	option, err := dbx.QueryOption(ensureContext(ctx), tx, query, s.repos.digestRefs.Mapper())
+func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, repo *repositoryx.Base[model.DigestRef, metadataDigestRefsSchema], digest string) (model.DigestRef, error) {
+	option, err := repo.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)))
 	if err != nil {
 		return model.DigestRef{}, fmt.Errorf("query digest ref: %w", err)
 	}
@@ -124,28 +125,19 @@ func (s *SQLMetadata) getDigestRefInTx(ctx context.Context, tx *dbx.Tx, digest s
 	return ref, nil
 }
 
-func (s *SQLMetadata) deleteDigestRefInTx(ctx context.Context, tx *dbx.Tx, digest string) error {
-	query := querydsl.DeleteFrom(metadataDigestRefs.schema).
-		Where(metadataDigestRefs.digest.Eq(digest))
-	if _, err := dbx.Exec(ensureContext(ctx), tx, query); err != nil {
+func (s *SQLMetadata) deleteDigestRefInTx(ctx context.Context, repo *repositoryx.Base[model.DigestRef, metadataDigestRefsSchema], digest string) error {
+	if _, err := repo.DeleteByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest))); err != nil {
 		return fmt.Errorf("delete digest ref: %w", err)
 	}
 	return nil
 }
 
-func (s *SQLMetadata) updateDigestRefInTx(ctx context.Context, tx *dbx.Tx, ref model.DigestRef) error {
-	assignments, err := s.repos.digestRefs.Mapper().UpdateAssignments(metadataDigestRefs.schema, &ref)
+func (s *SQLMetadata) updateDigestRefInTx(ctx context.Context, repo *repositoryx.Base[model.DigestRef, metadataDigestRefsSchema], ref model.DigestRef) error {
+	assignments, err := repo.Mapper().UpdateAssignments(metadataDigestRefs.schema, &ref)
 	if err != nil {
 		return fmt.Errorf("map digest ref update assignments: %w", err)
 	}
-	predicate, err := s.repos.digestRefs.Mapper().PrimaryPredicate(metadataDigestRefs.schema, &ref)
-	if err != nil {
-		return fmt.Errorf("map digest ref primary predicate: %w", err)
-	}
-	query := querydsl.Update(metadataDigestRefs.schema).
-		SetList(assignments).
-		Where(predicate)
-	if _, err := dbx.Exec(ensureContext(ctx), tx, query); err != nil {
+	if _, err := repo.UpdateByKeySet(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, ref.Digest)), assignments.Values()...); err != nil {
 		return fmt.Errorf("update digest ref: %w", err)
 	}
 	return nil

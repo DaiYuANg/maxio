@@ -2,7 +2,6 @@ package metadata
 
 import (
 	columnx "github.com/arcgolabs/dbx/column"
-	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
 )
 
@@ -47,16 +46,5 @@ func newMetadataSchedulerLeasesTable() metadataSchedulerLeasesTable {
 		expiresAt: schema.ExpiresAt,
 		createdAt: schema.CreatedAt,
 		updatedAt: schema.UpdatedAt,
-	}
-}
-
-func (t metadataSchedulerLeasesTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.taskName,
-		t.scope,
-		t.owner,
-		t.expiresAt,
-		t.createdAt,
-		t.updatedAt,
 	}
 }

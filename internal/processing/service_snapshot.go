@@ -6,6 +6,7 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
+	"github.com/samber/lo"
 )
 
 func (s *Service) Snapshot() Snapshot {
@@ -68,11 +69,15 @@ func (b snapshotBuilder) addCapabilities(processorCapabilities *collectionset.Se
 	if processorCapabilities == nil {
 		return
 	}
-	for _, capability := range processorCapabilities.Values() {
-		if value := strings.TrimSpace(string(capability)); value != "" {
-			b.capabilities.Add(value)
-		}
-	}
+	lo.ForEach(
+		lo.FilterMap(processorCapabilities.Values(), func(capability Capability, _ int) (string, bool) {
+			capabilityValue := strings.TrimSpace(string(capability))
+			return capabilityValue, capabilityValue != ""
+		}),
+		func(capability string, _ int) {
+			b.capabilities.Add(capability)
+		},
+	)
 }
 
 func (b snapshotBuilder) snapshot(cfg Config) Snapshot {

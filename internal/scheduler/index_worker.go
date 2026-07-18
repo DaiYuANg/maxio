@@ -28,12 +28,13 @@ func (runtime *Runtime) ScheduleIndexWorker(
 	if interval <= 0 {
 		interval = defaultIndexWorkerInterval
 	}
-	jobOptions := make([]gocron.JobOption, 0, len(options)+2)
-	jobOptions = append(jobOptions,
-		gocron.WithName(IndexWorkerJobName),
-		gocron.WithTags("index", "outbox"),
+	jobOptions := append(
+		[]gocron.JobOption{
+			gocron.WithName(IndexWorkerJobName),
+			gocron.WithTags("index", "outbox"),
+		},
+		options...,
 	)
-	jobOptions = append(jobOptions, options...)
 	job, err := runtime.NewLeasedJob(
 		gocron.DurationJob(interval),
 		LeaseSpec{

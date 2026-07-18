@@ -2,7 +2,6 @@ package metadata
 
 import (
 	columnx "github.com/arcgolabs/dbx/column"
-	"github.com/arcgolabs/dbx/querydsl"
 	schemax "github.com/arcgolabs/dbx/schema"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -50,18 +49,5 @@ func newMetadataDigestRefsTable() metadataDigestRefsTable {
 		upstreamKey:    schema.UpstreamKey,
 		createdAt:      schema.CreatedAt,
 		updatedAt:      schema.UpdatedAt,
-	}
-}
-
-func (t metadataDigestRefsTable) selectItems() []querydsl.SelectItem {
-	return []querydsl.SelectItem{
-		t.digest,
-		t.size,
-		t.refCount,
-		t.upstreamID,
-		t.upstreamBucket,
-		t.upstreamKey,
-		t.createdAt,
-		t.updatedAt,
 	}
 }

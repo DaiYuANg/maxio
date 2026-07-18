@@ -6,6 +6,7 @@ import (
 
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
+	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/scheduler"
 )
 
@@ -121,13 +122,14 @@ func (repository *SQLSchedulerLeaseRepository) getLease(
 	taskName string,
 	scope string,
 ) (scheduler.Lease, bool, error) {
-	query := querydsl.SelectFrom(metadataSchedulerLeases.schema, metadataSchedulerLeases.selectItems()...).
-		Where(querydsl.And(
-			metadataSchedulerLeases.taskName.Eq(taskName),
-			metadataSchedulerLeases.scope.Eq(scope),
-		)).
-		Limit(1)
-	option, err := dbx.QueryOption(ctx, repository.store.dbxDB, query, repository.store.repos.schedulerLeases.Mapper())
+	option, err := repositoryx.Query(repository.store.repos.schedulerLeases).
+		Where(
+			querydsl.And(
+				metadataSchedulerLeases.taskName.Eq(taskName),
+				metadataSchedulerLeases.scope.Eq(scope),
+			),
+		).
+		Find(ctx)
 	if err != nil {
 		return scheduler.Lease{}, false, fmt.Errorf("query scheduler lease: %w", err)
 	}
