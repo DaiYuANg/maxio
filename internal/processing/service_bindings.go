@@ -168,48 +168,34 @@ func cloneProcessorResults(results *collectionlist.List[ProcessorResult]) *colle
 }
 
 func mergeProcessorResults(base, additions *collectionlist.List[ProcessorResult]) *collectionlist.List[ProcessorResult] {
-	merged := collectionlist.NewList[ProcessorResult]()
-	replacements := replacementProcessorResults(additions)
-	appendNonReplacedProcessorResults(merged, base, replacements)
-	appendProcessorResults(merged, additions)
+	merged := nonReplacedProcessorResults(base, replacementProcessorResults(additions))
+	if additions != nil {
+		merged.Add(additions.Values()...)
+	}
 	return merged
 }
 
 func replacementProcessorResults(additions *collectionlist.List[ProcessorResult]) map[string]struct{} {
-	replacements := map[string]struct{}{}
-	appendProcessorResultKeys(replacements, additions)
-	return replacements
-}
-
-func appendProcessorResultKeys(keys map[string]struct{}, results *collectionlist.List[ProcessorResult]) {
-	if results == nil {
-		return
+	if additions == nil {
+		return map[string]struct{}{}
 	}
-	results.Range(func(_ int, result ProcessorResult) bool {
-		keys[processorResultKey(result)] = struct{}{}
-		return true
-	})
+	return collectionlist.ReduceList(
+		additions,
+		map[string]struct{}{},
+		func(replacements map[string]struct{}, _ int, result ProcessorResult) map[string]struct{} {
+			replacements[processorResultKey(result)] = struct{}{}
+			return replacements
+		},
+	)
 }
 
-func appendNonReplacedProcessorResults(merged, base *collectionlist.List[ProcessorResult], replacements map[string]struct{}) {
+func nonReplacedProcessorResults(base *collectionlist.List[ProcessorResult], replacements map[string]struct{}) *collectionlist.List[ProcessorResult] {
 	if base == nil {
-		return
+		return collectionlist.NewList[ProcessorResult]()
 	}
-	base.Range(func(_ int, result ProcessorResult) bool {
-		if _, replace := replacements[processorResultKey(result)]; !replace {
-			merged.Add(result)
-		}
-		return true
-	})
-}
-
-func appendProcessorResults(merged, results *collectionlist.List[ProcessorResult]) {
-	if results == nil {
-		return
-	}
-	results.Range(func(_ int, result ProcessorResult) bool {
-		merged.Add(result)
-		return true
+	return collectionlist.FilterMapList(base, func(_ int, result ProcessorResult) (ProcessorResult, bool) {
+		_, replace := replacements[processorResultKey(result)]
+		return result, !replace
 	})
 }
 
