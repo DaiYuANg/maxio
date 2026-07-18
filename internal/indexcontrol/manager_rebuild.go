@@ -25,28 +25,28 @@ func (manager *Manager) listCommittedObjectMetas(ctx context.Context) (*collecti
 	if err != nil {
 		return nil, fmt.Errorf("list buckets for index rebuild: %w", err)
 	}
-	objects := collectionlist.NewList[model.ObjectMeta]()
 	if buckets == nil {
-		return objects, nil
+		return collectionlist.NewList[model.ObjectMeta](), nil
 	}
-	var listErr error
-	buckets.Range(func(_ int, bucket model.Bucket) bool {
-		metas, err := manager.metadata.ListObjectMetas(ctx, bucket.Name, "")
-		if err != nil {
-			listErr = fmt.Errorf("list %q object metadata: %w", bucket.Name, err)
-			return false
-		}
-		if metas != nil {
-			objects.MergeSlice(metas.Values())
-		}
-		return true
-	})
-	if listErr != nil {
-		return nil, listErr
+	objects, err := collectionlist.ReduceErrList(
+		buckets,
+		collectionlist.NewList[model.ObjectMeta](),
+		func(objects *collectionlist.List[model.ObjectMeta], _ int, bucket model.Bucket) (*collectionlist.List[model.ObjectMeta], error) {
+			metas, listErr := manager.metadata.ListObjectMetas(ctx, bucket.Name, "")
+			if listErr != nil {
+				return objects, fmt.Errorf("list %q object metadata: %w", bucket.Name, listErr)
+			}
+			if metas != nil {
+				objects.MergeSlice(metas.Values())
+			}
+			return objects, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list committed object metadata: %w", err)
 	}
 	return objects, nil
 }
-
 func (manager *Manager) rebuildObjects(
 	ctx context.Context,
 	objects *collectionlist.List[model.ObjectMeta],
@@ -132,22 +132,21 @@ func firstVisibleVersionID(versions *collectionlist.List[model.ObjectVersion]) s
 	if versions == nil {
 		return ""
 	}
-	versionID := ""
-	versions.Range(func(_ int, version model.ObjectVersion) bool {
-		if version.DeleteMarker || strings.TrimSpace(version.VersionID) == "" {
-			return true
-		}
-		versionID = strings.TrimSpace(version.VersionID)
-		return false
+	version, found := collectionlist.FindList(versions, func(_ int, version model.ObjectVersion) bool {
+		return !version.DeleteMarker && strings.TrimSpace(version.VersionID) != ""
 	})
-	return versionID
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(version.VersionID)
 }
 
 func fallbackVersionID(meta model.ObjectMeta) string {
-	for _, candidate := range []string{meta.ETag, meta.Hash} {
-		if value := strings.TrimSpace(candidate); value != "" {
-			return value
-		}
+	candidate, found := collectionlist.FindList(collectionlist.NewList(meta.ETag, meta.Hash), func(_ int, candidate string) bool {
+		return strings.TrimSpace(candidate) != ""
+	})
+	if found {
+		return strings.TrimSpace(candidate)
 	}
 	if !meta.UpdatedAt.IsZero() {
 		return meta.UpdatedAt.UTC().Format(time.RFC3339Nano)
