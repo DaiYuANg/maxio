@@ -6,6 +6,7 @@ import (
 
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 func (m *InMemoryMetadata) UpsertProcessingRecord(_ context.Context, record model.ProcessingRecord) (model.ProcessingRecord, error) {
@@ -38,13 +39,9 @@ func (m *InMemoryMetadata) ListProcessingRecords(_ context.Context, status strin
 	limit = normalizeListLimit(limit)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	records := list.NewListWithCapacity[model.ProcessingRecord](len(m.processingRecords))
-	for id := range m.processingRecords {
-		record := m.processingRecords[id]
-		if status == "" || record.Status == status {
-			records.Add(record)
-		}
-	}
+	records := list.NewList(lo.Filter(lo.Values(m.processingRecords), func(record model.ProcessingRecord, _ int) bool {
+		return status == "" || record.Status == status
+	})...)
 	return limitProcessingRecords(sortProcessingRecords(records), limit), nil
 }
 
@@ -66,7 +63,7 @@ func limitProcessingRecords(records *list.List[model.ProcessingRecord], limit in
 	if records.Len() <= limit {
 		return records
 	}
-	return list.NewList(records.Values()[:limit]...)
+	return list.NewList(lo.Take(records.Values(), limit)...)
 }
 
 func (m *InMemoryMetadata) DeleteProcessingRecord(_ context.Context, bucket, key, versionID, digest string) (bool, error) {

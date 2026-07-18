@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -112,21 +113,24 @@ func digestETag(digest string) string {
 }
 
 func userMetadataFromHeader(header http.Header) map[string]string {
-	metadataValues := make(map[string]string)
-	for key, values := range header {
-		if !strings.HasPrefix(strings.ToLower(key), "x-amz-meta-") || len(values) == 0 {
-			continue
-		}
-		metadataKey := strings.TrimPrefix(strings.ToLower(key), "x-amz-meta-")
-		metadataValue := strings.TrimSpace(values[0])
-		if metadataKey != "" && metadataValue != "" {
-			metadataValues[metadataKey] = metadataValue
-		}
-	}
+	metadataValues := lo.FilterMap(
+		lo.Entries(header),
+		func(item lo.Entry[string, []string], _ int) (lo.Entry[string, string], bool) {
+			if !strings.HasPrefix(strings.ToLower(item.Key), "x-amz-meta-") || len(item.Value) == 0 {
+				return lo.Entry[string, string]{}, false
+			}
+			metadataKey := strings.TrimPrefix(strings.ToLower(item.Key), "x-amz-meta-")
+			metadataValue := strings.TrimSpace(item.Value[0])
+			if metadataKey == "" || metadataValue == "" {
+				return lo.Entry[string, string]{}, false
+			}
+			return lo.Entry[string, string]{Key: metadataKey, Value: metadataValue}, true
+		},
+	)
 	if len(metadataValues) == 0 {
 		return nil
 	}
-	return metadataValues
+	return lo.FromEntries(metadataValues)
 }
 
 func newObjectPutEventFromRequest(

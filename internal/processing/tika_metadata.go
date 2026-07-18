@@ -8,6 +8,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 func readTikaRMeta(reader io.Reader, limit int64) (map[string]string, error) {
@@ -76,12 +78,13 @@ func copyPrimaryTikaMetadata(metadata map[string]string, document map[string]any
 }
 
 func copyTikaMetadata(metadata map[string]string, document map[string]any, target string, sourceKeys ...string) {
-	for _, sourceKey := range sourceKeys {
-		value := tikaMetadataString(document[sourceKey])
-		if value != "" {
-			metadata[target] = value
-			return
-		}
+	var selected string
+	_, found := lo.Find(sourceKeys, func(sourceKey string) bool {
+		selected = tikaMetadataString(document[sourceKey])
+		return selected != ""
+	})
+	if found {
+		metadata[target] = selected
 	}
 }
 
@@ -105,22 +108,16 @@ func tikaMetadataString(value any) string {
 }
 
 func joinTikaStrings(values []string) string {
-	items := make([]string, 0, len(values))
-	for _, item := range values {
-		if value := strings.TrimSpace(item); value != "" {
-			items = append(items, value)
-		}
-	}
+	items := lo.Compact(lo.Map(values, func(value string, _ int) string {
+		return strings.TrimSpace(value)
+	}))
 	return strings.Join(items, ",")
 }
 
 func joinTikaValues(values []any) string {
-	items := make([]string, 0, len(values))
-	for _, item := range values {
-		if value := tikaMetadataString(item); value != "" {
-			items = append(items, value)
-		}
-	}
+	items := lo.Compact(lo.Map(values, func(value any, _ int) string {
+		return tikaMetadataString(value)
+	}))
 	return strings.Join(items, ",")
 }
 

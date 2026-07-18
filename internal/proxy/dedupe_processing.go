@@ -8,6 +8,7 @@ import (
 
 	"github.com/lyonbrown4d/maxio/internal/model"
 	"github.com/lyonbrown4d/maxio/internal/processing"
+	"github.com/samber/lo"
 )
 
 func (m *dedupeMiddleware) processPutBeforeCommit(
@@ -75,24 +76,22 @@ func (m *dedupeMiddleware) discardPutProcessingRecord(ctx context.Context, event
 }
 
 func processingSnapshotNeedsAsyncBody(snapshot processing.Snapshot) bool {
+	isAsyncMode := func(mode string) bool {
+		switch processing.NormalizeMode(mode) {
+		case processing.ModeAsyncPermissive, processing.ModeAsyncStrict:
+			return true
+		default:
+			return false
+		}
+	}
+
 	if !snapshot.Enabled || snapshot.Mode == processing.ModeDisabled {
 		return false
 	}
 	if len(snapshot.ProcessorModes) > 0 {
-		for _, mode := range snapshot.ProcessorModes {
-			switch processing.NormalizeMode(mode) {
-			case processing.ModeAsyncPermissive, processing.ModeAsyncStrict:
-				return true
-			}
-		}
-		return false
+		return lo.SomeBy(lo.Values(snapshot.ProcessorModes), isAsyncMode)
 	}
-	switch processing.NormalizeMode(snapshot.Mode) {
-	case processing.ModeAsyncPermissive, processing.ModeAsyncStrict:
-		return true
-	default:
-		return false
-	}
+	return isAsyncMode(snapshot.Mode)
 }
 func processingPreCommitInputFromPutEvent(event ObjectPutSucceededEvent, captured *capturedRequestBody) processing.Input {
 	input := processingInputFromPutEvent(event, captured)
