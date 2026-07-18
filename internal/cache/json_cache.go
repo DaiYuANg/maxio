@@ -11,7 +11,6 @@ import (
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/kvx"
 	"github.com/lyonbrown4d/maxio/internal/model"
-	"github.com/samber/mo"
 )
 
 const (
@@ -201,11 +200,8 @@ func getCacheJSON[T any](ctx context.Context, cache *metadataJSONCache, key stri
 	if err != nil {
 		return value, false, fmt.Errorf("get metadata cache: %w", err)
 	}
-	unmarshal := mo.Try(func() (struct{}, error) {
-		return struct{}{}, json.Unmarshal(data, &value)
-	})
-	if unmarshal.IsError() {
-		return value, false, fmt.Errorf("decode cached metadata: %w", unmarshal.Error())
+	if err := json.Unmarshal(data, &value); err != nil {
+		return value, false, fmt.Errorf("decode cached metadata: %w", err)
 	}
 	return value, true, nil
 }

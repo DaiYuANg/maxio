@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/processing"
+	"github.com/samber/lo"
 )
 
 type processingStatusResponse struct {
@@ -79,12 +81,9 @@ func stringListValues[T ~string](values interface{ Values() []T }) []string {
 	if values == nil {
 		return []string{}
 	}
-	items := values.Values()
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		result = append(result, string(item))
-	}
-	return result
+	return lo.Map(values.Values(), func(item T, _ int) string {
+		return string(item)
+	})
 }
 
 func (s *Service) handleProcessingRecord(w http.ResponseWriter, r *http.Request) {
@@ -145,11 +144,9 @@ func (s *Service) handleProcessingRecordList(w http.ResponseWriter, r *http.Requ
 	}
 	responses := []processingRecordResponse{}
 	if records != nil {
-		responses = make([]processingRecordResponse, 0, records.Len())
-		records.Range(func(_ int, record processing.Record) bool {
-			responses = append(responses, s.processingRecordToResponse(record))
-			return true
-		})
+		responses = collectionlist.MapList(records, func(_ int, record processing.Record) processingRecordResponse {
+			return s.processingRecordToResponse(record)
+		}).Values()
 	}
 	s.writeJSON(w, http.StatusOK, processingRecordsResponse{Records: responses})
 }
