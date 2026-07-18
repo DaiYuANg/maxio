@@ -215,13 +215,15 @@ func (m *InMemoryMetadata) ListObjectMetas(_ context.Context, bucket, prefix str
 		return nil, ErrBucketNotFound
 	}
 
-	result := list.NewListWithCapacity[model.ObjectMeta](keys.Len())
-	keys.Each(func(key string) {
-		if strings.HasPrefix(key, prefix) {
-			meta := m.objects[objectID(bucket, key)]
-			result.Add(meta)
-		}
-	})
+	result := list.FilterMapList(
+		list.NewList(keys.Values()...),
+		func(_ int, key string) (model.ObjectMeta, bool) {
+			if !strings.HasPrefix(key, prefix) {
+				return model.ObjectMeta{}, false
+			}
+			return m.objects[objectID(bucket, key)], true
+		},
+	)
 	sorted := result.Sort(func(left, right model.ObjectMeta) int {
 		if left.Key < right.Key {
 			return -1
