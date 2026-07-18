@@ -39,14 +39,7 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.IndexOutboxEvent{}, fmt.Errorf("upsert index outbox event: %w", execErr)
 	}
-	stored, found, err := s.GetIndexOutboxEvent(ctx, event.ID)
-	if err != nil {
-		return model.IndexOutboxEvent{}, err
-	}
-	if !found {
-		return model.IndexOutboxEvent{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetIndexOutboxEvent(ctx, event.ID))
 }
 
 func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model.IndexOutboxEvent, bool, error) {
@@ -65,12 +58,12 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 
 func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexOutboxEvent], error) {
 	status = strings.TrimSpace(status)
-	specs := []repositoryx.Spec{}
+	var predicate querydsl.Predicate
 	if status != "" {
-		specs = append(specs, repositoryx.Where(metadataIndexOutbox.status.Eq(status)))
+		predicate = metadataIndexOutbox.status.Eq(status)
 	}
-	specs = append(
-		specs,
+	specs := repositorySpecs(
+		optionalWhereSpec(predicate),
 		repositoryx.OrderBy(metadataIndexOutbox.availableAt.Asc(), metadataIndexOutbox.createdAt.Asc()),
 		repositoryx.Limit(normalizeListLimit(limit)),
 	)

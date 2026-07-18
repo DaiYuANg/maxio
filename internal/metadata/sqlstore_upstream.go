@@ -124,11 +124,7 @@ func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstrea
 	if execErr != nil {
 		return model.Upstream{}, fmt.Errorf("upsert upstream: %w", execErr)
 	}
-	stored, _, err := s.GetUpstream(ctx, upstream.ID)
-	if err != nil {
-		return model.Upstream{}, err
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetUpstream(ctx, upstream.ID))
 }
 
 func (s *SQLMetadata) DeleteUpstream(ctx context.Context, id string) (bool, error) {

@@ -34,14 +34,7 @@ func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) 
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.DigestRef{}, fmt.Errorf("upsert digest ref: %w", execErr)
 	}
-	stored, found, err := s.GetDigestRef(ctx, ref.Digest)
-	if err != nil {
-		return model.DigestRef{}, err
-	}
-	if !found {
-		return model.DigestRef{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetDigestRef(ctx, ref.Digest))
 }
 
 func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.DigestRef, bool, error) {

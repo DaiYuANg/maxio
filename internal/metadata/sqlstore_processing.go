@@ -40,14 +40,7 @@ func (s *SQLMetadata) UpsertProcessingRecord(ctx context.Context, record model.P
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.ProcessingRecord{}, fmt.Errorf("upsert processing record: %w", execErr)
 	}
-	stored, found, err := s.GetProcessingRecord(ctx, record.Bucket, record.Key, record.VersionID, record.Digest)
-	if err != nil {
-		return model.ProcessingRecord{}, err
-	}
-	if !found {
-		return model.ProcessingRecord{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetProcessingRecord(ctx, record.Bucket, record.Key, record.VersionID, record.Digest))
 }
 
 func (s *SQLMetadata) GetProcessingRecord(ctx context.Context, bucket, key, versionID, digest string) (model.ProcessingRecord, bool, error) {
@@ -66,13 +59,15 @@ func (s *SQLMetadata) GetProcessingRecord(ctx context.Context, bucket, key, vers
 func (s *SQLMetadata) ListProcessingRecords(ctx context.Context, status string, limit int) (*collectionlist.List[model.ProcessingRecord], error) {
 	status = strings.TrimSpace(status)
 	limit = normalizeListLimit(limit)
-	specs := []repositoryx.Spec{
+	var predicate querydsl.Predicate
+	if status != "" {
+		predicate = metadataProcessingRecords.status.Eq(status)
+	}
+	specs := repositorySpecs(
+		optionalWhereSpec(predicate),
 		repositoryx.OrderBy(metadataProcessingRecords.updatedAt.Desc(), metadataProcessingRecords.id.Asc()),
 		repositoryx.Limit(limit),
-	}
-	if status != "" {
-		specs = append([]repositoryx.Spec{repositoryx.Where(metadataProcessingRecords.status.Eq(status))}, specs...)
-	}
+	)
 	records, err := s.repos.processingRecords.ListSpec(ctx, specs...)
 	if err != nil {
 		return nil, fmt.Errorf("list processing records: %w", err)

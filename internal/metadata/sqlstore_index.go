@@ -44,14 +44,7 @@ func (s *SQLMetadata) UpsertIndexDocument(ctx context.Context, document model.In
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.IndexDocument{}, fmt.Errorf("upsert index document: %w", execErr)
 	}
-	stored, found, err := s.GetIndexDocument(ctx, document.ID)
-	if err != nil {
-		return model.IndexDocument{}, err
-	}
-	if !found {
-		return model.IndexDocument{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetIndexDocument(ctx, document.ID))
 }
 
 func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.IndexDocument, bool, error) {
@@ -71,11 +64,10 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.IndexDocument], error) {
 	bucket = strings.TrimSpace(bucket)
 	prefix = strings.TrimSpace(prefix)
-	specs := []repositoryx.Spec{}
-	if predicate := indexDocumentFilter(bucket, prefix); predicate != nil {
-		specs = append(specs, repositoryx.Where(predicate))
-	}
-	specs = append(specs, repositoryx.OrderBy(metadataIndexDocuments.bucket.Asc(), metadataIndexDocuments.key.Asc(), metadataIndexDocuments.versionID.Asc()))
+	specs := repositorySpecs(
+		optionalWhereSpec(indexDocumentFilter(bucket, prefix)),
+		repositoryx.OrderBy(metadataIndexDocuments.bucket.Asc(), metadataIndexDocuments.key.Asc(), metadataIndexDocuments.versionID.Asc()),
+	)
 	documents, err := s.repos.indexDocuments.ListSpec(ctx, specs...)
 	if err != nil {
 		return nil, fmt.Errorf("list index documents: %w", err)

@@ -35,14 +35,7 @@ func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.Objec
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.ObjectRecord{}, fmt.Errorf("upsert object record: %w", execErr)
 	}
-	stored, found, err := s.GetObjectRecord(ctx, record.Bucket, record.Key)
-	if err != nil {
-		return model.ObjectRecord{}, err
-	}
-	if !found {
-		return model.ObjectRecord{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetObjectRecord(ctx, record.Bucket, record.Key))
 }
 
 func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (model.ObjectRecord, bool, error) {
@@ -107,14 +100,7 @@ func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.Obj
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.ObjectVersion{}, fmt.Errorf("upsert object version: %w", execErr)
 	}
-	stored, found, err := s.GetObjectVersion(ctx, version.Bucket, version.Key, version.VersionID)
-	if err != nil {
-		return model.ObjectVersion{}, err
-	}
-	if !found {
-		return model.ObjectVersion{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetObjectVersion(ctx, version.Bucket, version.Key, version.VersionID))
 }
 
 func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, versionID string) (model.ObjectVersion, bool, error) {

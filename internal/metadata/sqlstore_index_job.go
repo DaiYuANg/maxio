@@ -50,14 +50,7 @@ func (s *SQLMetadata) UpsertIndexJob(ctx context.Context, job model.IndexJob) (m
 	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
 		return model.IndexJob{}, fmt.Errorf("upsert index job: %w", execErr)
 	}
-	stored, found, err := s.GetIndexJob(ctx, job.ID)
-	if err != nil {
-		return model.IndexJob{}, err
-	}
-	if !found {
-		return model.IndexJob{}, ErrObjectNotFound
-	}
-	return stored, nil
+	return requireStoredEntity(s.GetIndexJob(ctx, job.ID))
 }
 
 func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJob, bool, error) {
@@ -76,12 +69,12 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 
 func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexJob], error) {
 	status = strings.TrimSpace(status)
-	specs := []repositoryx.Spec{}
+	var predicate querydsl.Predicate
 	if status != "" {
-		specs = append(specs, repositoryx.Where(metadataIndexJobs.status.Eq(status)))
+		predicate = metadataIndexJobs.status.Eq(status)
 	}
-	specs = append(
-		specs,
+	specs := repositorySpecs(
+		optionalWhereSpec(predicate),
 		repositoryx.OrderBy(metadataIndexJobs.availableAt.Asc(), metadataIndexJobs.createdAt.Asc()),
 		repositoryx.Limit(normalizeListLimit(limit)),
 	)
