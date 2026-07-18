@@ -7,6 +7,7 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
+	"github.com/samber/lo"
 )
 
 func (cfg Config) normalized() Config {
@@ -61,11 +62,9 @@ func normalizeResultStatus(result ProcessorResult) ProcessorResult {
 }
 
 func bindProcessors(mode string, processors ...Processor) []ProcessorBinding {
-	bindings := make([]ProcessorBinding, 0, len(processors))
-	for _, processor := range processors {
-		bindings = append(bindings, BindProcessor(processor, mode))
-	}
-	return bindings
+	return lo.Map(processors, func(processor Processor, _ int) ProcessorBinding {
+		return BindProcessor(processor, mode)
+	})
 }
 
 func normalizeProcessorBindings(defaultMode string, bindings ...ProcessorBinding) *collectionlist.List[ProcessorBinding] {
@@ -76,15 +75,13 @@ func normalizeProcessorBindings(defaultMode string, bindings ...ProcessorBinding
 	if len(bindings) == 0 && defaultMode != ModeDisabled {
 		bindings = append(bindings, BindProcessor(NewNoopProcessor(), defaultMode))
 	}
-	result := collectionlist.NewListWithCapacity[ProcessorBinding](len(bindings))
-	for _, binding := range bindings {
+	return collectionlist.NewList(lo.Map(bindings, func(binding ProcessorBinding, _ int) ProcessorBinding {
 		binding.Mode = NormalizeMode(binding.Mode)
 		if binding.Mode == "" {
 			binding.Mode = defaultMode
 		}
-		result.Add(binding)
-	}
-	return result
+		return binding
+	})...)
 }
 
 func (s *Service) bindingsForModes(modes ...string) *collectionlist.List[ProcessorBinding] {
@@ -98,21 +95,17 @@ func filterProcessorBindings(
 	bindings *collectionlist.List[ProcessorBinding],
 	modes ...string,
 ) *collectionlist.List[ProcessorBinding] {
-	result := collectionlist.NewList[ProcessorBinding]()
 	if bindings == nil {
-		return result
+		return collectionlist.NewList[ProcessorBinding]()
 	}
 	allowed := allowedProcessingModes(modes)
-	bindings.Range(func(_ int, binding ProcessorBinding) bool {
+	return collectionlist.FilterMapList(bindings, func(_ int, binding ProcessorBinding) (ProcessorBinding, bool) {
 		if binding.Processor == nil {
-			return true
+			return ProcessorBinding{}, false
 		}
-		if _, ok := allowed[binding.Mode]; ok {
-			result.Add(binding)
-		}
-		return true
+		_, ok := allowed[binding.Mode]
+		return binding, ok
 	})
-	return result
 }
 
 func (s *Service) inlineStrictBindings() *collectionlist.List[ProcessorBinding] {
@@ -137,11 +130,9 @@ func (s *Service) strictReadBindings() *collectionlist.List[ProcessorBinding] {
 }
 
 func allowedProcessingModes(modes []string) map[string]struct{} {
-	allowed := make(map[string]struct{}, len(modes))
-	for _, mode := range modes {
-		allowed[NormalizeMode(mode)] = struct{}{}
-	}
-	return allowed
+	return lo.SliceToMap(modes, func(mode string) (string, struct{}) {
+		return NormalizeMode(mode), struct{}{}
+	})
 }
 
 func isStrictBinding(binding ProcessorBinding) bool {
@@ -152,30 +143,21 @@ func hasInlineStrictBinding(bindings *collectionlist.List[ProcessorBinding]) boo
 	if bindings == nil {
 		return false
 	}
-	found := false
-	bindings.Range(func(_ int, binding ProcessorBinding) bool {
-		if binding.Mode == ModeInlineStrict {
-			found = true
-			return false
-		}
-		return true
+	return lo.ContainsBy(bindings.Values(), func(binding ProcessorBinding) bool {
+		return binding.Mode == ModeInlineStrict
 	})
-	return found
 }
 
 func processorStatusResults(bindings *collectionlist.List[ProcessorBinding], status string) *collectionlist.List[ProcessorResult] {
-	results := collectionlist.NewList[ProcessorResult]()
 	if bindings == nil {
-		return results
+		return collectionlist.NewList[ProcessorResult]()
 	}
-	bindings.Range(func(_ int, binding ProcessorBinding) bool {
+	return collectionlist.FilterMapList(bindings, func(_ int, binding ProcessorBinding) (ProcessorResult, bool) {
 		if binding.Processor == nil || binding.Mode == ModeDisabled {
-			return true
+			return ProcessorResult{}, false
 		}
-		results.Add(ProcessorResult{Processor: binding.Processor.Name(), Mode: binding.Mode, Status: status})
-		return true
+		return ProcessorResult{Processor: binding.Processor.Name(), Mode: binding.Mode, Status: status}, true
 	})
-	return results
 }
 
 func cloneProcessorResults(results *collectionlist.List[ProcessorResult]) *collectionlist.List[ProcessorResult] {

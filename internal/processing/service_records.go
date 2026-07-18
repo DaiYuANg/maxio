@@ -8,6 +8,7 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/lyonbrown4d/maxio/internal/model"
+	"github.com/samber/lo"
 )
 
 func (s *Service) Discard(ctx context.Context, object ObjectRef) {
@@ -108,13 +109,9 @@ func (s *Service) filterStoredRecords(stored *collectionlist.List[model.Processi
 func (s *Service) listMemoryRecords(status string, limit int) *collectionlist.List[Record] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	records := collectionlist.NewListWithCapacity[Record](len(s.records))
-	for key := range s.records {
-		record := s.records[key]
-		if status == "" || record.Status == status {
-			records.Add(record)
-		}
-	}
+	records := collectionlist.NewList(lo.Filter(lo.Values(s.records), func(record Record, _ int) bool {
+		return status == "" || record.Status == status
+	})...)
 	return limitRecords(sortRecords(records), limit)
 }
 
@@ -134,7 +131,7 @@ func limitRecords(records *collectionlist.List[Record], limit int) *collectionli
 	if records.Len() <= limit {
 		return records
 	}
-	return collectionlist.NewList(records.Values()[:limit]...)
+	return collectionlist.NewList(lo.Take(records.Values(), limit)...)
 }
 
 func (s *Service) lookupRecord(ctx context.Context, object ObjectRef) (Record, bool, error) {
