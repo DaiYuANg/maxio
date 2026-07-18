@@ -58,15 +58,17 @@ func processingReadBlockReason(err error) string {
 }
 
 func processorResultsByKey(results *collectionlist.List[ProcessorResult]) map[string]ProcessorResult {
-	byKey := map[string]ProcessorResult{}
 	if results == nil {
-		return byKey
+		return map[string]ProcessorResult{}
 	}
-	results.Range(func(_ int, result ProcessorResult) bool {
-		byKey[processorResultKey(result)] = result
-		return true
-	})
-	return byKey
+	return collectionlist.ReduceList(
+		results,
+		map[string]ProcessorResult{},
+		func(byKey map[string]ProcessorResult, _ int, result ProcessorResult) map[string]ProcessorResult {
+			byKey[processorResultKey(result)] = result
+			return byKey
+		},
+	)
 }
 
 func lookupProcessorResult(results map[string]ProcessorResult, processorName, mode, recordMode string) (ProcessorResult, bool) {

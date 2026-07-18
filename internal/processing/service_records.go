@@ -95,15 +95,11 @@ func (s *Service) listStoredRecords(ctx context.Context, status string, limit in
 }
 
 func (s *Service) filterStoredRecords(stored *collectionlist.List[model.ProcessingRecord], limit int) *collectionlist.List[Record] {
-	records := collectionlist.NewListWithCapacity[Record](stored.Len())
-	stored.Range(func(_ int, storedRecord model.ProcessingRecord) bool {
+	records := collectionlist.FilterMapList(stored, func(_ int, storedRecord model.ProcessingRecord) (Record, bool) {
 		record := recordFromModel(storedRecord)
-		if !s.isDiscarded(record.Object) {
-			records.Add(record)
-		}
-		return records.Len() < limit
+		return record, !s.isDiscarded(record.Object)
 	})
-	return records
+	return limitRecords(records, limit)
 }
 
 func (s *Service) listMemoryRecords(status string, limit int) *collectionlist.List[Record] {

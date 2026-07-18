@@ -133,12 +133,13 @@ func statusFromResults(results *collectionlist.List[ProcessorResult]) string {
 	if results == nil || results.Len() == 0 {
 		return StatusSkipped
 	}
-	status := StatusSkipped
-	results.Range(func(_ int, result ProcessorResult) bool {
-		status = higherPriorityStatus(status, result.Status)
-		return status != StatusBlocked && status != StatusFailed
-	})
-	return status
+	return collectionlist.ReduceList(
+		results,
+		StatusSkipped,
+		func(status string, _ int, result ProcessorResult) string {
+			return higherPriorityStatus(status, result.Status)
+		},
+	)
 }
 
 func higherPriorityStatus(current, candidate string) string {
