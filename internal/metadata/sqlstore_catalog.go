@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -20,20 +19,19 @@ func (s *SQLMetadata) UpsertObjectRecord(ctx context.Context, record model.Objec
 	if ensureErr := s.ensureBucket(ctx, record.Bucket); ensureErr != nil {
 		return model.ObjectRecord{}, ensureErr
 	}
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.objectRecords, metadataObjectRecords.schema, &record, "map object record insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.objectRecords,
+		metadataObjectRecords.schema,
+		&record,
+		"map object record insert assignments",
+		"upsert object record",
+		collectionlist.NewList[querydsl.Expression](metadataObjectRecords.bucket, metadataObjectRecords.key),
+		metadataObjectRecords.currentVersionID.SetExcluded(),
+		metadataObjectRecords.deleted.SetExcluded(),
+		metadataObjectRecords.updatedAt.SetExcluded(),
+	); err != nil {
 		return model.ObjectRecord{}, err
-	}
-	query := querydsl.InsertInto(metadataObjectRecords.schema).
-		ValuesList(assignments).
-		OnConflict(metadataObjectRecords.bucket, metadataObjectRecords.key).
-		DoUpdateSet(
-			metadataObjectRecords.currentVersionID.SetExcluded(),
-			metadataObjectRecords.deleted.SetExcluded(),
-			metadataObjectRecords.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.ObjectRecord{}, fmt.Errorf("upsert object record: %w", execErr)
 	}
 	return requireStoredEntity(s.GetObjectRecord(ctx, record.Bucket, record.Key))
 }
@@ -75,31 +73,30 @@ func (s *SQLMetadata) UpsertObjectVersion(ctx context.Context, version model.Obj
 	if ensureErr := s.ensureBucket(ctx, version.Bucket); ensureErr != nil {
 		return model.ObjectVersion{}, ensureErr
 	}
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.objectVersions, metadataObjectVersions.schema, &version, "map object version insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.objectVersions,
+		metadataObjectVersions.schema,
+		&version,
+		"map object version insert assignments",
+		"upsert object version",
+		collectionlist.NewList[querydsl.Expression](metadataObjectVersions.bucket, metadataObjectVersions.key, metadataObjectVersions.versionID),
+		metadataObjectVersions.digest.SetExcluded(),
+		metadataObjectVersions.etag.SetExcluded(),
+		metadataObjectVersions.size.SetExcluded(),
+		metadataObjectVersions.contentType.SetExcluded(),
+		metadataObjectVersions.cacheControl.SetExcluded(),
+		metadataObjectVersions.contentDisposition.SetExcluded(),
+		metadataObjectVersions.contentEncoding.SetExcluded(),
+		metadataObjectVersions.contentLanguage.SetExcluded(),
+		metadataObjectVersions.userMetadata.SetExcluded(),
+		metadataObjectVersions.upstreamID.SetExcluded(),
+		metadataObjectVersions.upstreamBucket.SetExcluded(),
+		metadataObjectVersions.upstreamKey.SetExcluded(),
+		metadataObjectVersions.deleteMarker.SetExcluded(),
+		metadataObjectVersions.updatedAt.SetExcluded(),
+	); err != nil {
 		return model.ObjectVersion{}, err
-	}
-	query := querydsl.InsertInto(metadataObjectVersions.schema).
-		ValuesList(assignments).
-		OnConflict(metadataObjectVersions.bucket, metadataObjectVersions.key, metadataObjectVersions.versionID).
-		DoUpdateSet(
-			metadataObjectVersions.digest.SetExcluded(),
-			metadataObjectVersions.etag.SetExcluded(),
-			metadataObjectVersions.size.SetExcluded(),
-			metadataObjectVersions.contentType.SetExcluded(),
-			metadataObjectVersions.cacheControl.SetExcluded(),
-			metadataObjectVersions.contentDisposition.SetExcluded(),
-			metadataObjectVersions.contentEncoding.SetExcluded(),
-			metadataObjectVersions.contentLanguage.SetExcluded(),
-			metadataObjectVersions.userMetadata.SetExcluded(),
-			metadataObjectVersions.upstreamID.SetExcluded(),
-			metadataObjectVersions.upstreamBucket.SetExcluded(),
-			metadataObjectVersions.upstreamKey.SetExcluded(),
-			metadataObjectVersions.deleteMarker.SetExcluded(),
-			metadataObjectVersions.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.ObjectVersion{}, fmt.Errorf("upsert object version: %w", execErr)
 	}
 	return requireStoredEntity(s.GetObjectVersion(ctx, version.Bucket, version.Key, version.VersionID))
 }

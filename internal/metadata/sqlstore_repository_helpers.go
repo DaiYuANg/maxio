@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 )
@@ -58,6 +59,36 @@ func repositoryInsertAssignments[E any, S repositoryx.EntitySchema[E]](
 		return nil, fmt.Errorf("%s: %w", operation, err)
 	}
 	return assignments, nil
+}
+
+func execRepositoryUpsert[E any, S repositoryx.EntitySchema[E]](
+	ctx context.Context,
+	repository *repositoryx.Base[E, S],
+	schema S,
+	entity *E,
+	assignmentOperation string,
+	execOperation string,
+	conflictTargets *collectionlist.List[querydsl.Expression],
+	updateAssignments ...querydsl.Assignment,
+) error {
+	if conflictTargets == nil || conflictTargets.IsEmpty() {
+		return fmt.Errorf("%s: upsert conflict target is empty", execOperation)
+	}
+	assignments, err := repositoryInsertAssignments(ctx, repository, schema, entity, assignmentOperation)
+	if err != nil {
+		return err
+	}
+	conflict := querydsl.InsertInto(schema).
+		ValuesList(assignments).
+		OnConflictList(conflictTargets)
+	query := conflict.DoNothing()
+	if len(updateAssignments) > 0 {
+		query = conflict.DoUpdateSetList(collectionlist.NewList(updateAssignments...))
+	}
+	if _, err := dbx.Exec(ensureContext(ctx), repository.DB(), query); err != nil {
+		return fmt.Errorf("%s: %w", execOperation, err)
+	}
+	return nil
 }
 
 func requireStoredEntity[E any](entity E, found bool, err error) (E, error) {

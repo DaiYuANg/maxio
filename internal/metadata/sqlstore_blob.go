@@ -46,16 +46,16 @@ func (s *SQLMetadata) CreateBlobRef(
 	}
 
 	ref := BlobRef{Hash: hash, Path: path, Size: size, RefCount: 1}
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.blobRefs, metadataBlobRefs.schema, &ref, "map blob ref insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.blobRefs,
+		metadataBlobRefs.schema,
+		&ref,
+		"map blob ref insert assignments",
+		"create blob ref",
+		collectionlist.NewList[querydsl.Expression](metadataBlobRefs.hash),
+	); err != nil {
 		return err
-	}
-	query := querydsl.InsertInto(metadataBlobRefs.schema).
-		ValuesList(assignments).
-		OnConflict(metadataBlobRefs.hash).
-		DoNothing()
-	if _, err := dbx.Exec(ensureContext(ctx), s.dbxDB, query); err != nil {
-		return fmt.Errorf("create blob ref: %w", err)
 	}
 	return nil
 }

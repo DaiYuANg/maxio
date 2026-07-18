@@ -8,7 +8,6 @@ import (
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -19,26 +18,25 @@ func (s *SQLMetadata) UpsertProcessingRecord(ctx context.Context, record model.P
 	if err != nil {
 		return model.ProcessingRecord{}, err
 	}
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.processingRecords, metadataProcessingRecords.schema, &record, "map processing record insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.processingRecords,
+		metadataProcessingRecords.schema,
+		&record,
+		"map processing record insert assignments",
+		"upsert processing record",
+		collectionlist.NewList[querydsl.Expression](metadataProcessingRecords.id),
+		metadataProcessingRecords.bucket.SetExcluded(),
+		metadataProcessingRecords.key.SetExcluded(),
+		metadataProcessingRecords.versionID.SetExcluded(),
+		metadataProcessingRecords.digest.SetExcluded(),
+		metadataProcessingRecords.mode.SetExcluded(),
+		metadataProcessingRecords.status.SetExcluded(),
+		metadataProcessingRecords.errorText.SetExcluded(),
+		metadataProcessingRecords.results.SetExcluded(),
+		metadataProcessingRecords.updatedAt.SetExcluded(),
+	); err != nil {
 		return model.ProcessingRecord{}, err
-	}
-	query := querydsl.InsertInto(metadataProcessingRecords.schema).
-		ValuesList(assignments).
-		OnConflict(metadataProcessingRecords.id).
-		DoUpdateSet(
-			metadataProcessingRecords.bucket.SetExcluded(),
-			metadataProcessingRecords.key.SetExcluded(),
-			metadataProcessingRecords.versionID.SetExcluded(),
-			metadataProcessingRecords.digest.SetExcluded(),
-			metadataProcessingRecords.mode.SetExcluded(),
-			metadataProcessingRecords.status.SetExcluded(),
-			metadataProcessingRecords.errorText.SetExcluded(),
-			metadataProcessingRecords.results.SetExcluded(),
-			metadataProcessingRecords.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.ProcessingRecord{}, fmt.Errorf("upsert processing record: %w", execErr)
 	}
 	return requireStoredEntity(s.GetProcessingRecord(ctx, record.Bucket, record.Key, record.VersionID, record.Digest))
 }

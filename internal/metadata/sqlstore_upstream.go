@@ -8,7 +8,6 @@ import (
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	collectionset "github.com/arcgolabs/collectionx/set"
-	"github.com/arcgolabs/dbx"
 	columnx "github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
@@ -102,27 +101,24 @@ func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstrea
 	}
 	upstream.UpdatedAt = now
 
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.upstreams, metadataUpstreams.schema, &upstream, "map upstream insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.upstreams,
+		metadataUpstreams.schema,
+		&upstream,
+		"map upstream insert assignments",
+		"upsert upstream",
+		collectionlist.NewList[querydsl.Expression](metadataUpstreams.id),
+		metadataUpstreams.name.SetExcluded(),
+		metadataUpstreams.endpoint.SetExcluded(),
+		metadataUpstreams.region.SetExcluded(),
+		metadataUpstreams.weight.SetExcluded(),
+		metadataUpstreams.priority.SetExcluded(),
+		metadataUpstreams.buckets.SetExcluded(),
+		metadataUpstreams.enabled.SetExcluded(),
+		metadataUpstreams.updatedAt.SetExcluded(),
+	); err != nil {
 		return model.Upstream{}, err
-	}
-	query := querydsl.InsertInto(metadataUpstreams.schema).
-		ValuesList(assignments).
-		OnConflict(metadataUpstreams.id).
-		DoUpdateSet(
-			metadataUpstreams.name.SetExcluded(),
-			metadataUpstreams.endpoint.SetExcluded(),
-			metadataUpstreams.region.SetExcluded(),
-			metadataUpstreams.weight.SetExcluded(),
-			metadataUpstreams.priority.SetExcluded(),
-			metadataUpstreams.buckets.SetExcluded(),
-			metadataUpstreams.enabled.SetExcluded(),
-			metadataUpstreams.updatedAt.SetExcluded(),
-		)
-
-	_, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query)
-	if execErr != nil {
-		return model.Upstream{}, fmt.Errorf("upsert upstream: %w", execErr)
 	}
 	return requireStoredEntity(s.GetUpstream(ctx, upstream.ID))
 }

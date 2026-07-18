@@ -3,6 +3,8 @@ package metadata
 import (
 	"context"
 	"fmt"
+
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
@@ -16,23 +18,22 @@ func (s *SQLMetadata) UpsertDigestRef(ctx context.Context, ref model.DigestRef) 
 	if err != nil {
 		return model.DigestRef{}, err
 	}
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.digestRefs, metadataDigestRefs.schema, &ref, "map digest ref insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.digestRefs,
+		metadataDigestRefs.schema,
+		&ref,
+		"map digest ref insert assignments",
+		"upsert digest ref",
+		collectionlist.NewList[querydsl.Expression](metadataDigestRefs.digest),
+		metadataDigestRefs.size.SetExcluded(),
+		metadataDigestRefs.refCount.SetExcluded(),
+		metadataDigestRefs.upstreamID.SetExcluded(),
+		metadataDigestRefs.upstreamBucket.SetExcluded(),
+		metadataDigestRefs.upstreamKey.SetExcluded(),
+		metadataDigestRefs.updatedAt.SetExcluded(),
+	); err != nil {
 		return model.DigestRef{}, err
-	}
-	query := querydsl.InsertInto(metadataDigestRefs.schema).
-		ValuesList(assignments).
-		OnConflict(metadataDigestRefs.digest).
-		DoUpdateSet(
-			metadataDigestRefs.size.SetExcluded(),
-			metadataDigestRefs.refCount.SetExcluded(),
-			metadataDigestRefs.upstreamID.SetExcluded(),
-			metadataDigestRefs.upstreamBucket.SetExcluded(),
-			metadataDigestRefs.upstreamKey.SetExcluded(),
-			metadataDigestRefs.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.DigestRef{}, fmt.Errorf("upsert digest ref: %w", execErr)
 	}
 	return requireStoredEntity(s.GetDigestRef(ctx, ref.Digest))
 }

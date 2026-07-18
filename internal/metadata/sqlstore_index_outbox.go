@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	repositoryx "github.com/arcgolabs/dbx/repository"
 	"github.com/lyonbrown4d/maxio/internal/model"
@@ -17,27 +16,26 @@ func (s *SQLMetadata) UpsertIndexOutboxEvent(ctx context.Context, event model.In
 	if err != nil {
 		return model.IndexOutboxEvent{}, err
 	}
-	assignments, err := repositoryInsertAssignments(ctx, s.repos.indexOutbox, metadataIndexOutbox.schema, &event, "map index outbox insert assignments")
-	if err != nil {
+	if err := execRepositoryUpsert(
+		ctx,
+		s.repos.indexOutbox,
+		metadataIndexOutbox.schema,
+		&event,
+		"map index outbox insert assignments",
+		"upsert index outbox event",
+		collectionlist.NewList[querydsl.Expression](metadataIndexOutbox.id),
+		metadataIndexOutbox.eventType.SetExcluded(),
+		metadataIndexOutbox.bucket.SetExcluded(),
+		metadataIndexOutbox.key.SetExcluded(),
+		metadataIndexOutbox.versionID.SetExcluded(),
+		metadataIndexOutbox.payload.SetExcluded(),
+		metadataIndexOutbox.status.SetExcluded(),
+		metadataIndexOutbox.attempts.SetExcluded(),
+		metadataIndexOutbox.errorText.SetExcluded(),
+		metadataIndexOutbox.availableAt.SetExcluded(),
+		metadataIndexOutbox.updatedAt.SetExcluded(),
+	); err != nil {
 		return model.IndexOutboxEvent{}, err
-	}
-	query := querydsl.InsertInto(metadataIndexOutbox.schema).
-		ValuesList(assignments).
-		OnConflict(metadataIndexOutbox.id).
-		DoUpdateSet(
-			metadataIndexOutbox.eventType.SetExcluded(),
-			metadataIndexOutbox.bucket.SetExcluded(),
-			metadataIndexOutbox.key.SetExcluded(),
-			metadataIndexOutbox.versionID.SetExcluded(),
-			metadataIndexOutbox.payload.SetExcluded(),
-			metadataIndexOutbox.status.SetExcluded(),
-			metadataIndexOutbox.attempts.SetExcluded(),
-			metadataIndexOutbox.errorText.SetExcluded(),
-			metadataIndexOutbox.availableAt.SetExcluded(),
-			metadataIndexOutbox.updatedAt.SetExcluded(),
-		)
-	if _, execErr := dbx.Exec(ensureContext(ctx), s.dbxDB, query); execErr != nil {
-		return model.IndexOutboxEvent{}, fmt.Errorf("upsert index outbox event: %w", execErr)
 	}
 	return requireStoredEntity(s.GetIndexOutboxEvent(ctx, event.ID))
 }
