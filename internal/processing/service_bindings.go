@@ -88,12 +88,22 @@ func normalizeProcessorBindings(defaultMode string, bindings ...ProcessorBinding
 }
 
 func (s *Service) bindingsForModes(modes ...string) *collectionlist.List[ProcessorBinding] {
+	if s == nil {
+		return collectionlist.NewList[ProcessorBinding]()
+	}
+	return filterProcessorBindings(s.processors, modes...)
+}
+
+func filterProcessorBindings(
+	bindings *collectionlist.List[ProcessorBinding],
+	modes ...string,
+) *collectionlist.List[ProcessorBinding] {
 	result := collectionlist.NewList[ProcessorBinding]()
-	if s == nil || s.processors == nil {
+	if bindings == nil {
 		return result
 	}
 	allowed := allowedProcessingModes(modes)
-	s.processors.Range(func(_ int, binding ProcessorBinding) bool {
+	bindings.Range(func(_ int, binding ProcessorBinding) bool {
 		if binding.Processor == nil {
 			return true
 		}
@@ -103,6 +113,27 @@ func (s *Service) bindingsForModes(modes ...string) *collectionlist.List[Process
 		return true
 	})
 	return result
+}
+
+func (s *Service) inlineStrictBindings() *collectionlist.List[ProcessorBinding] {
+	if s == nil || s.inlineBindings == nil {
+		return collectionlist.NewList[ProcessorBinding]()
+	}
+	return s.inlineBindings
+}
+
+func (s *Service) asyncProcessorBindings() *collectionlist.List[ProcessorBinding] {
+	if s == nil || s.asyncBindings == nil {
+		return collectionlist.NewList[ProcessorBinding]()
+	}
+	return s.asyncBindings
+}
+
+func (s *Service) strictReadBindings() *collectionlist.List[ProcessorBinding] {
+	if s == nil || s.strictBindings == nil {
+		return collectionlist.NewList[ProcessorBinding]()
+	}
+	return s.strictBindings
 }
 
 func allowedProcessingModes(modes []string) map[string]struct{} {

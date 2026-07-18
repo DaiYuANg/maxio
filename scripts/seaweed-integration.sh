@@ -7,6 +7,9 @@ DURATION="${DURATION:-30s}"
 BUILD="${BUILD:-0}"
 PROJECT="${COMPOSE_PROJECT_NAME:-maxio-seaweed}"
 ADMIN_TOKEN="${MAXIO_ADMIN_TOKEN:-dev-admin-token}"
+CLEANUP_ON_FAILURE="${CLEANUP_ON_FAILURE:-0}"
+UPSTREAM_REGISTER_RETRIES="${UPSTREAM_REGISTER_RETRIES:-30}"
+UPSTREAM_REGISTER_RETRY_SLEEP="${UPSTREAM_REGISTER_RETRY_SLEEP:-2}"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
@@ -40,6 +43,20 @@ append_csv() {
   fi
 }
 
+snapshot_state() {
+  label="$1"
+  echo "===== ${label} state snapshot ====="
+  compose ps
+  echo "===== end ${label} snapshot ====="
+}
+
+cleanup_if_enabled() {
+  if is_enabled "$CLEANUP_ON_FAILURE"; then
+    echo "CLEANUP_ON_FAILURE is enabled, cleaning stack..."
+    compose down --remove-orphans --volumes
+  fi
+}
+
 wait_compose_service_ready() {
   service="$1"
   timeout_seconds="${2:-180}"
@@ -61,6 +78,12 @@ wait_compose_service_ready() {
   done
   echo "Timed out waiting for service $service" >&2
   return 1
+}
+
+wait_compose_services_ready() {
+  for service in seaweed-a seaweed-b seaweed-c; do
+    wait_compose_service_ready "$service" 180
+  done
 }
 
 start_optional_processors() {
@@ -114,10 +137,21 @@ register_upstream() {
 {"id":"$id","name":"$id","endpoint":"$endpoint","region":"us-east-1","weight":1,"priority":$priority,"buckets":["$bucket"],"enabled":true}
 JSON
 )
-  curl -fsS -X POST 'http://127.0.0.1:8080/_s3/upstreams' \
-    -H "Authorization: Bearer $ADMIN_TOKEN" \
-    -H 'Content-Type: application/json' \
-    --data "$payload" >/dev/null
+  attempts=0
+  while [ "$attempts" -lt "$UPSTREAM_REGISTER_RETRIES" ]; do
+    attempts=$((attempts + 1))
+    if curl -fsS -X POST 'http://127.0.0.1:8080/_s3/upstreams' \
+      -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H 'Content-Type: application/json' \
+      --data "$payload" >/dev/null; then
+      return 0
+    fi
+    if [ "$attempts" -ge "$UPSTREAM_REGISTER_RETRIES" ]; then
+      echo "Failed to register upstream $id after $attempts attempts" >&2
+      return 1
+    fi
+    sleep "$UPSTREAM_REGISTER_RETRY_SLEEP"
+  done
 }
 
 register_upstreams() {
@@ -126,11 +160,33 @@ register_upstreams() {
   register_upstream seaweed-c http://seaweed-c:8333 maxio-c 30
 }
 
+run_with_cleanup() {
+  label="$1"
+  shift
+  set +e
+  snapshot_state "$label before"
+  "$@"
+  status=$?
+  snapshot_state "$label after"
+  if [ "$status" -ne 0 ]; then
+    cleanup_if_enabled
+  fi
+  set -e
+  return "$status"
+}
+
 up() {
   compose up -d seaweed-a seaweed-b seaweed-c
+  wait_compose_services_ready
   start_optional_processors
   init_buckets
-  if [ "$BUILD" = "1" ]; then
+  if is_enabled "${MAXIO_PROCESSING_ENABLED:-false}"; then
+    if [ "$BUILD" = "1" ]; then
+      compose up -d --build --force-recreate maxio
+    else
+      compose up -d --force-recreate maxio
+    fi
+  elif [ "$BUILD" = "1" ]; then
     compose up -d --build maxio
   else
     compose up -d maxio
@@ -225,10 +281,10 @@ case "$ACTION" in
     up
     ;;
   k6)
-    run_k6
+    run_with_cleanup 'k6' run_k6
     ;;
   processing-k6)
-    run_processing_k6
+    run_with_cleanup 'processing-k6' run_processing_k6
     ;;
   logs)
     compose logs -f --tail 200
@@ -244,11 +300,9 @@ case "$ACTION" in
     ;;
   *)
     echo "Usage: $0 {up|restart|k6|processing-k6|logs|status|down|clean}" >&2
-    echo "Environment: BUILD=1 VUS=8 DURATION=1m COMPOSE_PROJECT_NAME=maxio-seaweed" >&2
+    echo "Environment: BUILD=1 VUS=8 DURATION=1m COMPOSE_PROJECT_NAME=maxio-seaweed CLEANUP_ON_FAILURE=1" >&2
     echo "Optional processors: MAXIO_PROCESSING_CLAMAV_ENABLED=true MAXIO_PROCESSING_TIKA_ENABLED=true" >&2
     echo "Processing smoke: $0 processing-k6" >&2
     exit 2
     ;;
 esac
-
-

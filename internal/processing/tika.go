@@ -3,6 +3,7 @@ package processing
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -74,12 +75,14 @@ func (p *TikaProcessor) Process(ctx context.Context, input Input) (ProcessorResu
 	return p.processContent(contextOrBackground(ctx), input)
 }
 
-func (p *TikaProcessor) processContent(ctx context.Context, input Input) (ProcessorResult, error) {
+func (p *TikaProcessor) processContent(ctx context.Context, input Input) (result ProcessorResult, err error) {
 	content, err := input.OpenContent(ctx)
 	if err != nil {
 		return p.failureResult("open content", fmt.Errorf("open content for tika: %w", err))
 	}
-	defer closeResource(content)
+	defer func() {
+		err = errors.Join(err, closeTikaResources(content, nil))
+	}()
 	requestBody, oversized, err := p.requestBody(content, input.Object.Size)
 	if err != nil {
 		return p.failureResult("read request body", fmt.Errorf("read content for tika: %w", err))
@@ -90,7 +93,7 @@ func (p *TikaProcessor) processContent(ctx context.Context, input Input) (Proces
 	return p.call(ctx, input, requestBody)
 }
 
-func (p *TikaProcessor) call(ctx context.Context, input Input, requestBody io.Reader) (ProcessorResult, error) {
+func (p *TikaProcessor) call(ctx context.Context, input Input, requestBody io.Reader) (result ProcessorResult, err error) {
 	endpoint := tikaEndpoint(p.url)
 	request, err := p.request(ctx, endpoint, input, requestBody)
 	if err != nil {
@@ -100,7 +103,9 @@ func (p *TikaProcessor) call(ctx context.Context, input Input, requestBody io.Re
 	if err != nil {
 		return p.failureResult("call tika", fmt.Errorf("call tika: %w", err))
 	}
-	defer closeResource(response.Body)
+	defer func() {
+		err = errors.Join(err, closeTikaResources(nil, response.Body))
+	}()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return p.failureResult("bad status", fmt.Errorf("tika returned status %d", response.StatusCode))
 	}
@@ -160,6 +165,10 @@ func (p *TikaProcessor) failureResult(reason string, err error) (ProcessorResult
 		return ProcessorResult{Processor: p.Name(), Status: StatusFailed, Metadata: metadata}, err
 	}
 	return ProcessorResult{Processor: p.Name(), Status: StatusSkipped, Error: err.Error(), Metadata: metadata}, nil
+}
+
+func closeTikaResources(content, responseBody io.Closer) error {
+	return errors.Join(closeResourceError(content), closeResourceError(responseBody))
 }
 
 func tikaEndpoint(baseURL string) string {

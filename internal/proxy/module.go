@@ -26,6 +26,7 @@ type ValeRuntime struct {
 	gateway        *vale.Gateway
 	configProvider valeConfigUpdater
 	store          metadata.MetadataStore
+	seedUpstreams  []model.Upstream
 	options        ValeProxyBuildOptions
 	enabled        bool
 	logger         *slog.Logger
@@ -66,17 +67,6 @@ func newValeGateway(
 	if logger == nil {
 		logger = slog.Default()
 	}
-	if err := seedConfiguredUpstreams(context.Background(), store, cfg.S3ProxyUpstreams); err != nil {
-		return nil, oops.Wrapf(err, "seed configured upstreams")
-	}
-	upstreams, err := loadEnabledUpstreams(context.Background(), store)
-	if err != nil {
-		return nil, oops.Wrapf(err, "load upstreams")
-	}
-	if upstreams == nil || upstreams.Len() == 0 {
-		logger.Warn("s3 proxy enabled without configured upstreams")
-	}
-
 	options := ValeProxyBuildOptions{
 		Entrypoint:        cfg.S3ProxyEntrypoint,
 		EntrypointName:    "web",
@@ -86,7 +76,7 @@ func newValeGateway(
 		EnableHealthCheck: true,
 	}
 	options = normalizeValeOptionsWithDefaults(options)
-	cfgData, err := BuildValeConfigSnapshot(upstreams, options)
+	cfgData, err := BuildValeConfigSnapshot(list.NewList[model.Upstream](), options)
 	if err != nil {
 		return nil, oops.Wrapf(err, "build vale config")
 	}
@@ -103,10 +93,24 @@ func newValeGateway(
 		gateway:        gateway,
 		configProvider: configProvider,
 		store:          store,
+		seedUpstreams:  cfg.S3ProxyUpstreams,
 		options:        options,
 		enabled:        true,
 		logger:         logger,
 	}, nil
+}
+
+func (r *ValeRuntime) initialize(ctx context.Context) error {
+	if r == nil || !r.enabled {
+		return nil
+	}
+	if err := seedConfiguredUpstreams(ctx, r.store, r.seedUpstreams); err != nil {
+		return oops.Wrapf(err, "seed configured upstreams")
+	}
+	if err := r.Reload(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *ValeRuntime) Reload(ctx context.Context) error {
@@ -205,6 +209,9 @@ func loadEnabledUpstreams(ctx context.Context, store metadata.MetadataStore) (*l
 func startValeGateway(ctx context.Context, runtime *ValeRuntime) error {
 	if runtime == nil || runtime.gateway == nil {
 		return nil
+	}
+	if err := runtime.initialize(ctx); err != nil {
+		return oops.Wrapf(err, "initialize vale gateway")
 	}
 	if err := runtime.gateway.Start(ctx); err != nil {
 		return oops.Wrapf(err, "start vale gateway")

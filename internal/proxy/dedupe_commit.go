@@ -273,8 +273,8 @@ func (m *dedupeMiddleware) publishObjectPut(ctx context.Context, event ObjectPut
 	if m.bus == nil {
 		return
 	}
-	eventCtx := context.WithoutCancel(ctx)
-	if err := m.bus.PublishAsync(eventCtx, event); err != nil {
+	ctx = proxyContextOrBackground(ctx)
+	if err := m.bus.PublishAsync(ctx, event); err != nil {
 		m.logger.ErrorContext(ctx, "publish s3 proxy object put event", "bucket", event.Bucket, "key", event.Key, "error", err)
 	}
 }
@@ -283,8 +283,15 @@ func (m *dedupeMiddleware) publishObjectDelete(ctx context.Context, event Object
 	if m.bus == nil {
 		return
 	}
-	eventCtx := context.WithoutCancel(ctx)
-	if err := m.bus.PublishAsync(eventCtx, event); err != nil {
+	ctx = proxyContextOrBackground(ctx)
+	if err := m.bus.PublishAsync(ctx, event); err != nil {
 		m.logger.ErrorContext(ctx, "publish s3 proxy object delete event", "bucket", event.Bucket, "key", event.Key, "error", err)
 	}
+}
+
+func proxyContextOrBackground(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }

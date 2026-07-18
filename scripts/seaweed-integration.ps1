@@ -11,16 +11,32 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ComposeFile = Join-Path $RepoRoot 'deploy\compose.seaweed.yaml'
 $Project = if ($env:COMPOSE_PROJECT_NAME) { $env:COMPOSE_PROJECT_NAME } else { 'maxio-seaweed' }
 $AdminToken = if ($env:MAXIO_ADMIN_TOKEN) { $env:MAXIO_ADMIN_TOKEN } else { 'dev-admin-token' }
+$UpstreamRegisterRetries = if ($env:UPSTREAM_REGISTER_RETRIES) { [int]$env:UPSTREAM_REGISTER_RETRIES } else { 30 }
+$UpstreamRegisterRetrySleep = if ($env:UPSTREAM_REGISTER_RETRY_SLEEP) { [double]$env:UPSTREAM_REGISTER_RETRY_SLEEP } else { 2 }
 
 function Invoke-Compose {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ComposeArgs)
+    param([string[]]$ComposeArgs)
     & docker compose -p $Project -f $ComposeFile @ComposeArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "docker compose command failed with exit code ${LASTEXITCODE}: docker compose $($ComposeArgs -join ' ')"
+    }
 }
 
 function Test-EnvEnabled {
     param([string]$Name)
     $value = [string](Get-Item -Path "Env:$Name" -ErrorAction SilentlyContinue).Value
     return @('1', 'true', 'yes', 'on') -contains $value.Trim().ToLowerInvariant()
+}
+
+function Write-IntegrationSnapshot {
+    param([string]$Label)
+    Write-Host "===== $Label state snapshot ====="
+    try {
+        Invoke-Compose -ComposeArgs @('ps')
+    } catch {
+        Write-Host "Snapshot command failed: $($_.Exception.Message)"
+    }
+    Write-Host "===== end $Label snapshot ====="
 }
 
 function Set-DefaultEnv {
@@ -33,7 +49,7 @@ function Wait-ComposeServiceReady {
     param([string]$Service, [int]$TimeoutSeconds = 180)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
-        $containerId = (Invoke-Compose ps -q $Service 2>$null) -join ''
+        $containerId = (Invoke-Compose -ComposeArgs @('ps', '-q', $Service) 2>$null) -join ''
         if ($containerId) {
             $status = (docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' $containerId 2>$null) -join ''
             if (@('healthy', 'running') -contains $status) { return }
@@ -44,13 +60,19 @@ function Wait-ComposeServiceReady {
     throw "Timed out waiting for service $Service"
 }
 
+function Wait-SeaweedServicesReady {
+    foreach ($service in @('seaweed-a', 'seaweed-b', 'seaweed-c')) {
+        Wait-ComposeServiceReady -Service $service -TimeoutSeconds 180
+    }
+}
+
 function Start-OptionalProcessors {
     if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_CLAMAV_ENABLED') {
-        Invoke-Compose --profile av up -d clamav
+        Invoke-Compose -ComposeArgs @('--profile', 'av', 'up', '-d', 'clamav')
         Wait-ComposeServiceReady -Service 'clamav' -TimeoutSeconds 180
     }
     if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_TIKA_ENABLED') {
-        Invoke-Compose --profile tika up -d tika
+        Invoke-Compose -ComposeArgs @('--profile', 'tika', 'up', '-d', 'tika')
         Wait-HttpOk -Url 'http://127.0.0.1:9998/version' -TimeoutSeconds 120
     }
 }
@@ -90,7 +112,18 @@ function Register-Upstream {
         buckets = @($Bucket)
         enabled = $true
     } | ConvertTo-Json -Compress
-    Invoke-WebRequest -Method Post -Uri 'http://127.0.0.1:8080/_s3/upstreams' -Headers @{Authorization="Bearer $AdminToken"} -ContentType 'application/json' -Body $payload -UseBasicParsing -TimeoutSec 10 | Out-Null
+
+    for ($attempt = 1; $attempt -le $UpstreamRegisterRetries; $attempt++) {
+        try {
+            Invoke-WebRequest -Method Post -Uri 'http://127.0.0.1:8080/_s3/upstreams' -Headers @{Authorization="Bearer $AdminToken"} -ContentType 'application/json' -Body $payload -UseBasicParsing -TimeoutSec 10 | Out-Null
+            return
+        } catch {
+            if ($attempt -ge $UpstreamRegisterRetries) {
+                throw "Failed to register upstream $Id after $attempt attempts"
+            }
+            Start-Sleep -Seconds $UpstreamRegisterRetrySleep
+        }
+    }
 }
 
 function Register-Upstreams {
@@ -99,14 +132,32 @@ function Register-Upstreams {
     Register-Upstream -Id 'seaweed-c' -Endpoint 'http://seaweed-c:8333' -Bucket 'maxio-c' -Priority 30
 }
 
+function Invoke-K6WithCleanup {
+    param([string]$Label, [ScriptBlock]$Action)
+    Write-IntegrationSnapshot "$Label before"
+    try {
+        & $Action
+    } catch {
+        if (Test-EnvEnabled -Name 'CLEANUP_ON_FAILURE') {
+            Write-Host 'CLEANUP_ON_FAILURE is enabled, cleaning stack...'
+            Invoke-Compose -ComposeArgs @('down', '--remove-orphans', '--volumes')
+        }
+        throw
+    } finally {
+        Write-IntegrationSnapshot "$Label after"
+    }
+}
+
 function Start-Environment {
-    Invoke-Compose up -d seaweed-a seaweed-b seaweed-c
+    Invoke-Compose -ComposeArgs @('up', '-d', 'seaweed-a', 'seaweed-b', 'seaweed-c')
+    Wait-SeaweedServicesReady
     Start-OptionalProcessors
     Initialize-SeaweedBuckets
-    $args = @('up', '-d')
-    if ($Build) { $args += '--build' }
-    $args += 'maxio'
-    Invoke-Compose @args
+    $composeArgs = @('up', '-d')
+    if ($Build) { $composeArgs += '--build' }
+    if (Test-EnvEnabled -Name 'MAXIO_PROCESSING_ENABLED') { $composeArgs += '--force-recreate' }
+    $composeArgs += 'maxio'
+    Invoke-Compose -ComposeArgs $composeArgs
     Wait-HttpOk -Url 'http://127.0.0.1:8080/healthz'
     Wait-HttpOk -Url 'http://127.0.0.1:8080/readyz'
     Register-Upstreams
@@ -118,7 +169,7 @@ function Start-Environment {
 function Run-K6 {
     $env:K6_VUS = [string]$Vus
     $env:K6_DURATION = $Duration
-    Invoke-Compose --profile perf run --rm k6 run /scripts/seaweed-smoke.js
+    Invoke-Compose -ComposeArgs @('--profile', 'perf', 'run', '--rm', 'k6', 'run', '/scripts/seaweed-smoke.js')
 }
 
 function Run-ProcessingK6 {
@@ -189,19 +240,18 @@ function Run-ProcessingK6 {
     } else {
         Set-DefaultEnv -Name 'CLAMAV_BLOCK_CHECK' -Value 'false'
     }
+
     Start-Environment
     Run-K6
 }
 
 switch ($Action) {
     'up' { Start-Environment }
-    'restart' { Invoke-Compose down --remove-orphans; Start-Environment }
-    'k6' { Start-Environment; Run-K6 }
-    'processing-k6' { Run-ProcessingK6 }
-    'logs' { Invoke-Compose logs -f --tail 200 }
-    'status' { Invoke-Compose ps }
-    'down' { Invoke-Compose down --remove-orphans }
-    'clean' { Invoke-Compose down --remove-orphans --volumes }
+    'restart' { Invoke-Compose -ComposeArgs @('down', '--remove-orphans'); Start-Environment }
+    'k6' { Invoke-K6WithCleanup -Label 'k6' -Action { Start-Environment; Run-K6 } }
+    'processing-k6' { Invoke-K6WithCleanup -Label 'processing-k6' -Action { Run-ProcessingK6 } }
+    'logs' { Invoke-Compose -ComposeArgs @('logs', '-f', '--tail', '200') }
+    'status' { Invoke-Compose -ComposeArgs @('ps') }
+    'down' { Invoke-Compose -ComposeArgs @('down', '--remove-orphans') }
+    'clean' { Invoke-Compose -ComposeArgs @('down', '--remove-orphans', '--volumes') }
 }
-
-

@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/arcgolabs/dix"
@@ -14,6 +15,9 @@ func Module() dix.Module {
 		dix.WithModuleProviders(
 			dix.Provider3(newServiceFromRuntimeConfig),
 		),
+		dix.Hooks(
+			dix.OnStop(closeService),
+		),
 	)
 }
 
@@ -24,6 +28,13 @@ func newServiceFromRuntimeConfig(cfg config.Config, logger *slog.Logger, store m
 		Timeout:  cfg.ProcessingTimeoutDuration(),
 		FailOpen: cfg.ProcessingFailOpen,
 	}, store, processorBindingsFromRuntimeConfig(cfg)...)
+}
+
+func closeService(ctx context.Context, service *Service) error {
+	if service == nil {
+		return nil
+	}
+	return service.Close(ctx)
 }
 
 func processorBindingsFromRuntimeConfig(cfg config.Config) []ProcessorBinding {

@@ -19,6 +19,12 @@ services:
       - "8331:8333"
     volumes:
       - seaweed-a-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8888/"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
 
   seaweed-b:
     image: chrislusf/seaweedfs:latest
@@ -38,6 +44,12 @@ services:
       - "8332:8333"
     volumes:
       - seaweed-b-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8888/"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
 
   seaweed-c:
     image: chrislusf/seaweedfs:latest
@@ -57,6 +69,12 @@ services:
       - "8333:8333"
     volumes:
       - seaweed-c-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8888/"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
 
   maxio:
     build:
@@ -153,6 +171,7 @@ services:
       S3_URL: http://maxio:8081
       ADMIN_TOKEN: ${MAXIO_ADMIN_TOKEN:-dev-admin-token}
       BUCKETS: maxio-a,maxio-b,maxio-c
+      EXPECTED_UPSTREAMS: ${EXPECTED_UPSTREAMS:-seaweed-a,seaweed-b,seaweed-c}
       VUS: ${K6_VUS:-4}
       DURATION: ${K6_DURATION:-30s}
       S3_OBJECT_BYTES: ${S3_OBJECT_BYTES:-1024}
@@ -179,9 +198,3 @@ volumes:
   seaweed-a-data:
   seaweed-b-data:
   seaweed-c-data:
-
-
-
-
-
-

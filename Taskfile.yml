@@ -1,0 +1,62 @@
+version: "3"
+
+vars:
+  SH_SCRIPT: "sh ./scripts/seaweed-integration.sh"
+  PS_SCRIPT: "powershell -ExecutionPolicy Bypass -NoProfile -File ./scripts/seaweed-integration.ps1"
+
+tasks:
+  up:
+    desc: "Start the seaweed compose integration environment"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} up"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} up"
+        platforms: ["windows"]
+
+  k6:
+    desc: "Run smoke k6 test (includes start/stop wrappers as configured in script)"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} k6"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} k6"
+        platforms: ["windows"]
+
+  processing-k6:
+    desc: "Run processing k6 test"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} processing-k6"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} processing-k6"
+        platforms: ["windows"]
+
+  down:
+    desc: "Stop and remove integration containers"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} down"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} down"
+        platforms: ["windows"]
+
+  clean:
+    desc: "Clean integration artifacts and compose state"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} clean"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} clean"
+        platforms: ["windows"]
+
+  status:
+    desc: "Show integration service status"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} status {{.CLI_ARGS}}"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} status {{.CLI_ARGS}}"
+        platforms: ["windows"]
+
+  logs:
+    desc: "Show integration service logs (pass services as args if needed)"
+    cmds:
+      - cmd: "{{.SH_SCRIPT}} logs {{.CLI_ARGS}}"
+        platforms: ["linux", "darwin"]
+      - cmd: "{{.PS_SCRIPT}} logs {{.CLI_ARGS}}"
+        platforms: ["windows"]

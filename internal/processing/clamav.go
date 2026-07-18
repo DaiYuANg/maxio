@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -50,29 +51,32 @@ func (p *ClamAVProcessor) Capabilities() *collectionset.Set[Capability] {
 	return collectionset.NewSet[Capability](CapabilityAntivirus, CapabilityPolicyEvaluation)
 }
 
-func (p *ClamAVProcessor) Process(ctx context.Context, input Input) (ProcessorResult, error) {
+func (p *ClamAVProcessor) Process(ctx context.Context, input Input) (result ProcessorResult, err error) {
 	if input.OpenContent == nil {
 		return p.failureResult("content stream unavailable", fmt.Errorf("%w: clamav content stream unavailable", ErrProcessingFailed))
 	}
 	ctx, cancel := context.WithTimeout(contextOrBackground(ctx), p.timeout)
 	defer cancel()
 
-	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", p.address)
+	var conn net.Conn
+	var content io.ReadCloser
+	conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", p.address)
 	if err != nil {
 		return p.failureResult("connect", fmt.Errorf("connect clamav: %w", err))
 	}
-	defer closeResource(conn)
+	defer func() {
+		err = errors.Join(err, closeClamAVResources(conn, content))
+	}()
 	if deadline, ok := ctx.Deadline(); ok {
 		if deadlineErr := conn.SetDeadline(deadline); deadlineErr != nil {
 			return p.failureResult("set deadline", fmt.Errorf("set clamav deadline: %w", deadlineErr))
 		}
 	}
 
-	content, err := input.OpenContent(ctx)
+	content, err = input.OpenContent(ctx)
 	if err != nil {
 		return p.failureResult("open content", fmt.Errorf("open content for clamav: %w", err))
 	}
-	defer closeResource(content)
 
 	if startErr := writeFull(conn, []byte("zINSTREAM\x00")); startErr != nil {
 		return p.failureResult("start instream", fmt.Errorf("start clamav instream: %w", startErr))
@@ -89,6 +93,10 @@ func (p *ClamAVProcessor) Process(ctx context.Context, input Input) (ProcessorRe
 
 func (p *ClamAVProcessor) failureResult(reason string, err error) (ProcessorResult, error) {
 	return ProcessorResult{Processor: p.Name(), Status: StatusFailed, Metadata: map[string]string{"address": p.address, "reason": reason}}, err
+}
+
+func closeClamAVResources(conn, content io.Closer) error {
+	return errors.Join(closeResourceError(conn), closeResourceError(content))
 }
 
 func writeClamAVStream(writer io.Writer, reader io.Reader) error {

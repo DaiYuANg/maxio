@@ -16,11 +16,11 @@ func (s *Service) strictError(err error) error {
 }
 
 func (s *Service) hasStrictReadGate() bool {
-	return s.bindingsForModes(ModeInlineStrict, ModeAsyncStrict).Len() > 0
+	return s.strictReadBindings().Len() > 0
 }
 
 func (s *Service) strictRecordError(record Record) error {
-	strictBindings := s.bindingsForModes(ModeInlineStrict, ModeAsyncStrict)
+	strictBindings := s.strictReadBindings()
 	if strictBindings.Len() == 0 {
 		return nil
 	}

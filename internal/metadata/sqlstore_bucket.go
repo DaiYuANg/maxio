@@ -183,12 +183,3 @@ func (s *SQLMetadata) deleteBucketRowInTx(ctx context.Context, tx *dbx.Tx, bucke
 	}
 	return nil
 }
-
-func isSQLConstraintError(err error) bool {
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "unique constraint failed") ||
-		strings.Contains(message, "duplicate key value violates unique constraint") ||
-		strings.Contains(message, "duplicate entry") ||
-		strings.Contains(message, "error 1062") ||
-		strings.Contains(message, "constraint failed")
-}
