@@ -52,12 +52,12 @@ func (s *SQLMetadata) GetObjectRecord(ctx context.Context, bucket, key string) (
 		return model.ObjectRecord{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.objectRecords.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectRecords.bucket, bucket), repositoryx.Part(metadataObjectRecords.key, key)))
-	if err != nil {
-		return model.ObjectRecord{}, false, fmt.Errorf("query object record: %w", err)
-	}
-	record, found := option.Get()
-	return record, found, nil
+	return getRepositoryByKey[model.ObjectRecord](
+		ctx,
+		s.repos.objectRecords,
+		repositoryx.KeySet(repositoryx.Part(metadataObjectRecords.bucket, bucket), repositoryx.Part(metadataObjectRecords.key, key)),
+		"query object record",
+	)
 }
 
 func (s *SQLMetadata) DeleteObjectRecord(ctx context.Context, bucket, key string) (bool, error) {
@@ -123,12 +123,16 @@ func (s *SQLMetadata) GetObjectVersion(ctx context.Context, bucket, key, version
 		return model.ObjectVersion{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.objectVersions.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataObjectVersions.bucket, bucket), repositoryx.Part(metadataObjectVersions.key, key), repositoryx.Part(metadataObjectVersions.versionID, versionID)))
-	if err != nil {
-		return model.ObjectVersion{}, false, fmt.Errorf("query object version: %w", err)
-	}
-	version, found := option.Get()
-	return version, found, nil
+	return getRepositoryByKey[model.ObjectVersion](
+		ctx,
+		s.repos.objectVersions,
+		repositoryx.KeySet(
+			repositoryx.Part(metadataObjectVersions.bucket, bucket),
+			repositoryx.Part(metadataObjectVersions.key, key),
+			repositoryx.Part(metadataObjectVersions.versionID, versionID),
+		),
+		"query object version",
+	)
 }
 
 func (s *SQLMetadata) ListObjectVersions(ctx context.Context, bucket, key string) (*collectionlist.List[model.ObjectVersion], error) {

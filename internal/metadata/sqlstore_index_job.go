@@ -66,12 +66,12 @@ func (s *SQLMetadata) GetIndexJob(ctx context.Context, id string) (model.IndexJo
 		return model.IndexJob{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.indexJobs.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexJobs.id, id)))
-	if err != nil {
-		return model.IndexJob{}, false, fmt.Errorf("query index job: %w", err)
-	}
-	job, found := option.Get()
-	return job, found, nil
+	return getRepositoryByKey[model.IndexJob](
+		ctx,
+		s.repos.indexJobs,
+		repositoryx.KeySet(repositoryx.Part(metadataIndexJobs.id, id)),
+		"query index job",
+	)
 }
 
 func (s *SQLMetadata) ListIndexJobs(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexJob], error) {

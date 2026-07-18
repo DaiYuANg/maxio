@@ -217,3 +217,55 @@ func TestListRecordsFiltersDiscardedStoreRecords(t *testing.T) {
 		t.Fatalf("records len = %d, want tombstoned store records filtered", records.Len())
 	}
 }
+
+func TestStoreRecordDeletesPersistedRecordWhenDiscardRacesWithUpsert(t *testing.T) {
+	ctx := context.Background()
+	object := ObjectRef{Bucket: "docs", Key: "discard-upsert-race.txt", VersionID: "v1"}
+	upsertEntered := make(chan struct{})
+	finishUpsert := make(chan struct{})
+	deleteCalled := make(chan struct{}, 2)
+	storeDone := make(chan error, 1)
+	service := NewServiceWithStore(
+		slog.New(slog.DiscardHandler),
+		Config{Enabled: true, Mode: ModeAsyncPermissive, Timeout: time.Second},
+		hookRecordStore{
+			onUpsert: func() {
+				close(upsertEntered)
+				<-finishUpsert
+			},
+			onDelete: func() {
+				deleteCalled <- struct{}{}
+			},
+		},
+		NewNoopProcessor(),
+	)
+
+	go func() {
+		storeDone <- service.storeRecord(ctx, object, StatusSucceeded, "", collectionlist.NewList[ProcessorResult]())
+	}()
+
+	select {
+	case <-upsertEntered:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for store upsert")
+	}
+	service.Discard(ctx, object)
+	close(finishUpsert)
+
+	select {
+	case err := <-storeDone:
+		if err != nil {
+			t.Fatalf("store processing record: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for store record")
+	}
+	if _, found := service.Record(ctx, object); found {
+		t.Fatal("expected discarded record to stay hidden after upsert race")
+	}
+	select {
+	case <-deleteCalled:
+	case <-time.After(time.Second):
+		t.Fatal("expected persisted record cleanup after discard race")
+	}
+}

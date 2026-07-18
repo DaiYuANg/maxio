@@ -60,12 +60,12 @@ func (s *SQLMetadata) GetIndexDocument(ctx context.Context, id string) (model.In
 		return model.IndexDocument{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.indexDocuments.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexDocuments.id, id)))
-	if err != nil {
-		return model.IndexDocument{}, false, fmt.Errorf("query index document: %w", err)
-	}
-	document, found := option.Get()
-	return document, found, nil
+	return getRepositoryByKey[model.IndexDocument](
+		ctx,
+		s.repos.indexDocuments,
+		repositoryx.KeySet(repositoryx.Part(metadataIndexDocuments.id, id)),
+		"query index document",
+	)
 }
 
 func (s *SQLMetadata) ListIndexDocuments(ctx context.Context, bucket, prefix string) (*collectionlist.List[model.IndexDocument], error) {

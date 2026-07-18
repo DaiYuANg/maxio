@@ -82,12 +82,12 @@ func (s *SQLMetadata) GetUpstream(ctx context.Context, id string) (model.Upstrea
 		return model.Upstream{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.upstreams.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataUpstreams.id, id)))
-	if err != nil {
-		return model.Upstream{}, false, fmt.Errorf("query upstream: %w", err)
-	}
-	upstream, found := option.Get()
-	return upstream, found, nil
+	return getRepositoryByKey[model.Upstream](
+		ctx,
+		s.repos.upstreams,
+		repositoryx.KeySet(repositoryx.Part(metadataUpstreams.id, id)),
+		"query upstream",
+	)
 }
 
 func (s *SQLMetadata) UpsertUpstream(ctx context.Context, upstream model.Upstream) (model.Upstream, error) {

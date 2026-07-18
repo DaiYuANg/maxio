@@ -55,12 +55,12 @@ func (s *SQLMetadata) GetIndexOutboxEvent(ctx context.Context, id string) (model
 		return model.IndexOutboxEvent{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.indexOutbox.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataIndexOutbox.id, id)))
-	if err != nil {
-		return model.IndexOutboxEvent{}, false, fmt.Errorf("query index outbox event: %w", err)
-	}
-	event, found := option.Get()
-	return event, found, nil
+	return getRepositoryByKey[model.IndexOutboxEvent](
+		ctx,
+		s.repos.indexOutbox,
+		repositoryx.KeySet(repositoryx.Part(metadataIndexOutbox.id, id)),
+		"query index outbox event",
+	)
 }
 
 func (s *SQLMetadata) ListIndexOutboxEvents(ctx context.Context, status string, limit int) (*collectionlist.List[model.IndexOutboxEvent], error) {

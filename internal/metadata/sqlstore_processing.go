@@ -55,12 +55,12 @@ func (s *SQLMetadata) GetProcessingRecord(ctx context.Context, bucket, key, vers
 	if id == "" {
 		return model.ProcessingRecord{}, false, ErrBadRequest
 	}
-	option, err := s.repos.processingRecords.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataProcessingRecords.id, id)))
-	if err != nil {
-		return model.ProcessingRecord{}, false, fmt.Errorf("query processing record: %w", err)
-	}
-	record, found := option.Get()
-	return record, found, nil
+	return getRepositoryByKey[model.ProcessingRecord](
+		ctx,
+		s.repos.processingRecords,
+		repositoryx.KeySet(repositoryx.Part(metadataProcessingRecords.id, id)),
+		"query processing record",
+	)
 }
 
 func (s *SQLMetadata) ListProcessingRecords(ctx context.Context, status string, limit int) (*collectionlist.List[model.ProcessingRecord], error) {

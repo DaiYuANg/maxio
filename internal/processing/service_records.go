@@ -23,20 +23,26 @@ func (s *Service) Discard(ctx context.Context, object ObjectRef) {
 }
 
 func (s *Service) discardVersion(ctx context.Context, object ObjectRef) {
-	key := objectKey(object)
-	s.mu.Lock()
-	s.rememberDiscardedLocked(key)
-	delete(s.records, key)
-	s.mu.Unlock()
+	s.discardRecord(objectKey(object), true)
 	s.deleteRecordFromStore(ctx, object)
 }
 
 func (s *Service) discardDigest(ctx context.Context, object ObjectRef) {
-	key := objectKey(object)
-	s.mu.Lock()
-	delete(s.records, key)
-	s.mu.Unlock()
+	s.discardRecord(objectKey(object), false)
 	s.deleteRecordFromStore(ctx, object)
+}
+
+func (s *Service) discardRecord(key string, tombstone bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.discardRecordLocked(key, tombstone)
+}
+
+func (s *Service) discardRecordLocked(key string, tombstone bool) {
+	if tombstone {
+		s.rememberDiscardedLocked(key)
+	}
+	delete(s.records, key)
 }
 
 func (s *Service) deleteRecordFromStore(ctx context.Context, object ObjectRef) {
@@ -191,26 +197,49 @@ func (s *Service) promotableDigestRecord(ctx context.Context, object ObjectRef) 
 	return record, found
 }
 
+type recordLifecycleAction int
+
+const (
+	recordLifecycleStored recordLifecycleAction = iota
+	recordLifecycleDiscarded
+)
+
 func (s *Service) storeRecord(ctx context.Context, object ObjectRef, status, errorText string, results *collectionlist.List[ProcessorResult]) error {
 	if s == nil {
 		return nil
 	}
 	ctx = contextOrBackground(ctx)
-	key := objectKey(object)
-	if s.isDiscarded(object) {
+	if !s.acceptsRecordStore(object) {
 		return nil
 	}
 	record := Record{Object: object, Mode: s.cfg.Mode, Status: status, Error: errorText, Results: results, UpdatedAt: time.Now().UTC()}
 	storeErr := s.upsertStoredRecord(ctx, record)
-	s.mu.Lock()
-	if _, discarded := s.discarded[key]; discarded {
-		s.mu.Unlock()
+	if s.commitStoredRecord(record) == recordLifecycleDiscarded {
 		s.deleteRecordFromStore(ctx, object)
 		return storeErr
 	}
-	s.records[key] = record
-	s.mu.Unlock()
 	return storeErr
+}
+
+func (s *Service) acceptsRecordStore(object ObjectRef) bool {
+	if object.VersionID == "" {
+		return true
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, discarded := s.discarded[objectKey(object)]
+	return !discarded
+}
+
+func (s *Service) commitStoredRecord(record Record) recordLifecycleAction {
+	key := objectKey(record.Object)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, discarded := s.discarded[key]; discarded {
+		return recordLifecycleDiscarded
+	}
+	s.records[key] = record
+	return recordLifecycleStored
 }
 
 func (s *Service) upsertStoredRecord(ctx context.Context, record Record) error {

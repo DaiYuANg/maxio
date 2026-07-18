@@ -25,12 +25,12 @@ func (s *SQLMetadata) GetBlobRef(ctx context.Context, hash string) (BlobRef, boo
 		return BlobRef{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.blobRefs.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataBlobRefs.hash, hash)))
-	if err != nil {
-		return BlobRef{}, false, fmt.Errorf("query blob ref: %w", err)
-	}
-	ref, found := option.Get()
-	return ref, found, nil
+	return getRepositoryByKey[BlobRef](
+		ctx,
+		s.repos.blobRefs,
+		repositoryx.KeySet(repositoryx.Part(metadataBlobRefs.hash, hash)),
+		"query blob ref",
+	)
 }
 
 func (s *SQLMetadata) CreateBlobRef(

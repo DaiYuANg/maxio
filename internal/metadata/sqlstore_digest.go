@@ -50,12 +50,12 @@ func (s *SQLMetadata) GetDigestRef(ctx context.Context, digest string) (model.Di
 		return model.DigestRef{}, false, ErrBadRequest
 	}
 
-	option, err := s.repos.digestRefs.GetByKeySetOption(ctx, repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)))
-	if err != nil {
-		return model.DigestRef{}, false, fmt.Errorf("query digest ref: %w", err)
-	}
-	ref, found := option.Get()
-	return ref, found, nil
+	return getRepositoryByKey[model.DigestRef](
+		ctx,
+		s.repos.digestRefs,
+		repositoryx.KeySet(repositoryx.Part(metadataDigestRefs.digest, digest)),
+		"query digest ref",
+	)
 }
 
 func (s *SQLMetadata) RetainDigestRef(ctx context.Context, ref model.DigestRef) (model.DigestRef, error) {
